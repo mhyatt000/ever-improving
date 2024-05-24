@@ -98,7 +98,7 @@ class ResidualRLWrapper(ObservationWrapper):
     using :meth:`observation` for :meth:`reset` and :meth:`step
 
     uses model (Octo or RTX) to predict initial action
-    trained model predicts the residual action
+    trained model predicts the partial_action
 
     example of env.step
     obs, reward, success, truncated, info = env.step(
@@ -159,7 +159,8 @@ class ResidualRLWrapper(ObservationWrapper):
 
         obs, _ = self.env.reset(seed=2022, options=dict(reconfigure=True))
         self.observation_space = convert_observation_to_space(obs)
-        self.observation_space.spaces["agent"].spaces["residual_action"] = (
+        self.image_space = convert_observation_to_space(self.get_image(obs))
+        self.observation_space.spaces["agent"].spaces["partial_action"] = (
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
         )
 
@@ -182,7 +183,7 @@ class ResidualRLWrapper(ObservationWrapper):
             )
 
         elif "octo" in self.policy:
-            from simpler_env.policies.octo.octo_model import OctoInference
+            from improve.simpler_mod.octo import OctoInference
 
             self.model = OctoInference(
                 model_type=self.ckpt, policy_setup=policy_setup, init_rng=0
@@ -191,8 +192,11 @@ class ResidualRLWrapper(ObservationWrapper):
         else:
             raise NotImplementedError()
 
-    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+    def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
         """Modifies the :attr:`env` after calling :meth:`reset`, returning a modified observation using :meth:`self.observation`."""
+        # sets seed  to random if it comes from jax
+        seed = None if type(seed) is not type(np.random.seed(None)) else seed
+
         obs, info = self.env.reset(seed=seed, options=options)
 
         self.is_final_subtask = self.env.is_final_subtask()
@@ -211,7 +215,7 @@ class ResidualRLWrapper(ObservationWrapper):
         """Modifies the :attr:`env` after calling :meth:`step` using :meth:`self.observation` on the returned observations."""
         observation, reward, terminated, truncated, info = self.env.step(action)
         # TODO: this needs to be integrated with residual rl pipeline somehow
-        is_final_subtask = env.is_final_subtask()
+        is_final_subtask = self.env.is_final_subtask()
         return self.observation(observation), reward, terminated, truncated, info
 
     def observation(self, observation):
@@ -226,10 +230,23 @@ class ResidualRLWrapper(ObservationWrapper):
         image = self.get_image(observation)
         # step the model; "raw_action" is raw model action output; "action" is the processed action to be sent into maniskill env
         raw_action, action = self.model.step(image, self.instruction)
-        observation["agent"]["residual_action"] = action
+
+        observation["agent"]["partial_action"] = action
+        cat_act = np.concatenate(
+            [action["world_vector"], action["rot_axangle"], action["gripper"]]
+        )
+
+        # going to force observation to be just the intended image and partial for now
+        obs = (
+            np.expand_dims(self.get_image(observation), axis=0),
+            np.expand_dims(cat_act, axis=0),
+        )
+
         # TODO: this needs to be integrated with residual rl pipeline somehow
         predicted_terminated = bool(action["terminate_episode"][0] > 0)
-        return observation
+
+        return obs
+        return observation  # just the tuple gets returned for now
 
     def get_image(self, obs):
         """show the right observation for video depending on the robot architecture"""
@@ -254,6 +271,7 @@ def alldict(thing):
 
 def make(task, policy, ckpt):
     """Creates simulated eval environment from task name."""
+    task = simpler_env.ENVIRONMENTS[0] if task is None else task
     env = simpler_env.make(task)
     return ResidualRLWrapper(env, task, policy, ckpt)
 
@@ -272,6 +290,16 @@ def main():
 
     print(env.model)
     print(env.observation_space)
+    print()
+
+    from pprint import pprint
+
+    observation, reward, terminated, truncated, info = env.step(
+        env.action_space.sample()
+    )
+    print(info)
+    pprint(info)
+    print('reward:', reward)
 
 
 if __name__ == "__main__":
