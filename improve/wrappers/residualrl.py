@@ -8,6 +8,8 @@ import simpler_env
 from gymnasium import logger, spaces
 from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
                             RewardWrapper, Wrapper)
+from gymnasium.spaces.box import Box
+from gymnasium.spaces.dict import Dict
 from gymnasium.spaces.space import Space
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
@@ -163,6 +165,13 @@ class ResidualRLWrapper(ObservationWrapper):
         self.observation_space.spaces["agent"].spaces["partial_action"] = (
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
         )
+        self.observation_space = Dict(
+            {
+                "image": self.image_space,
+                # this is just gonna be hardcoded for now
+                "partial_action": Box(-np.inf, np.inf, (7,), np.float32),
+            }
+        )
 
     def build_model(self):
         """Builds the model."""
@@ -213,7 +222,10 @@ class ResidualRLWrapper(ObservationWrapper):
 
     def step(self, action):
         """Modifies the :attr:`env` after calling :meth:`step` using :meth:`self.observation` on the returned observations."""
-        observation, reward, terminated, truncated, info = self.env.step(action)
+
+        complete_action = self.cat_act + action
+
+        observation, reward, terminated, truncated, info = self.env.step(complete_action)
         # TODO: this needs to be integrated with residual rl pipeline somehow
         is_final_subtask = self.env.is_final_subtask()
         return self.observation(observation), reward, terminated, truncated, info
@@ -232,14 +244,14 @@ class ResidualRLWrapper(ObservationWrapper):
         raw_action, action = self.model.step(image, self.instruction)
 
         observation["agent"]["partial_action"] = action
-        cat_act = np.concatenate(
+        self.cat_act = np.concatenate(
             [action["world_vector"], action["rot_axangle"], action["gripper"]]
         )
 
         # going to force observation to be just the intended image and partial for now
         obs = (
             np.expand_dims(self.get_image(observation), axis=0),
-            np.expand_dims(cat_act, axis=0),
+            np.expand_dims(self.cat_act, axis=0),
         )
 
         # TODO: this needs to be integrated with residual rl pipeline somehow
@@ -261,6 +273,36 @@ class ResidualRLWrapper(ObservationWrapper):
             self.model.reset(self.instruction)
 
 
+class SB3Wrapper(ResidualRLWrapper):
+
+    def __init__(self, env, task, policy, ckpt):
+        super().__init__(env, task, policy, ckpt)
+
+        # define a dict of spaces
+        self.observation_space = Dict(
+            {
+                "image": self.image_space,
+                "partial_action": Box(-np.inf, np.inf, (7,), np.float32),
+            }
+        )
+
+    def observation(self, observation):
+        observation = super().observation(observation)
+        return {
+            "image": observation[0],
+            "partial_action": observation[1],
+        }
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = super().step(action)
+        stats = info["episode_stats"].keys()
+        # no bonus for now
+        # bonus = [info[k] for k in stats]
+        # bonus = [ 0.1 if b else 0 for b in bonus ]
+        # reward += sum(bonus)
+        return observation, reward, terminated, truncated, info
+
+
 def alldict(thing):
     """gymnasium.spaces.dict.Dict to dict"""
     if type(thing) is gym.spaces.dict.Dict:
@@ -269,16 +311,18 @@ def alldict(thing):
         return thing
 
 
-def make(task, policy, ckpt):
+def make(task, policy="octo-base", ckpt=None, kind="default"):
     """Creates simulated eval environment from task name."""
     task = simpler_env.ENVIRONMENTS[0] if task is None else task
     env = simpler_env.make(task)
-    return ResidualRLWrapper(env, task, policy, ckpt)
+    wrapper = SB3Wrapper if kind == "sb3" else ResidualRLWrapper
+    return wrapper(env, task, policy, ckpt)
 
 
 def main():
 
     task = simpler_env.ENVIRONMENTS[0]
+    task = "widowx_put_eggplant_in_basket"
 
     cfg = {
         "task": task,
@@ -286,7 +330,7 @@ def main():
         "ckpt": None,
     }
 
-    env = make(**cfg)
+    env = make(**cfg, kind="sb3")
 
     print(env.model)
     print(env.observation_space)
@@ -294,12 +338,16 @@ def main():
 
     from pprint import pprint
 
-    observation, reward, terminated, truncated, info = env.step(
-        env.action_space.sample()
-    )
-    print(info)
-    pprint(info)
-    print('reward:', reward)
+    env.reset()
+    for i in range(2000):
+        observation, reward, terminated, truncated, info = env.step(
+            env.action_space.sample()
+        )
+
+        print(reward)
+        # print(info)
+        # pprint(info)
+        # print("reward:", reward)
 
 
 if __name__ == "__main__":

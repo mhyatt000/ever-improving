@@ -8,6 +8,7 @@ actively being developed
 * [Installation](#installation)
 * [Usage](#usage)
 
+
 # Description
 
 ```
@@ -34,4 +35,19 @@ actively being developed
 
 `python improve/cleanrl/ppo.py`
 
+# License
+
+TBD
+
+# Contributing
+
+TBD
+
+# Acknowledgements
+
+TBD
+
+# References
+
+TBD
 

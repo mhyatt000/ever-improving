@@ -1,5 +1,6 @@
 from typing import Sequence
 
+import distrax
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -8,7 +9,9 @@ from flax.linen.initializers import constant, orthogonal, zeros_init
 from octo.model.components.vit_encoders import SmallStem, SmallStem16
 
 
-class Network(nn.Module):
+class ActorCritic(nn.Module):
+    action_dim: Sequence[int]
+    continuous: bool = True
 
     # not needed see below
     # action_dim: int
@@ -40,29 +43,31 @@ class Network(nn.Module):
         x = stem(img)
         x = x.reshape((batch, -1))
         action = action.reshape((batch, -1))
-
         x = jnp.concatenate([x, action], axis=-1)
-        x = nn.Dense(512, kernel_init=zeros_init(), bias_init=constant(0.0))(x)
+
+        x = nn.Dense(512, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
+            x
+        )
+        x = nn.relu(x)
+        x = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
+            x
+        )
         x = nn.relu(x)
 
-        # dont need to output in the action space
-        # Network creates shared hidden representation for actor and critic heads
-        # x = nn.Dense(self.action_dim, kernel_init=zeros_init(), bias_init=constant(0.0))(x)
-        # x = nn.tanh(x)
-        return x
-
-
-class Critic(nn.Module):
-    @nn.compact
-    def __call__(self, x):
-        return nn.Dense(1, kernel_init=orthogonal(1), bias_init=constant(0.0))(x)
-
-
-class Actor(nn.Module):
-    action_dim: Sequence[int]
-
-    @nn.compact
-    def __call__(self, x):
-        return nn.Dense(
+        # if self.continuous:
+        mean = nn.Dense(
             self.action_dim, kernel_init=zeros_init(), bias_init=constant(0.0)
         )(x)
+        std = nn.Dense(
+            self.action_dim, kernel_init=zeros_init(), bias_init=constant(0.0)
+        )(x)
+        # TODO why apply exp to std
+        pi = distrax.MultivariateNormalDiag(mean, jnp.exp(std))
+
+        # else:
+        # raise NotImplementedError()
+        # pi = distrax.Categorical(logits)
+
+        value = nn.Dense(1, kernel_init=orthogonal(1), bias_init=constant(0.0))(x)
+
+        return pi, jnp.squeeze(value, axis=-1)
