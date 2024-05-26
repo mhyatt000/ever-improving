@@ -33,7 +33,10 @@ actively being developed
 
 # Usage
 
-`python improve/cleanrl/ppo.py`
+* SB3
+    * `python improve/sb3/main.py`
+* CleanRL
+    * `python improve/cleanrl/ppo.py`
 
 # License
 

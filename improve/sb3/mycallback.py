@@ -311,16 +311,7 @@ locals = {
 
 
 def main():
-
-    input_dict = {
-        "training/loss": "lossval",
-        "training/entropy": "entval",
-        "stat/gpu": "gpuval",
-    }
-
-    output_dict = nested_dict(input_dict)
-    print(output_dict)
-
+    pass
 
 if __name__ == "__main__":
     main()

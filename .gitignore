@@ -1,5 +1,6 @@
 # tensorboard
-outputs/2024*/
+wandb/
+outputs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
