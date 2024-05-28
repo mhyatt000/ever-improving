@@ -13,6 +13,7 @@ from gymnasium.spaces.dict import Dict
 from gymnasium.spaces.space import Space
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
+from pprint import pprint
 
 """
 from gymnasium.envs.registration import (make, make_vec, pprint_registry,
@@ -204,14 +205,19 @@ class ResidualRLWrapper(ObservationWrapper):
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
         """Modifies the :attr:`env` after calling :meth:`reset`, returning a modified observation using :meth:`self.observation`."""
         # sets seed  to random if it comes from jax
-        seed = None if type(seed) is not type(np.random.seed(None)) else seed
+        self.terminated = False
+        self.truncated = False
+        self.success = False
 
         obs, info = self.env.reset(seed=seed, options=options)
-
-        self.is_final_subtask = self.env.is_final_subtask()
         self.model.reset(self.instruction)
 
         return self.observation(obs), info
+
+    @property
+    def final(self):
+        """returns whether the current subtask is the final subtask"""
+        return self.env.is_final_subtask()
 
     @property
     def instruction(self):
@@ -220,42 +226,52 @@ class ResidualRLWrapper(ObservationWrapper):
         """
         return self.env.get_language_instruction()
 
+    def pre_step(self):
+        pass
+
+    def post_step(self):
+        pass
+
     def step(self, action):
         """Modifies the :attr:`env` after calling :meth:`step` using :meth:`self.observation` on the returned observations."""
 
-        complete_action = self.cat_act + action
+        complete = self.partial + action
+        obs, reward, self.success, self.truncated, info = self.env.step(complete)
 
-        observation, reward, terminated, truncated, info = self.env.step(complete_action)
-        # TODO: this needs to be integrated with residual rl pipeline somehow
-        is_final_subtask = self.env.is_final_subtask()
-        return self.observation(observation), reward, terminated, truncated, info
+        obs = self.observation(obs)
+        return obs, reward, self.success, self.truncated, info
+
+    def maybe_break(self):
+        """returns whether to break the loop"""
+        self.truncated = self.terminated or self.truncated
+        return self.terminated or self.truncated
 
     def observation(self, observation):
-        """Returns a modified observation.
+        """Returns a modified observation."""
 
-        Args:
-            observation: The :attr:`env` observation
-
-        Returns:
-            The modified observation
-        """
         image = self.get_image(observation)
-        # step the model; "raw_action" is raw model action output; "action" is the processed action to be sent into maniskill env
-        raw_action, action = self.model.step(image, self.instruction)
+
+        if self.maybe_break():
+            return (
+                np.expand_dims(image, axis=0),
+                # dont inference the model if env terminates
+                np.expand_dims(np.zeros(self.env.action_space.shape), axis=0),
+            )
+
+        _, action = self.model.step(image, self.instruction)
+        self.terminated = bool(action["terminate_episode"][0] > 0)
+        self.maybe_advance()
 
         observation["agent"]["partial_action"] = action
-        self.cat_act = np.concatenate(
+        self.partial = np.concatenate(
             [action["world_vector"], action["rot_axangle"], action["gripper"]]
         )
 
         # going to force observation to be just the intended image and partial for now
         obs = (
-            np.expand_dims(self.get_image(observation), axis=0),
-            np.expand_dims(self.cat_act, axis=0),
+            np.expand_dims(image, axis=0),
+            np.expand_dims(self.partial, axis=0),
         )
-
-        # TODO: this needs to be integrated with residual rl pipeline somehow
-        predicted_terminated = bool(action["terminate_episode"][0] > 0)
 
         return obs
         return observation  # just the tuple gets returned for now
@@ -265,12 +281,11 @@ class ResidualRLWrapper(ObservationWrapper):
         image = get_image_from_maniskill2_obs_dict(self.env, obs)
         return image
 
-    def advance(self, terminated=False, final_subtask=False):
+    def maybe_advance(self):
         """advance the environment to the next subtask"""
-        if terminated and not final_subtask:
+        if self.terminated and (not self.final):
+            self.terminated = False
             self.env.advance_to_next_subtask()
-            self.is_final_subtask = self.env.is_final_subtask()
-            self.model.reset(self.instruction)
 
 
 class SB3Wrapper(ResidualRLWrapper):
@@ -295,11 +310,17 @@ class SB3Wrapper(ResidualRLWrapper):
 
     def step(self, action):
         observation, reward, terminated, truncated, info = super().step(action)
-        stats = info["episode_stats"].keys()
-        # no bonus for now
-        # bonus = [info[k] for k in stats]
-        # bonus = [ 0.1 if b else 0 for b in bonus ]
-        # reward += sum(bonus)
+
+        # for sb3 EvalCallback
+        info["is_success"] = info["success"]
+
+        is_bonus = True
+        if is_bonus:
+            stats = info["episode_stats"].keys()
+            bonus = [info[k] for k in stats]
+            bonus = [ 0.1 if b else 0 for b in bonus ]
+            reward += sum(bonus)
+
         return observation, reward, terminated, truncated, info
 
 
@@ -321,6 +342,10 @@ def make(task, policy="octo-base", ckpt=None, kind="default"):
 
 def main():
 
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning)
+    warnings.filterwarnings("ignore", category=FutureWarning)
+
     task = simpler_env.ENVIRONMENTS[0]
     task = "widowx_put_eggplant_in_basket"
 
@@ -336,19 +361,41 @@ def main():
     print(env.observation_space)
     print()
 
-    from pprint import pprint
+    hist = {t: 0 for t in simpler_env.ENVIRONMENTS if 'widowx' in t}
+    allinstructions = set()
+    for t in hist:
 
-    env.reset()
-    for i in range(2000):
-        observation, reward, terminated, truncated, info = env.step(
-            env.action_space.sample()
-        )
+        env = make(**cfg, kind="sb3")
 
-        print(reward)
-        # print(info)
-        # pprint(info)
-        # print("reward:", reward)
+        for _ in range(10):
+            env.reset()
+            for i in range(2000):
 
+                # zero action
+                action = np.zeros(env.action_space.shape)
+                # random action
+                # env.action_space.sample()
+
+                observation, reward, success, truncated, info = env.step(action)
+
+                # print i as formatted for 3 decimals 001 - 100
+                print(f"{i:003}", reward, success, truncated)
+
+                allinstructions.add(env.instruction)
+                if not (env.instruction in allinstructions):
+                    print(env.instruction)
+
+                if truncated : # or success:
+                    break
+
+            if success:
+                hist[t] += 1
+            pprint(hist)
+
+        env.close()
+    print(allinstructions)
+
+    
 
 if __name__ == "__main__":
     main()

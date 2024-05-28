@@ -1,6 +1,6 @@
 from pprint import pprint
-from typing import (Any, Dict, List, Mapping, Optional, Sequence, TextIO,
-                    Tuple, Union)
+from functools import partial
+from typing import Any, Dict, List, Mapping, Optional, Sequence, TextIO, Tuple, Union
 
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import KVWriter, Logger
@@ -63,7 +63,7 @@ class WandbLogger(Logger):
         self.key_count = {}
 
     def dump(self, step: int = 0) -> None:
-        """ Write all of the diagnostics from the current iteration """
+        """Write all of the diagnostics from the current iteration"""
         wandb.log(self.name_to_value, step=step)
         super().dump(step)
 
@@ -149,6 +149,30 @@ class MyCallback(BaseCallback):
         """
         pass
 
+
+class ReZeroCallback(BaseCallback):
+
+
+    def __init__(self, num_reset=50):
+        super().__init__()
+        self.num_reset = num_reset
+        self.counter = 0
+
+    def _on_step(self) -> bool:
+        return True
+
+    def _on_rollout_start(self):
+        print(f"ReZero final Actor layer {self.counter:3}/{self.num_reset}")
+
+        if self.counter > self.num_reset:
+            return True
+
+        self.model.policy.log_std.data.fill_(-10)
+
+        for module, gain in {self.model.policy.action_net: 0}.items():
+            module.apply(partial(self.model.policy.init_weights, gain=gain))
+
+        self.counter += 1
 
 def to_nest(d):
     result = {}
@@ -312,6 +336,7 @@ locals = {
 
 def main():
     pass
+
 
 if __name__ == "__main__":
     main()

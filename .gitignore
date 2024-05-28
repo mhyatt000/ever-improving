@@ -1,4 +1,6 @@
-# tensorboard
+# custom: tensorboard wandb and others
+*.mp4
+logs/
 wandb/
 outputs/
 
