@@ -1,11 +1,11 @@
-from pprint import pprint
 from functools import partial
-from typing import Any, Dict, List, Mapping, Optional, Sequence, TextIO, Tuple, Union
-
-from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.logger import KVWriter, Logger
+from pprint import pprint
+from typing import (Any, Dict, List, Mapping, Optional, Sequence, TextIO,
+                    Tuple, Union)
 
 import wandb
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.logger import KVWriter, Logger
 
 """ for EvalCallback
 
@@ -152,27 +152,47 @@ class MyCallback(BaseCallback):
 
 class ReZeroCallback(BaseCallback):
 
-
-    def __init__(self, num_reset=50):
+    def __init__(self, algo_name, num_reset=50, verbose=0):
         super().__init__()
+        self.algo_name = algo_name
         self.num_reset = num_reset
         self.counter = 0
+        self.verbose = verbose
 
     def _on_step(self) -> bool:
         return True
 
     def _on_rollout_start(self):
-        print(f"ReZero final Actor layer {self.counter:3}/{self.num_reset}")
 
         if self.counter > self.num_reset:
             return True
+        if self.verbose:
+            print(f"ReZero final Actor layer {self.counter:3}/{self.num_reset}")
 
-        self.model.policy.log_std.data.fill_(-10)
-
-        for module, gain in {self.model.policy.action_net: 0}.items():
-            module.apply(partial(self.model.policy.init_weights, gain=gain))
+        zero_init(self.model, self.algo_name)
 
         self.counter += 1
+
+
+def zero_init(model, algo_name):
+    """only zero last layer"""
+
+    if algo_name == "ppo":
+        gains = {model.policy.action_net: 0}
+        for module, gain in gains.items():
+            module.apply(partial(model.policy.init_weights, gain=gain))
+
+        # make the policy.log_std very small
+        # model.policy.log_std
+        model.policy.log_std.data.fill_(-10)
+
+    if algo_name == "sac":
+        for u in [model.actor.mu, model.actor.log_std]:
+            u.weight.data.fill_(0)
+            u.bias.data.fill_(0)
+
+        model.actor.log_std.bias.data.fill_(-10)
+
 
 def to_nest(d):
     result = {}

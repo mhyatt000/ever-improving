@@ -1,0 +1,16 @@
+# defaults:
+#- policy: ppo
+#- optim: base
+
+name: "ppo"
+
+gamma: 0.99
+gae_lambda: 0.95
+ent_coef: 0.01
+vf_coef: 0.5
+
+# num_envs: 1 # 8
+# num_steps: 128
+# total_timesteps: 1e7
+# num_minibatches: 4
+# update_epochs: 4

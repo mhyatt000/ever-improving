@@ -1,0 +1,25 @@
+# @package _global_
+
+defaults:
+  - override /env: base
+  - override /algo: sac
+  - override /job: base
+
+  - _self_
+
+
+log_dir: ../ # TODO resolve to improve ROOT
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+  sweeper:
+    params:
+      +env/bonus: do,dont
+      +algo/ent_coeff: 0,0.01,0.1
+      +algo/log_std: -3,-10
+

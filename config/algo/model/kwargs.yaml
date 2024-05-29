@@ -1,0 +1,14 @@
+# from policy_kwargs
+lr_schedule: null
+net_arch: null
+activation_fn: nn.Tanh
+ortho_init: false
+use_sde: false
+log_std_init: 0.0
+full_std: true
+use_expln: false
+squash_output: false
+features_extractor_class: CombinedExtractor
+features_extractor_kwargs: null
+share_features_extractor: true
+normalize_images: true

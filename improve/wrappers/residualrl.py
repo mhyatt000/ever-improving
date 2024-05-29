@@ -14,6 +14,7 @@ from gymnasium.spaces.space import Space
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
 from pprint import pprint
+from omegaconf import OmegaConf as OC
 
 """
 from gymnasium.envs.registration import (make, make_vec, pprint_registry,
@@ -290,8 +291,9 @@ class ResidualRLWrapper(ObservationWrapper):
 
 class SB3Wrapper(ResidualRLWrapper):
 
-    def __init__(self, env, task, policy, ckpt):
+    def __init__(self, env, task, policy, ckpt, use_wandb):
         super().__init__(env, task, policy, ckpt)
+        self.use_wandb = use_wandb
 
         # define a dict of spaces
         self.observation_space = Dict(
@@ -301,12 +303,29 @@ class SB3Wrapper(ResidualRLWrapper):
             }
         )
 
+        self.image = None
+        self.render_arr = []
+
+    def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
+        if self.render_arr and self.use_wandb:
+            wandb.log({"video/buffer": wandb.Video(self.render_arr, fps=5)})
+            self.render_arr = []
+        return super().reset(seed=seed, options=options)
+
     def observation(self, observation):
         observation = super().observation(observation)
+        self.image = observation[0] # for render
         return {
             "image": observation[0],
             "partial_action": observation[1],
         }
+
+    def render(self, mode="headless"):
+        if mode == "rgb_array":
+            return self.image
+        if mode == "headless":
+            # to be submitted during the next reset
+            self.render_arr.append(self.image)
 
     def step(self, action):
         observation, reward, terminated, truncated, info = super().step(action)
@@ -314,7 +333,7 @@ class SB3Wrapper(ResidualRLWrapper):
         # for sb3 EvalCallback
         info["is_success"] = info["success"]
 
-        is_bonus = True
+        is_bonus = False
         if is_bonus:
             stats = info["episode_stats"].keys()
             bonus = [info[k] for k in stats]
@@ -332,12 +351,11 @@ def alldict(thing):
         return thing
 
 
-def make(task, policy="octo-base", ckpt=None, kind="default"):
+def make(_cfg, use_wandb=False):
     """Creates simulated eval environment from task name."""
-    task = simpler_env.ENVIRONMENTS[0] if task is None else task
-    env = simpler_env.make(task)
-    wrapper = SB3Wrapper if kind == "sb3" else ResidualRLWrapper
-    return wrapper(env, task, policy, ckpt)
+    env = simpler_env.make(_cfg.task)
+    wrapper = SB3Wrapper if _cfg.kind == "sb3" else ResidualRLWrapper
+    return wrapper(env, _cfg.task, _cfg.foundation.name, _cfg.foundation.ckpt, use_wandb)
 
 
 def main():

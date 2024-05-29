@@ -1,0 +1,8 @@
+defaults:
+  - wandb: do
+
+name: null
+
+seed: 1
+torch_deterministic: true
+cuda: true
