@@ -1,4 +1,6 @@
 # custom: tensorboard wandb and others
+runs/
+multirun/
 *.mp4
 logs/
 wandb/
