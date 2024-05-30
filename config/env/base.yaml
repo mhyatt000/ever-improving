@@ -1,0 +1,7 @@
+defaults:
+  - foundation: octo-base
+
+task: ${.foundation.task}  # relative to the foundation
+bonus: False
+kind: "sb3"
+downscale: null
