@@ -1,0 +1,12 @@
+use: true
+project_name: null
+entity: null
+capture_video: false
+env_id: null
+
+name: ${job.name}
+group: ${algo.name}
+tags:
+  - ${algo.name}
+  - ${env.foundation.name}
+  - ${r_tag_bonus:${env.bonus}}
