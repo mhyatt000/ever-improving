@@ -1,0 +1,34 @@
+# @package _global_
+
+# to see if sac works at certain batch size and buffer size
+
+# help with sweepers
+# https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
+# https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
+
+defaults:
+  - override /env: base
+  - override /algo: sac
+  - override /job: base
+  - override /train: base
+  - override /callback: base
+
+  - _self_
+
+log_dir: ${callback.log_path}
+sweep_id: "may29_sac_intro"
+train: # has to be nested to override the base train config
+  n_steps: ${r_toint:2e4} # only 20k steps to get a feel
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+  sweeper:
+    params: # {learning_starts:1000,buffer_size:5000}{learning_starts:5000,buffer_size:5000}
+      +algo: "{learning_starts:10000,buffer_size:10000}"
+      +env/bonus: do,dont
+

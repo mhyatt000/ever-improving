@@ -3,3 +3,4 @@ defaults:
   - algo: base
   - job: base
   - train: base
+  - callback: base

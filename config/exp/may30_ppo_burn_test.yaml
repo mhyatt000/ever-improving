@@ -1,0 +1,34 @@
+# @package _global_
+
+# DESCRIPTION:
+# to identify when the PPO critic converges
+
+# help with sweepers
+# https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
+# https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
+
+defaults:
+
+  - _self_
+
+log_dir: ${callback.log_path}
+sweep_id: "may30_ppo_burn"
+
+
+
+# downscale is still prob a good idea unless using cluster
+# update: downscale doesnt allow larger batch sizes
+train: # has to be nested to override the base train config
+  n_steps: ${r_toint:1e7} # 10M steps
+
+
+callback:
+    rezero:
+      num_reset: ${r_toint:1e7} # match the n_steps
+
+
+
+# not a sweep
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}

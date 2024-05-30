@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import numpy as np
+from scipy.ndimage import zoom
+
+from pprint import pprint
 from typing import Any
 
 import gymnasium as gym
@@ -11,10 +15,9 @@ from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
 from gymnasium.spaces.box import Box
 from gymnasium.spaces.dict import Dict
 from gymnasium.spaces.space import Space
+from omegaconf import OmegaConf as OC
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
-from pprint import pprint
-from omegaconf import OmegaConf as OC
 
 """
 from gymnasium.envs.registration import (make, make_vec, pprint_registry,
@@ -95,6 +98,15 @@ def convert_observation_to_space(observation, prefix=""):
         raise NotImplementedError(type(observation), observation)
 
     return space
+
+
+def alldict(thing):
+    """gymnasium.spaces.dict.Dict to dict"""
+    if type(thing) is gym.spaces.dict.Dict:
+        return {k: alldict(v) for k, v in thing.spaces.items()}
+    else:
+        return thing
+
 
 
 class ResidualRLWrapper(ObservationWrapper):
@@ -291,9 +303,20 @@ class ResidualRLWrapper(ObservationWrapper):
 
 class SB3Wrapper(ResidualRLWrapper):
 
-    def __init__(self, env, task, policy, ckpt, use_wandb):
+    def __init__(
+        self,
+        env,
+        task,
+        policy,
+        ckpt,
+        bonus=False,
+        use_wandb=False,
+        downscale=None
+    ):
         super().__init__(env, task, policy, ckpt)
         self.use_wandb = use_wandb
+        self.bonus = bonus
+        self.downscale = downscale
 
         # define a dict of spaces
         self.observation_space = Dict(
@@ -312,9 +335,22 @@ class SB3Wrapper(ResidualRLWrapper):
             self.render_arr = []
         return super().reset(seed=seed, options=options)
 
+    def scale_image(self, image, scale):
+
+        # TODO can we get rid of batch dim?
+        zoom_factors = (1, scale, scale, 1)
+        scaled_image = zoom(image, zoom_factors)
+        return scaled_image
+
+
     def observation(self, observation):
         observation = super().observation(observation)
-        self.image = observation[0] # for render
+        self.image = observation[0]  # for render
+        
+        # scale image
+        if self.downscale:
+            self.image = self.scale_image(self.image, 1/self.downscale)
+
         return {
             "image": observation[0],
             "partial_action": observation[1],
@@ -333,34 +369,56 @@ class SB3Wrapper(ResidualRLWrapper):
         # for sb3 EvalCallback
         info["is_success"] = info["success"]
 
-        is_bonus = False
-        if is_bonus:
+        if self.bonus:
+            val = 0.01
             stats = info["episode_stats"].keys()
             bonus = [info[k] for k in stats]
-            bonus = [ 0.1 if b else 0 for b in bonus ]
+            bonus = [val if b else 0 for b in bonus]
             reward += sum(bonus)
 
         return observation, reward, terminated, truncated, info
 
+    def close(self):
 
-def alldict(thing):
-    """gymnasium.spaces.dict.Dict to dict"""
-    if type(thing) is gym.spaces.dict.Dict:
-        return {k: alldict(v) for k, v in thing.spaces.items()}
-    else:
-        return thing
+        # deallocate model
+        if self.model is not None:
+            del self.model
+            self.model = None
 
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
-def make(_cfg, use_wandb=False):
+            # manually call garbage collector for jax models
+            # might not be necessary
+            import gc
+            gc.collect()
+
+            import tensorflow as tf
+            tf.keras.backend.clear_session()
+
+        super().close()
+
+def make(cfg_env, use_wandb=False):
     """Creates simulated eval environment from task name."""
-    env = simpler_env.make(_cfg.task)
-    wrapper = SB3Wrapper if _cfg.kind == "sb3" else ResidualRLWrapper
-    return wrapper(env, _cfg.task, _cfg.foundation.name, _cfg.foundation.ckpt, use_wandb)
+    env = simpler_env.make(cfg_env.task)
+    wrapper = SB3Wrapper if cfg_env.kind == "sb3" else ResidualRLWrapper
+
+    return wrapper(
+        env,
+        cfg_env.task,
+        cfg_env.foundation.name,
+        cfg_env.foundation.ckpt,
+        bonus=cfg_env.bonus,
+        use_wandb=use_wandb,
+        downscale=cfg_env.downscale,
+    )
 
 
 def main():
 
     import warnings
+
     warnings.filterwarnings("ignore", category=UserWarning)
     warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -379,7 +437,7 @@ def main():
     print(env.observation_space)
     print()
 
-    hist = {t: 0 for t in simpler_env.ENVIRONMENTS if 'widowx' in t}
+    hist = {t: 0 for t in simpler_env.ENVIRONMENTS if "widowx" in t}
     allinstructions = set()
     for t in hist:
 
@@ -403,7 +461,7 @@ def main():
                 if not (env.instruction in allinstructions):
                     print(env.instruction)
 
-                if truncated : # or success:
+                if truncated:  # or success:
                     break
 
             if success:
@@ -413,7 +471,6 @@ def main():
         env.close()
     print(allinstructions)
 
-    
 
 if __name__ == "__main__":
     main()

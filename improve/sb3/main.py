@@ -14,19 +14,22 @@ import torch.nn.functional as F
 import wandb
 from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
-from stable_baselines3 import A2C, PPO, SAC
-from stable_baselines3.common.callbacks import (CallbackList,
-                                                CheckpointCallback,
-                                                EvalCallback)
+from stable_baselines3 import HerReplayBuffer, A2C, PPO, SAC
+from stable_baselines3.common.callbacks import (
+    CallbackList,
+    CheckpointCallback,
+    EvalCallback,
+)
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from tqdm import tqdm
 from wandb.integration.sb3 import WandbCallback
 
 import improve
+import improve.config.resolver
+import improve.config.prepare
+from improve.sb3 import util
 from improve.sb3.util import MyCallback, ReZeroCallback, WandbLogger
-from improve.sb3 import util 
 from improve.wrappers import residualrl as rrl
-
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -35,30 +38,32 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # TODO cfg should be OmegaConf from hydra
 def build_callbacks(env, cfg):
 
-    freq = int(1e4) 
-
     checkpoint_callback = CheckpointCallback(
-        save_freq=freq,
-        save_path="./logs/",
-        name_prefix="rl_model",
-        save_replay_buffer=True,
-        save_vecnormalize=True,
+        save_freq=cfg.callback.freq,
+        save_path=cfg.callback.log_path,
+        name_prefix=cfg.callback.ckpt.name_prefix,
+        save_replay_buffer=cfg.callback.ckpt.save_others,
+        save_vecnormalize=cfg.callback.ckpt.save_others,
     )
+
     eval_callback = EvalCallback(
         eval_env=env,
-        best_model_save_path="./logs/",
+        best_model_save_path=cfg.callback.log_path,
         callback_after_eval=None,
-        log_path="./logs/",
-        eval_freq=freq,
+        log_path=cfg.callback.log_path,
+        eval_freq=cfg.callback.freq,
         deterministic=True,
-        render=True,
+        render=True,  # TODO does this work?
         verbose=1,
     )
 
     callbacks = [checkpoint_callback, eval_callback]
 
-    if cfg.train.use_zero_init:
-        rezero = ReZeroCallback(cfg.algo.name, num_reset=int(1e3))  # was 50 (arbitrarily chosen)
+    if cfg.callback.rezero.use:
+        rezero = ReZeroCallback(
+            cfg.algo.name,
+            num_reset=cfg.callback.rezero.num_reset,
+        )
         callbacks.append(rezero)
 
     callbacks = CallbackList(callbacks)
@@ -72,6 +77,13 @@ def build_algo(_cfg):
         "a2c": A2C,
     }
     return algos[_cfg.name]
+
+
+def build_buffer(_cfg):
+    buffers = {
+        "her": HerReplayBuffer,
+    }
+    return buffers.get(_cfg.name)
 
 
 def rollout(model):
@@ -106,7 +118,16 @@ def rollout(model):
 @hydra.main(config_path=improve.CONFIG, config_name="config")
 def main(cfg):
 
-    pprint(OC.to_container(cfg, resolve=True))
+    if cfg.job.wandb.use:
+        wandb.init(
+            project="residualrl",
+            job_type="train",
+            name=cfg.job.wandb.name,
+            group=cfg.job.wandb.group,
+            tags=[t for t in cfg.job.wandb.tags],
+            config=OC.to_container(cfg, resolve=True),
+        )
+    pprint(OC.to_container(cfg, resolve=True))  # keep after wandb so it logs
 
     env = rrl.make(cfg.env, cfg.job.wandb.use)
 
@@ -114,23 +135,23 @@ def main(cfg):
     # not priority
     # torch lr schedule as cosine lr schedule
     algo = build_algo(cfg.algo)
+
+    # TODO linke buffer for HER
+    # buffer = build_buffer(cfg.algo.buffer)
+
+    # TODO i really wish there was a clean way to do this
+    # outsource to resolver? or another module
     algo_kwargs = OC.to_container(cfg.algo)
     del algo_kwargs["name"]
+    # del algo_kwargs["buffer"]
+    # del algo_kwargs["replay_buffer_kwargs"]["name"]
+
     model = algo("MultiInputPolicy", env, verbose=1, **algo_kwargs)
 
     if cfg.train.use_zero_init:
-        util.zero_init(model,cfg.algo.name)
+        util.zero_init(model, cfg.algo.name)
 
     if cfg.job.wandb.use:
-        wandb.init(
-            project="residualrl",
-            job_type="train",
-            name=cfg.job.wandb.name,
-            group=cfg.job.wandb.group,
-            tags=cfg.job.wandb.tags,
-            config=OC.to_container(cfg, resolve=True),
-        )
-
         # initialize wandb logger
         format_strings = ["stdout", "tensorboard"]
         folder = "home/zero-shot/sb3_logs"
@@ -140,7 +161,7 @@ def main(cfg):
 
     if cfg.train.use_train:
         model.learn(
-            total_timesteps=int(1e7),  # was 10_000
+            total_timesteps=cfg.train.n_steps,
             callback=callbacks,
             log_interval=1,
             tb_log_name=cfg.algo.name,
@@ -149,6 +170,7 @@ def main(cfg):
         )
 
     rollout(model)
+    env.close()
 
     if cfg.job.wandb.use:
         wandb.finish()

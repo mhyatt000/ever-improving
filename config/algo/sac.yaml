@@ -1,14 +1,19 @@
+# defaults: 
+# - buffer: base
+
 name: "sac"
 
+policy_kwargs:
+  share_features_extractor: True
 
-learning_rate: 0.0003
+learning_rate: 0.0003 # ${r_tofloat:3e-4}
+
 # 1m samples was too many (858GB) for 24GB.
-buffer_size: 3000
-
+buffer_size: ${r_toint:1e3}
 # 120 * 50 epiisodes = 6000 steps
-learning_starts: 3000 # n env steps to collect transitions for before learning 
+learning_starts: ${r_toint:1e3} # n env steps to collect transitions for before learning 
 
-batch_size: 32
+batch_size: 16
 tau: 0.005
 gamma: 0.99
 train_freq: 1
@@ -16,6 +21,8 @@ gradient_steps: 1
 action_noise: null
 
 replay_buffer_class: null
+# TODO fix for HER
+# replay_buffer_kwargs: ${buffer}
 replay_buffer_kwargs: null
 optimize_memory_usage: false
 
@@ -29,7 +36,6 @@ use_sde_at_warmup: false
 
 stats_window_size: 100
 tensorboard_log: null
-policy_kwargs: null
 seed: 0
 device: 'auto'
 _init_setup_model: true
