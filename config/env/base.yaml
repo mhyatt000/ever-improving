@@ -5,3 +5,10 @@ task: ${.foundation.task}  # relative to the foundation
 bonus: False
 kind: "sb3"
 downscale: null
+device: null
+
+obs_keys: # anything besides the expected image
+  - "agent_qpos"
+  - "agent_qvel"
+  - simpler-img
+  - agent_partial-action

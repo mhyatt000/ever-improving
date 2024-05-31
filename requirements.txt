@@ -1,0 +1,6 @@
+hydra-core
+mediapy
+torch
+torchvision
+torchaudio
+stable-baselines3[extra]

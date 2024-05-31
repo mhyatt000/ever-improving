@@ -1,6 +1,6 @@
 defaults:
   - ckpt: base
-  - rezero: base
+  - rezero: dont
 
 freq: ${r_toint:1e4}
 log_path: ${r_home:improve_logs}

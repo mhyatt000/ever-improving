@@ -152,7 +152,7 @@ class MyCallback(BaseCallback):
 
 class ReZeroCallback(BaseCallback):
 
-    def __init__(self, algo_name, num_reset=50, verbose=0):
+    def __init__(self, algo_name, num_reset=50, verbose=1):
         super().__init__()
         self.algo_name = algo_name
         self.num_reset = num_reset

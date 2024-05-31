@@ -141,12 +141,17 @@ def main(cfg):
 
     # TODO i really wish there was a clean way to do this
     # outsource to resolver? or another module
-    algo_kwargs = OC.to_container(cfg.algo)
+    algo_kwargs = OC.to_container(cfg.algo, resolve=True)
     del algo_kwargs["name"]
     # del algo_kwargs["buffer"]
     # del algo_kwargs["replay_buffer_kwargs"]["name"]
 
-    model = algo("MultiInputPolicy", env, verbose=1, **algo_kwargs)
+    model = algo(
+        "MultiInputPolicy",
+        env,
+        verbose=1,
+        **algo_kwargs,
+    )
 
     if cfg.train.use_zero_init:
         util.zero_init(model, cfg.algo.name)

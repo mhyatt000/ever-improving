@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import numpy as np
-from scipy.ndimage import zoom
-
 from pprint import pprint
 from typing import Any
 
 import gymnasium as gym
+import hydra
 import numpy as np
 import simpler_env
 from gymnasium import logger, spaces
@@ -15,9 +13,14 @@ from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
 from gymnasium.spaces.box import Box
 from gymnasium.spaces.dict import Dict
 from gymnasium.spaces.space import Space
+from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
+from scipy.ndimage import zoom
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
+
+import improve
+import improve.config.resolver
 
 """
 from gymnasium.envs.registration import (make, make_vec, pprint_registry,
@@ -108,6 +111,20 @@ def alldict(thing):
         return thing
 
 
+def dict_walk(d, func):
+    """Recursively apply func to items in d."""
+
+    if isinstance(d, gym.spaces.dict.Dict):
+        return gym.spaces.dict.Dict(
+            {k: dict_walk(v, func) for k, v in d.spaces.items()}
+        )
+    elif isinstance(d, dict):
+        return {k: dict_walk(v, func) for k, v in d.items()}
+    elif isinstance(d, list):
+        return [dict_walk(item, func) for item in d]
+    else:
+        return func(d)
+
 
 class ResidualRLWrapper(ObservationWrapper):
     """Superclass of wrappers that can modify observations
@@ -176,15 +193,10 @@ class ResidualRLWrapper(ObservationWrapper):
         obs, _ = self.env.reset(seed=2022, options=dict(reconfigure=True))
         self.observation_space = convert_observation_to_space(obs)
         self.image_space = convert_observation_to_space(self.get_image(obs))
-        self.observation_space.spaces["agent"].spaces["partial_action"] = (
+        self.observation_space.spaces["simpler-img"] = self.image_space
+
+        self.observation_space.spaces["agent"].spaces["partial-action"] = (
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
-        )
-        self.observation_space = Dict(
-            {
-                "image": self.image_space,
-                # this is just gonna be hardcoded for now
-                "partial_action": Box(-np.inf, np.inf, (7,), np.float32),
-            }
         )
 
     def build_model(self):
@@ -265,28 +277,28 @@ class ResidualRLWrapper(ObservationWrapper):
         image = self.get_image(observation)
 
         if self.maybe_break():
-            return (
-                np.expand_dims(image, axis=0),
-                # dont inference the model if env terminates
-                np.expand_dims(np.zeros(self.env.action_space.shape), axis=0),
-            )
+            pass  # this is fine for now
 
         _, action = self.model.step(image, self.instruction)
         self.terminated = bool(action["terminate_episode"][0] > 0)
         self.maybe_advance()
 
-        observation["agent"]["partial_action"] = action
         self.partial = np.concatenate(
             [action["world_vector"], action["rot_axangle"], action["gripper"]]
         )
+        observation["agent"]["partial-action"] = self.partial
+        observation["simpler-img"] = image
 
+        """
         # going to force observation to be just the intended image and partial for now
+        # update: add qpos and qvel for PPO
         obs = (
             np.expand_dims(image, axis=0),
             np.expand_dims(self.partial, axis=0),
         )
+        # return obs
+        """
 
-        return obs
         return observation  # just the tuple gets returned for now
 
     def get_image(self, obs):
@@ -311,20 +323,38 @@ class SB3Wrapper(ResidualRLWrapper):
         ckpt,
         bonus=False,
         use_wandb=False,
-        downscale=None
+        downscale=None,
+        device=None,
+        keys=None,
     ):
         super().__init__(env, task, policy, ckpt)
         self.use_wandb = use_wandb
         self.bonus = bonus
         self.downscale = downscale
 
-        # define a dict of spaces
-        self.observation_space = Dict(
-            {
-                "image": self.image_space,
-                "partial_action": Box(-np.inf, np.inf, (7,), np.float32),
-            }
-        )
+        if device:
+            params = jax.device_put(self.model.params, jax.devices("gpu")[device])
+            del self.model.params
+            self.model.params = params
+        self.device = device
+
+        # filter for the desired obs space
+        spaces = dict_flatten(alldict(self.observation_space))
+        spaces = {k: v for k, v in spaces.items() if k in keys}
+        self.keys = keys
+
+        self.observation_space = Dict(spaces)
+        if self.downscale:
+
+            sample = self.observation_space.spaces["simpler-img"].sample()
+            shape = self.scale_image(
+                sample,
+                1 / self.downscale,
+            ).shape
+            dtype = sample.dtype
+            self.observation_space.spaces["simpler-img"] = gym.spaces.Box(
+                low=0, high=255, shape=shape, dtype=dtype
+            )
 
         self.image = None
         self.render_arr = []
@@ -338,23 +368,23 @@ class SB3Wrapper(ResidualRLWrapper):
     def scale_image(self, image, scale):
 
         # TODO can we get rid of batch dim?
-        zoom_factors = (1, scale, scale, 1)
+        zoom_factors = (scale, scale, 1)
         scaled_image = zoom(image, zoom_factors)
         return scaled_image
 
-
     def observation(self, observation):
         observation = super().observation(observation)
-        self.image = observation[0]  # for render
-        
-        # scale image
-        if self.downscale:
-            self.image = self.scale_image(self.image, 1/self.downscale)
+        observation = dict_flatten(alldict(observation))
+        observation = {k: v for k, v in observation.items() if k in self.keys}
 
-        return {
-            "image": observation[0],
-            "partial_action": observation[1],
-        }
+        self.image = observation["simpler-img"]  # for render
+
+        # scale image !!! doesnt return the scaled image
+        if self.downscale:
+            self.image = self.scale_image(self.image, 1 / self.downscale)
+
+        observation["simpler-img"] = self.image
+        return observation
 
     def render(self, mode="headless"):
         if mode == "rgb_array":
@@ -386,18 +416,22 @@ class SB3Wrapper(ResidualRLWrapper):
             self.model = None
 
             import torch
+
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
             # manually call garbage collector for jax models
             # might not be necessary
             import gc
+
             gc.collect()
 
             import tensorflow as tf
+
             tf.keras.backend.clear_session()
 
         super().close()
+
 
 def make(cfg_env, use_wandb=False):
     """Creates simulated eval environment from task name."""
@@ -412,30 +446,56 @@ def make(cfg_env, use_wandb=False):
         bonus=cfg_env.bonus,
         use_wandb=use_wandb,
         downscale=cfg_env.downscale,
+        keys=cfg_env.obs_keys,
     )
 
 
-def main():
+def dict_flatten(d, delim="_"):
+    """flattens a dict. the opposite of dict_nest"""
+
+    def _flatten(subd, parentk=""):
+        items = {}
+        for k, v in subd.items():
+            new = parentk + delim + k if parentk else k
+            if isinstance(v, dict):
+                items.update(_flatten(v, new))
+            else:
+                items[new] = v
+        return items
+
+    return _flatten(d)
+
+
+@hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
+def main(cfg):
+
+    pprint(OmegaConf.to_container(cfg, resolve=True))
 
     import warnings
 
     warnings.filterwarnings("ignore", category=UserWarning)
     warnings.filterwarnings("ignore", category=FutureWarning)
 
+    """
     task = simpler_env.ENVIRONMENTS[0]
     task = "widowx_put_eggplant_in_basket"
 
     cfg = {
         "task": task,
-        "policy": "octo-base",
-        "ckpt": None,
+        "foundation": {
+            "policy": "octo-base",
+            "ckpt": None,
+        },
+        'bonus': None,
+        'kind': 'default',
+        'downscale': None,
     }
+    """
 
-    env = make(**cfg, kind="sb3")
+    env = make(cfg.env)  # , kind="sb3")
 
-    print(env.model)
-    print(env.observation_space)
-    print()
+    print(env.observation_space.sample)
+    quit()
 
     hist = {t: 0 for t in simpler_env.ENVIRONMENTS if "widowx" in t}
     allinstructions = set()

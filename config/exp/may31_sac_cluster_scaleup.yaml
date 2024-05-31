@@ -1,29 +1,27 @@
 # @package _global_
 
 # to see if sac works at certain batch size and buffer size
+# instead of image downscale we split onto different machines
 
 # help with sweepers
 # https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
 # https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
 
 defaults:
-  - override /env: base
   - override /algo: sac
-  - override /job: base
-  - override /train: base
-  - override /callback: base
-
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "may30_sac_downscale_batch256"
-train: # has to be nested to override the base train config
-  n_steps: ${r_toint:2e6} # only 20k steps to get a feel
+sweep_id: "may_31_sac_cluster_scaleup"
+
+train: 
+  n_steps: ${r_toint:2e6} # 20M
+
 algo:
   batch_size: 256
-
-env:
-  downscale: 3 # 3 in both w h dimensions is 9 ... final (213,160)
+  # 100x previous experiments (may30)
+  learning_starts: ${r_toint:1e6}
+  buffer_size: ${r_toint:1e6}
 
 hydra:
   run:
@@ -32,6 +30,3 @@ hydra:
     dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.override_dirname}
 
-  sweeper:
-    params: 
-      +algo: "{learning_starts:10000,buffer_size:10000}"
