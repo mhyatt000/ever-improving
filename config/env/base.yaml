@@ -4,7 +4,7 @@ defaults:
 task: ${.foundation.task}  # relative to the foundation
 bonus: False
 kind: sb3
-downscale: null
+downscale: 7
 device: null
 
 obs_keys: # anything besides the expected image
@@ -18,6 +18,6 @@ goal:
   key: simpler-img
   cls: ${r_typeof:improve.wrapper.GoalEnvWrapper}
 
-use_original_space: False
+use_original_space: ${algo.use_original_space}
 # should add foundation_key: agent_partial-action ?
 use_wandb: ${job.wandb.use}

@@ -36,4 +36,5 @@ seed: 0
 device: 'auto'
 _init_setup_model: true
 
-use_original_space: ${env.use_original_space}
+use_original_space: False
+warmup_zero_action: False

@@ -1,30 +1,34 @@
 # @package _global_
 
-# to see if sac works at certain batch size and buffer size
-# instead of image downscale we split onto different machines
+# to see if sac improves when the critic learns from fm and rp together
 
 # help with sweepers
 # https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
 # https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
 
 defaults:
-  - override /algo: sac
+  - override /buffer: base
   - _self_
 
-sweep_id: "may31_sac_gaussian"
+env:
+  goal:
+    use: False
+
+sweep_id: "jun1_original_space"
 
 train: 
   n_steps: ${r_toint:2e6} # 20M
 
 algo:
-  batch_size: 256
-  # 100x previous experiments (may30)
+  batch_size: 256 # downscale 7 by default
   learning_starts: ${r_toint:1e4} # 10k
   buffer_size: ${r_toint:1e6}
 
   replay_buffer_class: null
   replay_buffer_kwargs: null
 
+  use_original_space: True
+  warmup_zero_action: True
 
 log_dir: ${callback.log_path}
 hydra:

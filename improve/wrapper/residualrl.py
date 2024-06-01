@@ -175,7 +175,7 @@ class ResidualRLWrapper(ObservationWrapper):
     }
     """
 
-    def __init__(self, env, task, policy, ckpt, original_space=False):
+    def __init__(self, env, task, policy, ckpt, use_original_space=False):
         """Constructor for the observation wrapper."""
         Wrapper.__init__(self, env)
 
@@ -188,7 +188,7 @@ class ResidualRLWrapper(ObservationWrapper):
         self.policy = policy
         self.ckpt = ckpt
 
-        self.original_space = original_space
+        self.use_original_space = use_original_space
 
         model = self.build_model()
 
@@ -263,7 +263,7 @@ class ResidualRLWrapper(ObservationWrapper):
         """Modifies the :attr:`env` after calling :meth:`step` using :meth:`self.observation` on the returned observations."""
 
         # if learning in the original space, the partial is added inside algo
-        action = self.partial + action if not self.original_space else action
+        action = self.partial + action if not self.use_original_space else action
         obs, reward, self.success, self.truncated, info = self.env.step(action)
 
         obs = self.observation(obs)
@@ -329,9 +329,9 @@ class SB3Wrapper(ResidualRLWrapper):
         downscale=None,
         device=None,
         keys=None,
-        original_space=False,
+        use_original_space=False,
     ):
-        super().__init__(env, task, policy, ckpt, original_space)
+        super().__init__(env, task, policy, ckpt, use_original_space)
         self.use_wandb = use_wandb
         self.bonus = bonus
         self.downscale = downscale
@@ -453,7 +453,7 @@ def make(cn):
         use_wandb=cn.use_wandb,
         downscale=cn.downscale,
         keys=cn.obs_keys,
-        original_space=cn.original_space
+        use_original_space=cn.use_original_space
     )
 
 

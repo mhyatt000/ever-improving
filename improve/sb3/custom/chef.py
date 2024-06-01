@@ -108,7 +108,8 @@ class CHEF(OffPolicyAlgorithm):
         sde_support: bool = True,
         supported_action_spaces: Optional[Tuple[Type[spaces.Space], ...]] = None,
         # 
-        original_space=False
+        use_original_space=False,
+        warmup_zero_action=False,
     ):
         super().__init__(
             policy=policy,
@@ -127,7 +128,8 @@ class CHEF(OffPolicyAlgorithm):
             supported_action_spaces=supported_action_spaces,
         )
 
-        self.original_space = original_space
+        self.use_original_space = use_original_space
+        self.warmup_zero_action = warmup_zero_action 
 
         self.buffer_size = buffer_size
         self.batch_size = batch_size
@@ -390,6 +392,11 @@ class CHEF(OffPolicyAlgorithm):
         if self.num_timesteps < learning_starts and not (self.use_sde and self.use_sde_at_warmup):
             # Warmup phase
             unscaled_action = np.array([self.action_space.sample() for _ in range(n_envs)])
+
+            if self.warmup_zero_action:
+                print('WARN: using zero actions in warmup phase')
+                unscaled_action = np.array([np.zeros(self.action_space.shape) for _ in range(n_envs)])
+
         else:
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action
@@ -564,9 +571,10 @@ class CHEF(OffPolicyAlgorithm):
             # Select action randomly or according to policy
             actions, buffer_actions = self._sample_action(learning_starts, action_noise, env.num_envs)
 
-            if self.original_space:
+            if self.use_original_space:
                 # hard-coded for now
                 actions = actions + self._last_obs['agent_partial-action']
+                buffer_actions = buffer_actions + self._last_obs['agent_partial-action']
 
             # Rescale and perform action
             new_obs, rewards, dones, infos = env.step(actions)

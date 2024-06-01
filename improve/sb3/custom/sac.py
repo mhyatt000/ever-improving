@@ -125,6 +125,7 @@ class SAC(CHEF):
         _init_setup_model: bool = True,
         #
         use_original_space=False, # use original action space?
+        warmup_zero_action=False, # zero action or gaussian noise before learning starts
     ):
         super().__init__(
             policy,
@@ -154,6 +155,7 @@ class SAC(CHEF):
             support_multi_env=True,
             #
             use_original_space=use_original_space,
+            warmup_zero_action=warmup_zero_action,
         )
 
         self.target_entropy = target_entropy

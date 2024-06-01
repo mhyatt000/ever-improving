@@ -1,2 +1,4 @@
 # by default use no kwargs for buffer
 name: null
+cls: null
+args: null
