@@ -385,6 +385,7 @@ class CHEF(OffPolicyAlgorithm):
             and scaled action that will be stored in the replay buffer.
             The two differs when the action space is not normalized (bounds are not [-1, 1]).
         """
+
         # Select action randomly or according to policy
         if self.num_timesteps < learning_starts and not (self.use_sde and self.use_sde_at_warmup):
             # Warmup phase
@@ -562,6 +563,10 @@ class CHEF(OffPolicyAlgorithm):
 
             # Select action randomly or according to policy
             actions, buffer_actions = self._sample_action(learning_starts, action_noise, env.num_envs)
+
+            if self.original_space:
+                # hard-coded for now
+                actions = actions + self._last_obs['agent_partial-action']
 
             # Rescale and perform action
             new_obs, rewards, dones, infos = env.step(actions)

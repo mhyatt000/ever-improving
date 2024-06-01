@@ -24,7 +24,7 @@ import improve
 import improve.config.resolver
 
 
-class GoalEnv(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):
+class GoalEnvWrapper(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):
 
     def __init__(self, env, goalkey):
         super().__init__(env)

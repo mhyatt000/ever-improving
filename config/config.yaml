@@ -1,7 +1,7 @@
 defaults:
   - env: base
   - algo: sac
-  - buffer: her
+  - buffer: ${r_ifelse:env.goal.use,her,base}
   - job: base
   - train: base
   - callback: base

@@ -1,3 +1,8 @@
+"""
+custom SAC implementation
+- with adjustments
+"""
+
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
@@ -7,17 +12,18 @@ from torch.nn import functional as F
 
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.noise import ActionNoise
+from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy, ContinuousCritic
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import get_parameters_by_name, polyak_update
 from stable_baselines3.sac.policies import Actor, CnnPolicy, MlpPolicy, MultiInputPolicy, SACPolicy
 
-from improve.sb3.custom import CHEF
+from improve.sb3.custom.chef import CHEF
 
-SelfSAC = TypeVar("SelfSAC", bound="ResidualSAC")
+SelfSAC = TypeVar("SelfSAC", bound="SAC")
 
 
-class ResidualSAC(CHEF):
+class SAC(CHEF):
     """
     Soft Actor-Critic (SAC)
     Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor,
@@ -118,7 +124,7 @@ class ResidualSAC(CHEF):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
         #
-        original_space=False # use original action space?
+        use_original_space=False, # use original action space?
     ):
         super().__init__(
             policy,
@@ -146,6 +152,8 @@ class ResidualSAC(CHEF):
             optimize_memory_usage=optimize_memory_usage,
             supported_action_spaces=(spaces.Box,),
             support_multi_env=True,
+            #
+            use_original_space=use_original_space,
         )
 
         self.target_entropy = target_entropy

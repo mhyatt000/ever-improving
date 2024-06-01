@@ -3,12 +3,21 @@ defaults:
 
 task: ${.foundation.task}  # relative to the foundation
 bonus: False
-kind: "sb3"
+kind: sb3
 downscale: null
 device: null
 
 obs_keys: # anything besides the expected image
-  - "agent_qpos"
-  - "agent_qvel"
-  - simpler-img
+  - agent_qpos
+  - agent_qvel
   - agent_partial-action
+  - simpler-img
+
+goal:
+  use: True
+  key: simpler-img
+  cls: ${r_typeof:improve.wrapper.GoalEnvWrapper}
+
+use_original_space: False
+# should add foundation_key: agent_partial-action ?
+use_wandb: ${job.wandb.use}

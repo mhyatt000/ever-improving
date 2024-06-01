@@ -175,7 +175,7 @@ class ResidualRLWrapper(ObservationWrapper):
     }
     """
 
-    def __init__(self, env, task, policy, ckpt):
+    def __init__(self, env, task, policy, ckpt, original_space=False):
         """Constructor for the observation wrapper."""
         Wrapper.__init__(self, env)
 
@@ -187,6 +187,8 @@ class ResidualRLWrapper(ObservationWrapper):
         self.task = task
         self.policy = policy
         self.ckpt = ckpt
+
+        self.original_space = original_space
 
         model = self.build_model()
 
@@ -260,8 +262,9 @@ class ResidualRLWrapper(ObservationWrapper):
     def step(self, action):
         """Modifies the :attr:`env` after calling :meth:`step` using :meth:`self.observation` on the returned observations."""
 
-        complete = self.partial + action
-        obs, reward, self.success, self.truncated, info = self.env.step(complete)
+        # if learning in the original space, the partial is added inside algo
+        action = self.partial + action if not self.original_space else action
+        obs, reward, self.success, self.truncated, info = self.env.step(action)
 
         obs = self.observation(obs)
         return obs, reward, self.success, self.truncated, info
@@ -326,8 +329,9 @@ class SB3Wrapper(ResidualRLWrapper):
         downscale=None,
         device=None,
         keys=None,
+        original_space=False,
     ):
-        super().__init__(env, task, policy, ckpt)
+        super().__init__(env, task, policy, ckpt, original_space)
         self.use_wandb = use_wandb
         self.bonus = bonus
         self.downscale = downscale
@@ -433,20 +437,23 @@ class SB3Wrapper(ResidualRLWrapper):
         super().close()
 
 
-def make(cfg_env, use_wandb=False):
-    """Creates simulated eval environment from task name."""
-    env = simpler_env.make(cfg_env.task)
-    wrapper = SB3Wrapper if cfg_env.kind == "sb3" else ResidualRLWrapper
+def make(cn):
+    """Creates simulated eval environment from task name.
+    param: cn: config node
+    """
+    env = simpler_env.make(cn.task)
+    wrapper = SB3Wrapper if cn.kind == "sb3" else ResidualRLWrapper
 
     return wrapper(
         env,
-        cfg_env.task,
-        cfg_env.foundation.name,
-        cfg_env.foundation.ckpt,
-        bonus=cfg_env.bonus,
-        use_wandb=use_wandb,
-        downscale=cfg_env.downscale,
-        keys=cfg_env.obs_keys,
+        cn.task,
+        cn.foundation.name,
+        cn.foundation.ckpt,
+        bonus=cn.bonus,
+        use_wandb=cn.use_wandb,
+        downscale=cn.downscale,
+        keys=cn.obs_keys,
+        original_space=cn.original_space
     )
 
 

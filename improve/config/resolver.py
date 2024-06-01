@@ -50,6 +50,9 @@ def r_instantiate(class_path, *args, **kwargs):
         raise ImportError(f"Error importing or instantiating class '{class_path}': {e}")
 
 
+def r_ifelse(cond, true_val, false_val):
+    return true_val if cond else false_val
+
 OmegaConf.register_new_resolver("r_tag_bonus", r_tag_bonus)
 OmegaConf.register_new_resolver("r_toint", r_toint)
 OmegaConf.register_new_resolver("r_tofloat", r_tofloat)
@@ -57,3 +60,4 @@ OmegaConf.register_new_resolver("r_home", r_home)
 
 OmegaConf.register_new_resolver("r_instantiate", r_instantiate)
 OmegaConf.register_new_resolver("r_typeof", r_typeof)
+OmegaConf.register_new_resolver("r_ifelse", r_ifelse)

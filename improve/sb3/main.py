@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import wandb
 from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
-from stable_baselines3 import HerReplayBuffer, A2C, PPO, SAC
+from stable_baselines3 import HerReplayBuffer, A2C, PPO
 from stable_baselines3.common.callbacks import (
     CallbackList,
     CheckpointCallback,
@@ -29,7 +29,8 @@ import improve.config.resolver
 import improve.config.prepare
 from improve.sb3 import util
 from improve.sb3.util import MyCallback, ReZeroCallback, WandbLogger
-from improve.wrappers import residualrl as rrl
+from improve.wrapper import residualrl as rrl
+from improve.sb3.custom.sac import SAC
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -122,7 +123,9 @@ def main(cfg):
         )
     pprint(OC.to_container(cfg, resolve=True))  # keep after wandb so it logs
 
-    env = rrl.make(cfg.env, cfg.job.wandb.use)
+    env = rrl.make(cfg.env)
+    if cfg.env.goal.use: # use GoalEnvWrapper?
+        env = cfg.env.goal.cls(env, cfg.env.goal.key)
 
     # TODO add cosine schedule
     # not priority
