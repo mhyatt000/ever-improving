@@ -79,13 +79,6 @@ def build_algo(_cfg):
     return algos[_cfg.name]
 
 
-def build_buffer(_cfg):
-    buffers = {
-        "her": HerReplayBuffer,
-    }
-    return buffers.get(_cfg.name)
-
-
 def rollout(model):
 
     for ep_id in range(1):
@@ -135,16 +128,8 @@ def main(cfg):
     # not priority
     # torch lr schedule as cosine lr schedule
     algo = build_algo(cfg.algo)
-
-    # TODO linke buffer for HER
-    # buffer = build_buffer(cfg.algo.buffer)
-
-    # TODO i really wish there was a clean way to do this
-    # outsource to resolver? or another module
     algo_kwargs = OC.to_container(cfg.algo, resolve=True)
     del algo_kwargs["name"]
-    # del algo_kwargs["buffer"]
-    # del algo_kwargs["replay_buffer_kwargs"]["name"]
 
     model = algo(
         "MultiInputPolicy",

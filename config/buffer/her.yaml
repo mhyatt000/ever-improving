@@ -1,0 +1,20 @@
+# HER hindsight experience replay buffer
+# works with DQN, SAC, DDPG and TD3
+
+name: "her"
+cls: ${r_typeof:stable_baselines3.HerReplayBuffer}
+
+
+# _target_: "stable_baselines3.HerReplayBuffer"
+
+size: ${r_toint:1e3}
+args:
+  # Available strategies (cf paper): future, final, episode
+  goal_selection_strategy: "future" # equivalent to GoalSelectionStrategy.FUTURE
+  n_sampled_goal: 4
+# device: 'cpu'
+
+# observation_space: null 
+# action_space: null 
+# env: null 
+# n_envs: 1 

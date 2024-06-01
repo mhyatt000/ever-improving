@@ -1,6 +1,15 @@
 defaults:
   - env: base
-  - algo: base
+  - algo: sac
+  - buffer: her
   - job: base
   - train: base
   - callback: base
+
+log_dir: ${callback.log_path}
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}

@@ -1,6 +1,3 @@
-# defaults: 
-# - buffer: base
-
 name: "sac"
 
 policy_kwargs:
@@ -9,7 +6,7 @@ policy_kwargs:
 learning_rate: 0.0003 # ${r_tofloat:3e-4}
 
 # 1m samples was too many (858GB) for 24GB.
-buffer_size: ${r_toint:1e3}
+buffer_size: ${buffer.size} 
 # 120 * 50 epiisodes = 6000 steps
 learning_starts: ${r_toint:1e3} # n env steps to collect transitions for before learning 
 
@@ -20,10 +17,9 @@ train_freq: 1
 gradient_steps: 1
 action_noise: null
 
-replay_buffer_class: null
-# TODO fix for HER
-# replay_buffer_kwargs: ${buffer}
-replay_buffer_kwargs: null
+# replay_buffer: ${.buffer._target_}
+replay_buffer_class: ${buffer.cls}
+replay_buffer_kwargs: ${buffer.args}
 optimize_memory_usage: false
 
 # ent_coef: 'auto'

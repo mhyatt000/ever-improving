@@ -476,23 +476,9 @@ def main(cfg):
     warnings.filterwarnings("ignore", category=UserWarning)
     warnings.filterwarnings("ignore", category=FutureWarning)
 
-    """
-    task = simpler_env.ENVIRONMENTS[0]
-    task = "widowx_put_eggplant_in_basket"
-
-    cfg = {
-        "task": task,
-        "foundation": {
-            "policy": "octo-base",
-            "ckpt": None,
-        },
-        'bonus': None,
-        'kind': 'default',
-        'downscale': None,
-    }
-    """
-
-    env = make(cfg.env)  # , kind="sb3")
+    env = make(cfg.env)
+    things = env.reset()
+    # print(things[-1]) 
 
     print(env.observation_space.sample)
     quit()
