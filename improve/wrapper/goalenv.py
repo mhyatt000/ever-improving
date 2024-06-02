@@ -81,10 +81,17 @@ class GoalEnvWrapper(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):
 
         return observation, reward, terminated, truncated, info
 
+
     def compute_reward(self, achieved_goal, desired_goal, info):
         """give small tolerance in case simulator gets weird"""
-        eq = np.allclose(achieved_goal, desired_goal, atol=0.01)
-        return np.array([1 if eq else 0], dtype=np.float32)
+
+        if len(achieved_goal.shape) == 4:
+            eq = np.isclose(achieved_goal, desired_goal, atol=0.01)
+            eq = np.all(eq, axis=(1, 2, 3))
+        else:
+            eq = np.array(np.allclose(achieved_goal, desired_goal, atol=0.01))
+        print(eq.shape)
+        return eq.astype(np.float32)
 
     def compute_terminated(self, achieved_goal, desired_goal, info):
         return info["is_success"]
