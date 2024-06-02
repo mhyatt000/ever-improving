@@ -6,6 +6,7 @@ from typing import (Any, Dict, List, Mapping, Optional, Sequence, TextIO,
 import wandb
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import KVWriter, Logger
+import numpy as np
 
 """ for EvalCallback
 
@@ -20,6 +21,20 @@ from stable_baselines3.common.logger import KVWriter, Logger
 - render: Whether to render or not the environment during evaluation
 - verbose: Verbosity level: 0 for no output, 1 for indicating information about evaluation results
 """
+
+class CosineAnnealingLRSchedule:
+    def __init__(self, initial: float, n_steps: int, eta_min: float = 0.0):
+        self.initial = initial
+        self.n_steps = n_steps
+        self.eta_min = eta_min
+
+    def __call__(self, step: int) -> float:
+        return self.annealing_lr(step)
+
+    def annealing_lr(self, step: int) -> float:
+        lr = self.eta_min + (self.initial - self.eta_min) * (1 + np.cos(np.pi * step / self.n_steps)) / 2
+        return lr
+
 
 
 class PlottingCallback(BaseCallback):

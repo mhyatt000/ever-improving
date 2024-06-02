@@ -265,14 +265,6 @@ class SAC(CHEF):
                 next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
 
-                # print type and shape of rewards dones and gamma and next_q_values
-                print('rewards type:', type(replay_data.rewards))
-                print('rewards shape:', replay_data.rewards.shape)
-                print('dones type:', type(replay_data.dones))
-                print('dones shape:', replay_data.dones.shape)
-                print('next_q_values type:', type(next_q_values))
-                print('next_q_values shape:', next_q_values.shape)
-
                 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
             # Get current Q-values estimates for each critic network
@@ -346,3 +338,4 @@ class SAC(CHEF):
         else:
             saved_pytorch_variables = ["ent_coef_tensor"]
         return state_dicts, saved_pytorch_variables
+

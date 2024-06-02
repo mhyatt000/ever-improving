@@ -1,0 +1,36 @@
+# @package _global_
+
+# help with sweepers
+# https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
+# https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
+
+defaults:
+  # i dont think i need to override anything else
+  - _self_
+
+log_dir: ${callback.log_path}
+sweep_id: "jun2_sacher_converge"
+
+train: 
+  n_steps: ${r_toint:5e3} 
+algo:
+  batch_size: 256
+  warmup_zero_action: True
+  gradient_steps: 10
+  learning_starts: ${r_toint:1e3}
+
+buffer:
+  size: ${r_toint:1e6}
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+  mode: MULTIRUN # needed or else -m flag
+  sweeper:
+    params: 
+      # algo.learning_starts: ${r_toint:1e3},${r_toint:5e3},${r_toint:1e4}
+      algo.learning_rate.args.initial: ${r_tofloat:1e-4},${r_tofloat:5e-5},${r_tofloat:1e-5}

@@ -3,7 +3,13 @@ name: "sac"
 policy_kwargs:
   share_features_extractor: True
 
-learning_rate: 0.0003 # ${r_tofloat:3e-4}
+learning_rate:
+  name: 'cosine'
+  cls: ${r_typeof:improve.sb3.util.CosineAnnealingLRSchedule}
+  args:
+    initial: ${r_tofloat:3e-4}
+    n_steps: ${train.n_steps}
+    eta_min: ${r_tofloat:1e-6}
 
 # 1m samples was too many (858GB) for 24GB.
 buffer_size: ${buffer.size} 
@@ -22,7 +28,7 @@ replay_buffer_class: ${buffer.cls}
 replay_buffer_kwargs: ${buffer.args}
 optimize_memory_usage: false
 
-ent_coef: auto_0.01
+ent_coef: auto_0.1
 # target_entropy: 'auto'
 
 target_update_interval: 1

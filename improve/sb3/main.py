@@ -14,23 +14,21 @@ import torch.nn.functional as F
 import wandb
 from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
-from stable_baselines3 import HerReplayBuffer, A2C, PPO
-from stable_baselines3.common.callbacks import (
-    CallbackList,
-    CheckpointCallback,
-    EvalCallback,
-)
+from stable_baselines3 import A2C, PPO, HerReplayBuffer
+from stable_baselines3.common.callbacks import (CallbackList,
+                                                CheckpointCallback,
+                                                EvalCallback)
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from tqdm import tqdm
 from wandb.integration.sb3 import WandbCallback
 
 import improve
-import improve.config.resolver
 import improve.config.prepare
+import improve.config.resolver
 from improve.sb3 import util
+from improve.sb3.custom.sac import SAC
 from improve.sb3.util import MyCallback, ReZeroCallback, WandbLogger
 from improve.wrapper import residualrl as rrl
-from improve.sb3.custom.sac import SAC
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -109,6 +107,7 @@ def rollout(model):
         wandb.log({f"video/{ep_id}": wandb.Video(fname, fps=5)})
 
 
+
 @hydra.main(config_path=improve.CONFIG, config_name="config")
 def main(cfg):
 
@@ -124,8 +123,18 @@ def main(cfg):
     pprint(OC.to_container(cfg, resolve=True))  # keep after wandb so it logs
 
     env = rrl.make(cfg.env)
-    if cfg.env.goal.use: # use GoalEnvWrapper?
+    if cfg.env.goal.use:  # use GoalEnvWrapper?
         env = cfg.env.goal.cls(env, cfg.env.goal.key)
+
+    if not type(cfg.algo.learning_rate) is float:
+        learning_rate = cfg.algo.learning_rate.cls(
+            **OC.to_container(cfg.algo.learning_rate.args, resolve=True)
+        )
+    else:
+        learning_rate = cfg.algo.learning_rate
+    del cfg.algo.learning_rate
+
+    # from torch.optim.lr_scheduler import CosineAnnealingLR
 
     # TODO add cosine schedule
     # not priority
@@ -139,6 +148,7 @@ def main(cfg):
         env,
         verbose=1,
         **algo_kwargs,
+        learning_rate=learning_rate,
     )
 
     if cfg.train.use_zero_init:

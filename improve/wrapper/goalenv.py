@@ -90,7 +90,6 @@ class GoalEnvWrapper(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):
             eq = np.all(eq, axis=(1, 2, 3))
         else:
             eq = np.array(np.allclose(achieved_goal, desired_goal, atol=0.01))
-        print(eq.shape)
         return eq.astype(np.float32)
 
     def compute_terminated(self, achieved_goal, desired_goal, info):
