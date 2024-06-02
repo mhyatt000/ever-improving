@@ -13,17 +13,14 @@ log_dir: ${callback.log_path}
 sweep_id: "may31_sac_her"
 
 train: # has to be nested to override the base train config
-  n_steps: ${r_toint:2e5} # 200k steps
+  n_steps: ${r_toint:3e4} # 30k
 algo:
   batch_size: 256
-  learning_starts: ${r_toint:1e4}
+  use_original_space: True
+  warmup_zero_action: True
 
 buffer:
-  size: ${r_toint:1e4}
-
-# 3 in both w h dimensions is 9 ... final (213,160)
-env:
-  downscale: 3 
+  size: ${r_toint:1e6}
 
 hydra:
   run:
@@ -31,3 +28,7 @@ hydra:
   sweep:
     dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.override_dirname}
+
+  sweeper:
+    params: 
+      algo.learning_starts: ${r_toint:1e3},${r_toint:5e3},${r_toint:1e4}

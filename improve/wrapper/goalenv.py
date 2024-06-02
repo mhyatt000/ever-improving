@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import random
-from pprint import pprint
-from typing import Any
 
 import gymnasium as gym
 import hydra
 import numpy as np
-import simpler_env
 from gymnasium import logger, spaces
 from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
                             RewardWrapper, Wrapper)
@@ -16,13 +13,10 @@ from gymnasium.spaces.dict import Dict
 from gymnasium.spaces.space import Space
 from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
-from scipy.ndimage import zoom
-from simpler_env.utils.env.observation_utils import \
-    get_image_from_maniskill2_obs_dict
 
 import improve
 import improve.config.resolver
-
+import improve.wrapper.dict_util as du
 
 class GoalEnvWrapper(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):
 
@@ -30,10 +24,12 @@ class GoalEnvWrapper(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):
         super().__init__(env)
         self.env = env
 
+        # SB3 does not support nested dict
         obspace = env.observation_space
+        modspace = {k: v for k, v in obspace.spaces.items() if k != goalkey}
         self.observation_space = Dict(
             {
-                "observation": obspace,
+                **modspace, # all obs besides the goal
                 "achieved_goal": obspace[goalkey],
                 "desired_goal": obspace[goalkey],
             }
@@ -45,33 +41,34 @@ class GoalEnvWrapper(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):
         self.goal = np.zeros_like(obspace[goalkey].sample())
         self.goals = [self.goal]
         self.goal_buffer_size = 10
+        self.goalkey = goalkey
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reset the environment.
         In addition, check if the observation space is correct by inspecting the `observation`, `achieved_goal`, and `desired_goal` keys.
         """
         self.goal = random.choice(self.goals)
-        things = self.env.reset(seed=seed)
+        obs, info = self.env.reset(seed=seed)
+        obs = self.observation(obs)
 
         # Enforce that each GoalEnv uses a Goal-compatible observation space.
         if not isinstance(self.observation_space, gym.spaces.Dict):
-            raise error.Error(
+            raise Exception(
                 "GoalEnv requires an observation space of type gym.spaces.Dict"
             )
-        for key in ["observation", "achieved_goal", "desired_goal"]:
+        for key in ["achieved_goal", "desired_goal"]:
             if key not in self.observation_space.spaces:
-                raise error.Error(
+                raise Exception(
                     f'GoalEnv requires the "{key}" key to be part of the observation dictionary.'
                 )
-        return things
+
+        return obs, info
 
     def observation(self, observation):
-        observation = self.env.observation(observation)
-        return {
-            "observation": observation,
-            "achieved_goal": observation[self.goalkey],
-            "desired_goal": self.goal,
-        }
+        observation["achieved_goal"] = observation[self.goalkey]
+        del observation[self.goalkey]
+        observation["desired_goal"] = self.goal
+        return observation
 
     def step(self, action):
         observation, reward, terminated, truncated, info = self.env.step(action)
@@ -82,10 +79,12 @@ class GoalEnvWrapper(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):
             self.goals.append(observation["desired_goal"])
             self.goals = self.goals[-self.goal_buffer_size :]
 
+        return observation, reward, terminated, truncated, info
+
     def compute_reward(self, achieved_goal, desired_goal, info):
         """give small tolerance in case simulator gets weird"""
         eq = np.allclose(achieved_goal, desired_goal, atol=0.01)
-        return 1 if eq else 0
+        return np.array([1 if eq else 0], dtype=np.float32)
 
     def compute_terminated(self, achieved_goal, desired_goal, info):
         return info["is_success"]
