@@ -21,6 +21,7 @@ from simpler_env.utils.env.observation_utils import \
 
 import improve
 import improve.config.resolver
+import improve.wrappers.dict_utils as du
 
 """
 from gymnasium.envs.registration import (make, make_vec, pprint_registry,
@@ -175,7 +176,15 @@ class ResidualRLWrapper(ObservationWrapper):
     }
     """
 
-    def __init__(self, env, task, policy, ckpt, use_original_space=False):
+    def __init__(
+        self,
+        env,
+        task,
+        policy,
+        ckpt,
+        use_original_space=False,
+        residual_scale=1,
+    ):
         """Constructor for the observation wrapper."""
         Wrapper.__init__(self, env)
 
@@ -189,6 +198,7 @@ class ResidualRLWrapper(ObservationWrapper):
         self.ckpt = ckpt
 
         self.use_original_space = use_original_space
+        self.residual_scale = residual_scale
 
         model = self.build_model()
 
@@ -263,9 +273,10 @@ class ResidualRLWrapper(ObservationWrapper):
         """Modifies the :attr:`env` after calling :meth:`step` using :meth:`self.observation` on the returned observations."""
 
         # if learning in the original space, the partial is added inside algo
-        action = self.partial + action if not self.use_original_space else action
-        obs, reward, self.success, self.truncated, info = self.env.step(action)
+        if not self.use_original_space:
+            action = self.partial + action * self.residual_scale
 
+        obs, reward, self.success, self.truncated, info = self.env.step(action)
         obs = self.observation(obs)
         return obs, reward, self.success, self.truncated, info
 
@@ -330,8 +341,9 @@ class SB3Wrapper(ResidualRLWrapper):
         device=None,
         keys=None,
         use_original_space=False,
+        residual_scale=1,
     ):
-        super().__init__(env, task, policy, ckpt, use_original_space)
+        super().__init__(env, task, policy, ckpt, use_original_space, residual_scale)
         self.use_wandb = use_wandb
         self.bonus = bonus
         self.downscale = downscale
@@ -343,7 +355,7 @@ class SB3Wrapper(ResidualRLWrapper):
         self.device = device
 
         # filter for the desired obs space
-        spaces = dict_flatten(alldict(self.observation_space))
+        spaces = du.dict_flatten(alldict(self.observation_space))
         spaces = {k: v for k, v in spaces.items() if k in keys}
         self.keys = keys
 
@@ -378,7 +390,7 @@ class SB3Wrapper(ResidualRLWrapper):
 
     def observation(self, observation):
         observation = super().observation(observation)
-        observation = dict_flatten(alldict(observation))
+        observation = du.dict_flatten(alldict(observation))
         observation = {k: v for k, v in observation.items() if k in self.keys}
 
         self.image = observation["simpler-img"]  # for render
@@ -453,24 +465,8 @@ def make(cn):
         use_wandb=cn.use_wandb,
         downscale=cn.downscale,
         keys=cn.obs_keys,
-        use_original_space=cn.use_original_space
+        use_original_space=cn.use_original_space,
     )
-
-
-def dict_flatten(d, delim="_"):
-    """flattens a dict. the opposite of dict_nest"""
-
-    def _flatten(subd, parentk=""):
-        items = {}
-        for k, v in subd.items():
-            new = parentk + delim + k if parentk else k
-            if isinstance(v, dict):
-                items.update(_flatten(v, new))
-            else:
-                items[new] = v
-        return items
-
-    return _flatten(d)
 
 
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
@@ -485,7 +481,7 @@ def main(cfg):
 
     env = make(cfg.env)
     things = env.reset()
-    # print(things[-1]) 
+    # print(things[-1])
 
     print(env.observation_space.sample)
     quit()
