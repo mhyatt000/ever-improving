@@ -21,7 +21,7 @@ from simpler_env.utils.env.observation_utils import \
 
 import improve
 import improve.config.resolver
-import improve.wrappers.dict_utils as du
+import improve.wrapper.dict_util as du
 
 """
 from gymnasium.envs.registration import (make, make_vec, pprint_registry,
