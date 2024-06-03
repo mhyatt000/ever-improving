@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from pprint import pprint
 from typing import Any
 
+import json
+from tqdm import tqdm
 import gymnasium as gym
 import hydra
 import numpy as np
@@ -21,7 +24,7 @@ from simpler_env.utils.env.observation_utils import \
 
 import improve
 import improve.config.resolver
-import improve.wrappers.dict_utils as du
+import improve.wrapper.dict_util as du
 
 """
 from gymnasium.envs.registration import (make, make_vec, pprint_registry,
@@ -355,7 +358,7 @@ class SB3Wrapper(ResidualRLWrapper):
         self.device = device
 
         # filter for the desired obs space
-        spaces = du.dict_flatten(alldict(self.observation_space))
+        spaces = du.flatten(alldict(self.observation_space))
         spaces = {k: v for k, v in spaces.items() if k in keys}
         self.keys = keys
 
@@ -390,7 +393,7 @@ class SB3Wrapper(ResidualRLWrapper):
 
     def observation(self, observation):
         observation = super().observation(observation)
-        observation = du.dict_flatten(alldict(observation))
+        observation = du.flatten(alldict(observation))
         observation = {k: v for k, v in observation.items() if k in self.keys}
 
         self.image = observation["simpler-img"]  # for render
@@ -480,45 +483,58 @@ def main(cfg):
     warnings.filterwarnings("ignore", category=FutureWarning)
 
     env = make(cfg.env)
-    things = env.reset()
-    # print(things[-1])
+    #things = env.reset()
 
-    print(env.observation_space.sample)
-    quit()
-
-    hist = {t: 0 for t in simpler_env.ENVIRONMENTS if "widowx" in t}
+    #hist = {t: 0 for t in simpler_env.ENVIRONMENTS if "widowx" in t}
     allinstructions = set()
-    for t in hist:
+    
+    EPISODES = 100
+    MAX_STEPS = 2000
+    
+    #for t in hist:
+    env = make(cfg.env)
+    
+    episode_infos = []
 
-        env = make(**cfg, kind="sb3")
+    for _ in range(EPISODES):
+        obs, initial_info = env.reset()
+        breakpoint()
+        # perform transformations to allow for json file saving
+        initial_info['episode_source_obj_init_pose_wrt_robot_base'] = list(initial_info['episode_source_obj_init_pose_wrt_robot_base'].__getstate__())
+        initial_info['episode_target_obj_init_pose_wrt_robot_base'] = list(initial_info['episode_target_obj_init_pose_wrt_robot_base'].__getstate__())
+        
+        for i in tqdm(range(MAX_STEPS)):
 
-        for _ in range(10):
-            env.reset()
-            for i in range(2000):
+            # zero action
+            action = np.zeros(env.action_space.shape)
+            # random action
+            # env.action_space.sample()
 
-                # zero action
-                action = np.zeros(env.action_space.shape)
-                # random action
-                # env.action_space.sample()
+            observation, reward, success, truncated, info = env.step(action)
 
-                observation, reward, success, truncated, info = env.step(action)
+            # print i as formatted for 3 decimals 001 - 100
+            print(f"{i:003}", reward, success, truncated)
 
-                # print i as formatted for 3 decimals 001 - 100
-                print(f"{i:003}", reward, success, truncated)
+            allinstructions.add(env.instruction)
+            if not (env.instruction in allinstructions):
+                print(env.instruction)
 
-                allinstructions.add(env.instruction)
-                if not (env.instruction in allinstructions):
-                    print(env.instruction)
+            if truncated or success:
+                initial_info["success"] = success
+                break
 
-                if truncated:  # or success:
-                    break
+        # if success:
+        #     hist[t] += 1
+        # pprint(hist)
+        
+        episode_infos.append(initial_info)
 
-            if success:
-                hist[t] += 1
-            pprint(hist)
-
-        env.close()
+    env.close()
+            
     print(allinstructions)
+    
+    with open("improve/wrapper/infos.json", "w") as file:
+        json.dump(episode_infos, file, indent=4)
 
 
 if __name__ == "__main__":

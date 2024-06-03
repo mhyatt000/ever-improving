@@ -1,0 +1,4302 @@
+[
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24648845195770264,
+            -0.1300778090953827,
+            0.08872473239898682,
+            -0.11698059737682343,
+            0.02744860202074051,
+            -0.9087661504745483,
+            0.3996332883834839
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27523618936538696,
+            0.0375850647687912,
+            0.08588016033172607,
+            0.06494775414466858,
+            -0.0035315260756760836,
+            -0.9978103041648865,
+            0.012007225304841995
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2463395893573761,
+            -0.139537513256073,
+            0.0883108377456665,
+            -0.1187833845615387,
+            0.02261626347899437,
+            -0.9036874771118164,
+            0.41076552867889404
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27523553371429443,
+            0.03758493810892105,
+            0.0858801007270813,
+            0.06494773179292679,
+            -0.003531218506395817,
+            -0.9978103637695312,
+            0.012006071396172047
+        ],
+        "episode_id": 4,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.246320903301239,
+            -0.13395683467388153,
+            0.08854061365127563,
+            -0.11305178701877594,
+            0.07952218502759933,
+            -0.9902112483978271,
+            0.01942845992743969
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2754722833633423,
+            0.037590786814689636,
+            0.08591490983963013,
+            0.0650206208229065,
+            -0.0037082780618220568,
+            -0.9978069067001343,
+            0.011842476204037666
+        ],
+        "episode_id": 0,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22623923420906067,
+            -0.13921800255775452,
+            0.08827459812164307,
+            -0.12233411520719528,
+            0.014999434351921082,
+            -0.8989053964614868,
+            0.42045095562934875
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2744396924972534,
+            0.03755023330450058,
+            0.08583366870880127,
+            0.06466130167245865,
+            -0.003911587875336409,
+            -0.9978260397911072,
+            0.012132559902966022
+        ],
+        "episode_id": 16,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464868426322937,
+            -0.13007578253746033,
+            0.08872479200363159,
+            -0.11697876453399658,
+            0.027457116171717644,
+            -0.9087831377983093,
+            0.3995940387248993
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27551448345184326,
+            0.037588559091091156,
+            0.08592015504837036,
+            0.06503242254257202,
+            -0.0037269233725965023,
+            -0.9978054761886597,
+            0.011891447007656097
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2236386239528656,
+            -0.14649905264377594,
+            0.08807635307312012,
+            -0.09415655583143234,
+            0.11574490368366241,
+            -0.9197052121162415,
+            -0.3631533086299896
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2749359905719757,
+            0.037561897188425064,
+            0.08585220575332642,
+            0.06485145539045334,
+            -0.0035243721213191748,
+            -0.9978185296058655,
+            0.011846200563013554
+        ],
+        "episode_id": 17,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.21875005960464478,
+            -0.1691707819700241,
+            0.08684897422790527,
+            0.20127224922180176,
+            0.919075071811676,
+            -0.3241925835609436,
+            -0.09843812882900238
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27548593282699585,
+            0.03759293630719185,
+            0.08591675758361816,
+            0.06502600014209747,
+            -0.0037156967446208,
+            -0.9978071451187134,
+            0.011788236908614635
+        ],
+        "episode_id": 2,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22660771012306213,
+            -0.1593683511018753,
+            0.08778280019760132,
+            -0.127545565366745,
+            0.006299869157373905,
+            -0.9121564626693726,
+            0.38943976163864136
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27528858184814453,
+            0.03759961575269699,
+            0.08588957786560059,
+            0.06496767699718475,
+            -0.0035901684314012527,
+            -0.9978116750717163,
+            0.01176655013114214
+        ],
+        "episode_id": 22,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23732204735279083,
+            -0.15051443874835968,
+            0.08784770965576172,
+            -0.11808370798826218,
+            0.054389696568250656,
+            -0.9891263842582703,
+            0.068754643201828
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27573055028915405,
+            0.03761805593967438,
+            0.08594602346420288,
+            0.06511081010103226,
+            -0.0038021584041416645,
+            -0.9978060722351074,
+            0.011379270814359188
+        ],
+        "episode_id": 18,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2435397207736969,
+            -0.16562245786190033,
+            0.08786427974700928,
+            -0.08302176743745804,
+            0.09664563834667206,
+            -0.9201313853263855,
+            -0.3703047037124634
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757309079170227,
+            0.03761618584394455,
+            0.08594638109207153,
+            0.06510984152555466,
+            -0.00380770699121058,
+            -0.9978058338165283,
+            0.01140323281288147
+        ],
+        "episode_id": 11,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24373850226402283,
+            -0.14620524644851685,
+            0.08805394172668457,
+            -0.09164121747016907,
+            0.10880541801452637,
+            -0.9212698936462402,
+            -0.36197447776794434
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2745360732078552,
+            0.037526845932006836,
+            0.08580905199050903,
+            0.06471726298332214,
+            -0.003440745873376727,
+            -0.9978240728378296,
+            0.01213780976831913
+        ],
+        "episode_id": 5,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.25639933347702026,
+            -0.16176162660121918,
+            0.08699744939804077,
+            -0.36303362250328064,
+            0.7473462224006653,
+            -0.5255463719367981,
+            0.18297898769378662
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752617597579956,
+            0.037598419934511185,
+            0.08588725328445435,
+            0.06495865434408188,
+            -0.003591787302866578,
+            -0.9978123307228088,
+            0.01176520437002182
+        ],
+        "episode_id": 15,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464868426322937,
+            -0.13007578253746033,
+            0.08872479200363159,
+            -0.11697876453399658,
+            0.027457116171717644,
+            -0.9087831377983093,
+            0.3995940387248993
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757249176502228,
+            0.03761185705661774,
+            0.08594650030136108,
+            0.06510643661022186,
+            -0.003817563410848379,
+            -0.9978055953979492,
+            0.011440649628639221
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2501789331436157,
+            -0.1787479966878891,
+            0.0869065523147583,
+            -0.14004144072532654,
+            0.8610861301422119,
+            -0.4884185791015625,
+            0.01914992742240429
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748473882675171,
+            0.03756385296583176,
+            0.08584684133529663,
+            0.06482037901878357,
+            -0.0035634352825582027,
+            -0.9978201985359192,
+            0.01186674926429987
+        ],
+        "episode_id": 3,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464868426322937,
+            -0.13007578253746033,
+            0.08872479200363159,
+            -0.11697876453399658,
+            0.027457116171717644,
+            -0.9087831377983093,
+            0.3995940387248993
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27486783266067505,
+            0.037565816193819046,
+            0.08584904670715332,
+            0.06482820957899094,
+            -0.003567679086700082,
+            -0.9978201985359192,
+            0.011823715642094612
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2437235713005066,
+            -0.14620843529701233,
+            0.08805394172668457,
+            -0.0915987491607666,
+            0.10884673148393631,
+            -0.9210570454597473,
+            -0.3625138998031616
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27523231506347656,
+            0.03758463263511658,
+            0.08587974309921265,
+            0.06494665890932083,
+            -0.003529698122292757,
+            -0.9978105425834656,
+            0.011999614536762238
+        ],
+        "episode_id": 5,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2463195025920868,
+            -0.13395509123802185,
+            0.08854067325592041,
+            -0.11305055767297745,
+            0.07953114062547684,
+            -0.9902123212814331,
+            0.019345158711075783
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2746199071407318,
+            0.03754067420959473,
+            0.08582139015197754,
+            0.06474455446004868,
+            -0.0035026168916374445,
+            -0.9978229999542236,
+            0.012061923742294312
+        ],
+        "episode_id": 0,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.25633543729782104,
+            -0.16165536642074585,
+            0.08699840307235718,
+            -0.3647771179676056,
+            0.7463175654411316,
+            -0.5252782106399536,
+            0.18447428941726685
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27523618936538696,
+            0.037584707140922546,
+            0.08588016033172607,
+            0.06494767218828201,
+            -0.0035307297948747873,
+            -0.997810423374176,
+            0.012004324235022068
+        ],
+        "episode_id": 15,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2266344130039215,
+            -0.14992932975292206,
+            0.08796948194503784,
+            -0.12189722061157227,
+            0.022054195404052734,
+            -0.9138674736022949,
+            0.3866536319255829
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27516835927963257,
+            0.037594519555568695,
+            0.08587437868118286,
+            0.06492625921964645,
+            -0.0035375573206692934,
+            -0.9978121519088745,
+            0.01197248324751854
+        ],
+        "episode_id": 19,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23736944794654846,
+            -0.150529146194458,
+            0.08785772323608398,
+            -0.11836991459131241,
+            0.05555533990263939,
+            -0.9889289736747742,
+            0.07015739381313324
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.274452805519104,
+            0.03753012418746948,
+            0.08583831787109375,
+            0.06466596573591232,
+            -0.003955950494855642,
+            -0.9978283047676086,
+            0.011901973746716976
+        ],
+        "episode_id": 18,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464868426322937,
+            -0.13007578253746033,
+            0.08872479200363159,
+            -0.11697876453399658,
+            0.027457116171717644,
+            -0.9087831377983093,
+            0.3995940387248993
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2754742503166199,
+            0.037591975182294846,
+            0.08591526746749878,
+            0.06502225250005722,
+            -0.0037094925064593554,
+            -0.9978073239326477,
+            0.011800892651081085
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24648696184158325,
+            -0.13007648289203644,
+            0.08872473239898682,
+            -0.11698130518198013,
+            0.027462420985102654,
+            -0.9087926149368286,
+            0.3995715379714966
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752360701560974,
+            0.037584058940410614,
+            0.08588004112243652,
+            0.06494789570569992,
+            -0.0035299232695251703,
+            -0.9978103637695312,
+            0.012003936804831028
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22352075576782227,
+            -0.16561473906040192,
+            0.08778536319732666,
+            -0.08298805356025696,
+            0.0966685563325882,
+            -0.920011043548584,
+            -0.37060508131980896
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27453601360321045,
+            0.03752683103084564,
+            0.08580899238586426,
+            0.06471706926822662,
+            -0.0034410206135362387,
+            -0.9978240132331848,
+            0.012139016762375832
+        ],
+        "episode_id": 23,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2187412977218628,
+            -0.1691853255033493,
+            0.08684074878692627,
+            0.20349933207035065,
+            0.9191468358039856,
+            -0.32259827852249146,
+            -0.09842700511217117
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752689719200134,
+            0.03759879618883133,
+            0.08588778972625732,
+            0.06496121734380722,
+            -0.0035907223355025053,
+            -0.9978121519088745,
+            0.011765237897634506
+        ],
+        "episode_id": 2,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22623732686042786,
+            -0.1392211616039276,
+            0.08827447891235352,
+            -0.12234499305486679,
+            0.015029795467853546,
+            -0.899002194404602,
+            0.42023950815200806
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2754863500595093,
+            0.037587858736515045,
+            0.08591723442077637,
+            0.0650235041975975,
+            -0.0037227366119623184,
+            -0.9978061318397522,
+            0.01188962534070015
+        ],
+        "episode_id": 16,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22363832592964172,
+            -0.1464979499578476,
+            0.08807647228240967,
+            -0.09416382759809494,
+            0.11574037373065948,
+            -0.9197409749031067,
+            -0.36306214332580566
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2749359607696533,
+            0.03756190091371536,
+            0.08585220575332642,
+            0.06485141068696976,
+            -0.003524402854964137,
+            -0.9978185296058655,
+            0.0118462098762393
+        ],
+        "episode_id": 17,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22623923420906067,
+            -0.13921800255775452,
+            0.08827459812164307,
+            -0.12233411520719528,
+            0.014999434351921082,
+            -0.8989053964614868,
+            0.42045095562934875
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2744396924972534,
+            0.03755023330450058,
+            0.08583366870880127,
+            0.06466130167245865,
+            -0.003911587875336409,
+            -0.9978260397911072,
+            0.012132559902966022
+        ],
+        "episode_id": 16,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22623923420906067,
+            -0.13921800255775452,
+            0.08827459812164307,
+            -0.12233411520719528,
+            0.014999434351921082,
+            -0.8989053964614868,
+            0.42045095562934875
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2744396924972534,
+            0.03755023330450058,
+            0.08583366870880127,
+            0.06466130167245865,
+            -0.003911587875336409,
+            -0.9978260397911072,
+            0.012132559902966022
+        ],
+        "episode_id": 16,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2236386239528656,
+            -0.14649905264377594,
+            0.08807635307312012,
+            -0.09415655583143234,
+            0.11574490368366241,
+            -0.9197052121162415,
+            -0.3631533086299896
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2749359905719757,
+            0.037561897188425064,
+            0.08585220575332642,
+            0.06485145539045334,
+            -0.0035243721213191748,
+            -0.9978185296058655,
+            0.011846200563013554
+        ],
+        "episode_id": 17,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24375787377357483,
+            -0.15553782880306244,
+            0.0878414511680603,
+            -0.08333408087491989,
+            0.09635796397924423,
+            -0.9213271737098694,
+            -0.36732450127601624
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748607397079468,
+            0.037564609199762344,
+            0.08584833145141602,
+            0.06482552736997604,
+            -0.0035666408948600292,
+            -0.9978201389312744,
+            0.011838946491479874
+        ],
+        "episode_id": 8,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24659673869609833,
+            -0.15935994684696198,
+            0.08786165714263916,
+            -0.12752406299114227,
+            0.006534385494887829,
+            -0.9128532409667969,
+            0.38780680298805237
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27483105659484863,
+            0.03756241500377655,
+            0.0858449935913086,
+            0.0648149773478508,
+            -0.0035590194165706635,
+            -0.9978201389312744,
+            0.011903909966349602
+        ],
+        "episode_id": 10,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24641786515712738,
+            -0.1631557047367096,
+            0.08786988258361816,
+            -0.11383985728025436,
+            0.05602318048477173,
+            -0.9918869137763977,
+            0.007895197719335556
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27485954761505127,
+            0.037565067410469055,
+            0.08584815263748169,
+            0.06482508033514023,
+            -0.003566362662240863,
+            -0.997820258140564,
+            0.011835421435534954
+        ],
+        "episode_id": 9,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24639132618904114,
+            -0.1531311571598053,
+            0.08784627914428711,
+            -0.11389052867889404,
+            0.05591568350791931,
+            -0.9918798804283142,
+            0.008779983967542648
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27444201707839966,
+            0.0375356525182724,
+            0.08583676815032959,
+            0.064662404358387,
+            -0.003948204219341278,
+            -0.9978281259536743,
+            0.011938889510929585
+        ],
+        "episode_id": 6,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2236136496067047,
+            -0.15555652976036072,
+            0.08776211738586426,
+            -0.08332299441099167,
+            0.09636853635311127,
+            -0.921276867389679,
+            -0.3674502372741699
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748369574546814,
+            0.0375625342130661,
+            0.08584564924240112,
+            0.0648169293999672,
+            -0.0035605961456894875,
+            -0.9978200793266296,
+            0.011897801421582699
+        ],
+        "episode_id": 20,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23731881380081177,
+            -0.1505134254693985,
+            0.08784765005111694,
+            -0.11807359755039215,
+            0.05442461371421814,
+            -0.9891462922096252,
+            0.06845983862876892
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748338580131531,
+            0.03756323456764221,
+            0.08584541082382202,
+            0.0648159384727478,
+            -0.003560245269909501,
+            -0.9978201389312744,
+            0.011896990239620209
+        ],
+        "episode_id": 18,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22623923420906067,
+            -0.13921800255775452,
+            0.08827459812164307,
+            -0.12233411520719528,
+            0.014999434351921082,
+            -0.8989053964614868,
+            0.42045095562934875
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2744396924972534,
+            0.03755023330450058,
+            0.08583366870880127,
+            0.06466130167245865,
+            -0.003911587875336409,
+            -0.9978260397911072,
+            0.012132559902966022
+        ],
+        "episode_id": 16,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24634405970573425,
+            -0.13953939080238342,
+            0.08831077814102173,
+            -0.11879296600818634,
+            0.02266569994390011,
+            -0.9038286805152893,
+            0.4104493260383606
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.274438738822937,
+            0.037551820278167725,
+            0.08583372831344604,
+            0.0646611824631691,
+            -0.003912631887942553,
+            -0.997826337814331,
+            0.012103639543056488
+        ],
+        "episode_id": 4,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24663247168064117,
+            -0.14972208440303802,
+            0.08797997236251831,
+            -0.12393162399530411,
+            0.016418175771832466,
+            -0.9121395945549011,
+            0.3903498351573944
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27451175451278687,
+            0.037536412477493286,
+            0.085843026638031,
+            0.0646851509809494,
+            -0.003946041688323021,
+            -0.9978265762329102,
+            0.011947659775614738
+        ],
+        "episode_id": 7,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24370862543582916,
+            -0.14612624049186707,
+            0.0880587100982666,
+            -0.09122560918331146,
+            0.10954219102859497,
+            -0.9180129766464233,
+            -0.3700419068336487
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27573031187057495,
+            0.0376163125038147,
+            0.08594632148742676,
+            0.06510984152555466,
+            -0.003807089990004897,
+            -0.9978059530258179,
+            0.011393210850656033
+        ],
+        "episode_id": 5,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23164969682693481,
+            -0.12043657898902893,
+            0.08909600973129272,
+            -0.11390309780836105,
+            0.007086397148668766,
+            -0.8433641791343689,
+            0.5250839591026306
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757270336151123,
+            0.03761139512062073,
+            0.08594661951065063,
+            0.06510751694440842,
+            -0.0038167035672813654,
+            -0.9978055953979492,
+            0.011435276828706264
+        ],
+        "episode_id": 12,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22665634751319885,
+            -0.1499621421098709,
+            0.08796942234039307,
+            -0.12189856916666031,
+            0.02206462435424328,
+            -0.9139844179153442,
+            0.38637635111808777
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748654782772064,
+            0.03756578266620636,
+            0.08584880828857422,
+            0.06482754647731781,
+            -0.0035667098127305508,
+            -0.9978201985359192,
+            0.011824666522443295
+        ],
+        "episode_id": 19,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2236412614583969,
+            -0.14649750292301178,
+            0.08807653188705444,
+            -0.09417285770177841,
+            0.11573615670204163,
+            -0.919781506061554,
+            -0.3629584312438965
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757248282432556,
+            0.0376100018620491,
+            0.08594667911529541,
+            0.06510598212480545,
+            -0.0038199499249458313,
+            -0.9978054761886597,
+            0.011450214311480522
+        ],
+        "episode_id": 17,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22665435075759888,
+            -0.1499490886926651,
+            0.08796936273574829,
+            -0.12189654260873795,
+            0.02202114462852478,
+            -0.913821816444397,
+            0.3867638409137726
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27572399377822876,
+            0.037611059844493866,
+            0.08594655990600586,
+            0.06510594487190247,
+            -0.0038192805368453264,
+            -0.9978055953979492,
+            0.011444853618741035
+        ],
+        "episode_id": 19,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22363798320293427,
+            -0.14649909734725952,
+            0.08807647228240967,
+            -0.09415549784898758,
+            0.11574362218379974,
+            -0.9197158813476562,
+            -0.36312684416770935
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27573034167289734,
+            0.03761719912290573,
+            0.08594620227813721,
+            0.06511016190052032,
+            -0.0038054054602980614,
+            -0.9978060126304626,
+            0.011389683932065964
+        ],
+        "episode_id": 17,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.246320903301239,
+            -0.13395683467388153,
+            0.08854061365127563,
+            -0.11305178701877594,
+            0.07952218502759933,
+            -0.9902112483978271,
+            0.01942845992743969
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748544216156006,
+            0.037564657628536224,
+            0.08584755659103394,
+            0.06482350081205368,
+            -0.0035643824376165867,
+            -0.9978201985359192,
+            0.011850381270051003
+        ],
+        "episode_id": 0,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.21698524057865143,
+            -0.14660502970218658,
+            0.08851104974746704,
+            -0.021156512200832367,
+            0.4129718542098999,
+            -0.8461997509002686,
+            -0.33608463406562805
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27528679370880127,
+            0.03759888559579849,
+            0.08588951826095581,
+            0.06496698409318924,
+            -0.0035915488842874765,
+            -0.9978117346763611,
+            0.011765535920858383
+        ],
+        "episode_id": 14,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2266106903553009,
+            -0.15936481952667236,
+            0.0877828598022461,
+            -0.12754502892494202,
+            0.006310648284852505,
+            -0.9121742248535156,
+            0.38939839601516724
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27453160285949707,
+            0.03752588853240013,
+            0.08580851554870605,
+            0.06471550464630127,
+            -0.003439647611230612,
+            -0.9978240728378296,
+            0.012150285765528679
+        ],
+        "episode_id": 22,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464868426322937,
+            -0.13007578253746033,
+            0.08872479200363159,
+            -0.11697876453399658,
+            0.027457116171717644,
+            -0.9087831377983093,
+            0.3995940387248993
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27549296617507935,
+            0.03759343922138214,
+            0.08591771125793457,
+            0.06502800434827805,
+            -0.003719077445566654,
+            -0.9978070259094238,
+            0.011788205243647099
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464258074760437,
+            -0.16314536333084106,
+            0.08786988258361816,
+            -0.11386821419000626,
+            0.055967479944229126,
+            -0.9918835163116455,
+            0.008321682922542095
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752709984779358,
+            0.037598393857479095,
+            0.08588796854019165,
+            0.06496146321296692,
+            -0.0035912184976041317,
+            -0.9978120923042297,
+            0.011767592281103134
+        ],
+        "episode_id": 9,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2187570035457611,
+            -0.1692536175251007,
+            0.08683979511260986,
+            0.20167206227779388,
+            0.9196218252182007,
+            -0.32261842489242554,
+            -0.09768187999725342
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27549445629119873,
+            0.03758811205625534,
+            0.0859183669090271,
+            0.06502597033977509,
+            -0.0037284160498529673,
+            -0.9978061318397522,
+            0.011872340925037861
+        ],
+        "episode_id": 2,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24375185370445251,
+            -0.1555439829826355,
+            0.0878414511680603,
+            -0.0833519846200943,
+            0.09634293615818024,
+            -0.9213860630989075,
+            -0.3671763837337494
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27572983503341675,
+            0.03761640191078186,
+            0.08594620227813721,
+            0.06511013954877853,
+            -0.003805799875408411,
+            -0.9978058934211731,
+            0.01139783300459385
+        ],
+        "episode_id": 8,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24648576974868774,
+            -0.1300765573978424,
+            0.08872485160827637,
+            -0.11698031425476074,
+            0.027455350384116173,
+            -0.9087827205657959,
+            0.399594783782959
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2745341658592224,
+            0.037526506930589676,
+            0.08580881357192993,
+            0.06471646577119827,
+            -0.003440484404563904,
+            -0.9978240728378296,
+            0.012144338339567184
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2501789331436157,
+            -0.1787479966878891,
+            0.0869065523147583,
+            -0.14004144072532654,
+            0.8610861301422119,
+            -0.4884185791015625,
+            0.01914992742240429
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757253050804138,
+            0.037610139697790146,
+            0.08594667911529541,
+            0.06510602682828903,
+            -0.003820158541202545,
+            -0.9978055357933044,
+            0.011446578428149223
+        ],
+        "episode_id": 3,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.25629764795303345,
+            -0.16176505386829376,
+            0.08699673414230347,
+            -0.3622148334980011,
+            0.7477914094924927,
+            -0.5257027745246887,
+            0.18233342468738556
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27453553676605225,
+            0.037527017295360565,
+            0.08580893278121948,
+            0.06471717357635498,
+            -0.003440242726355791,
+            -0.9978240728378296,
+            0.012138466350734234
+        ],
+        "episode_id": 15,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.21691778302192688,
+            -0.14667943120002747,
+            0.08850908279418945,
+            -0.018826467916369438,
+            0.4155694842338562,
+            -0.8436645865440369,
+            -0.33937904238700867
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27444103360176086,
+            0.03755217418074608,
+            0.08583420515060425,
+            0.06466250866651535,
+            -0.003915069159120321,
+            -0.9978267550468445,
+            0.012065747752785683
+        ],
+        "episode_id": 14,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23164969682693481,
+            -0.12043657898902893,
+            0.08909600973129272,
+            -0.11390309780836105,
+            0.007086397148668766,
+            -0.8433641791343689,
+            0.5250839591026306
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748485803604126,
+            0.037563759833574295,
+            0.0858469009399414,
+            0.06482075154781342,
+            -0.003563227830454707,
+            -0.9978201389312744,
+            0.011867535300552845
+        ],
+        "episode_id": 12,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2582824230194092,
+            -0.16394099593162537,
+            0.08695465326309204,
+            -0.3795715272426605,
+            0.7881006002426147,
+            -0.45760947465896606,
+            0.15942633152008057
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757297456264496,
+            0.03761769086122513,
+            0.08594614267349243,
+            0.06511010974645615,
+            -0.0038046413101255894,
+            -0.9978060722351074,
+            0.011383673176169395
+        ],
+        "episode_id": 15,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2266107201576233,
+            -0.1593635231256485,
+            0.0877828598022461,
+            -0.12754565477371216,
+            0.006293031387031078,
+            -0.9121332764625549,
+            0.3894941508769989
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27483871579170227,
+            0.03756261244416237,
+            0.08584582805633545,
+            0.0648173838853836,
+            -0.0035610117483884096,
+            -0.9978200197219849,
+            0.011898885481059551
+        ],
+        "episode_id": 22,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23164969682693481,
+            -0.12043657898902893,
+            0.08909600973129272,
+            -0.11390309780836105,
+            0.007086397148668766,
+            -0.8433641791343689,
+            0.5250839591026306
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27550116181373596,
+            0.03758717328310013,
+            0.08591824769973755,
+            0.06502824276685715,
+            -0.003718169406056404,
+            -0.9978054165840149,
+            0.011921331286430359
+        ],
+        "episode_id": 12,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24659673869609833,
+            -0.15935994684696198,
+            0.08786165714263916,
+            -0.12752406299114227,
+            0.006534385494887829,
+            -0.9128532409667969,
+            0.38780680298805237
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748773992061615,
+            0.037566445767879486,
+            0.08584994077682495,
+            0.06483134627342224,
+            -0.0035679941065609455,
+            -0.9978200197219849,
+            0.011821764521300793
+        ],
+        "episode_id": 10,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.25014373660087585,
+            -0.1787966638803482,
+            0.08690649271011353,
+            -0.13983215391635895,
+            0.8611205220222473,
+            -0.4884223937988281,
+            0.01903262361884117
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27523133158683777,
+            0.03758452832698822,
+            0.08587968349456787,
+            0.06494679301977158,
+            -0.003530023153871298,
+            -0.9978106021881104,
+            0.01199397537857294
+        ],
+        "episode_id": 3,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24663668870925903,
+            -0.14971612393856049,
+            0.08797955513000488,
+            -0.12407324463129044,
+            0.016492953523993492,
+            -0.9122366309165955,
+            0.3900749087333679
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27572840452194214,
+            0.03761320188641548,
+            0.08594650030136108,
+            0.06510830670595169,
+            -0.0038122194819152355,
+            -0.9978055953979492,
+            0.011428151279687881
+        ],
+        "episode_id": 7,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22623774409294128,
+            -0.13921983540058136,
+            0.08827453851699829,
+            -0.12234348803758621,
+            0.015029927715659142,
+            -0.8989952802658081,
+            0.42025482654571533
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27549034357070923,
+            0.03759303689002991,
+            0.08591735363006592,
+            0.06502697616815567,
+            -0.0037182567175477743,
+            -0.9978070855140686,
+            0.011792789213359356
+        ],
+        "episode_id": 16,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24639147520065308,
+            -0.15313057601451874,
+            0.08784627914428711,
+            -0.1138920858502388,
+            0.05591384321451187,
+            -0.9918798208236694,
+            0.008779170922935009
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27526089549064636,
+            0.0376000702381134,
+            0.08588653802871704,
+            0.06495853513479233,
+            -0.0035839169286191463,
+            -0.9978122115135193,
+            0.011774811893701553
+        ],
+        "episode_id": 6,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2187449038028717,
+            -0.16908147931098938,
+            0.08685779571533203,
+            0.20067216455936432,
+            0.918570876121521,
+            -0.32578223943710327,
+            -0.09911824017763138
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2746148109436035,
+            0.0375409759581089,
+            0.08582067489624023,
+            0.06474314630031586,
+            -0.003499098587781191,
+            -0.9978231191635132,
+            0.012059425003826618
+        ],
+        "episode_id": 2,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464258074760437,
+            -0.16314536333084106,
+            0.08786988258361816,
+            -0.11386821419000626,
+            0.055967479944229126,
+            -0.9918835163116455,
+            0.008321682922542095
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752709984779358,
+            0.037598393857479095,
+            0.08588796854019165,
+            0.06496146321296692,
+            -0.0035912184976041317,
+            -0.9978120923042297,
+            0.011767592281103134
+        ],
+        "episode_id": 9,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22623732686042786,
+            -0.1392211616039276,
+            0.08827447891235352,
+            -0.12234499305486679,
+            0.015029795467853546,
+            -0.899002194404602,
+            0.42023950815200806
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2754863500595093,
+            0.037587858736515045,
+            0.08591723442077637,
+            0.0650235041975975,
+            -0.0037227366119623184,
+            -0.9978061318397522,
+            0.01188962534070015
+        ],
+        "episode_id": 16,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24632661044597626,
+            -0.13395105302333832,
+            0.08854091167449951,
+            -0.11305438727140427,
+            0.07951845228672028,
+            -0.990211009979248,
+            0.019440405070781708
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752723693847656,
+            0.03759915381669998,
+            0.08588814735412598,
+            0.06496240943670273,
+            -0.0035906594712287188,
+            -0.9978120923042297,
+            0.011765946634113789
+        ],
+        "episode_id": 0,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23165026307106018,
+            -0.12043482065200806,
+            0.08909618854522705,
+            -0.11390382796525955,
+            0.007082958705723286,
+            -0.8433515429496765,
+            0.5251039266586304
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752396762371063,
+            0.03758548945188522,
+            0.0858803391456604,
+            0.06494869291782379,
+            -0.003528999863192439,
+            -0.9978103041648865,
+            0.012008491903543472
+        ],
+        "episode_id": 12,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24659505486488342,
+            -0.1593618541955948,
+            0.08786159753799438,
+            -0.1275247037410736,
+            0.006552449427545071,
+            -0.9129032492637634,
+            0.3876888155937195
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752872109413147,
+            0.03759950399398804,
+            0.08588939905166626,
+            0.06496737152338028,
+            -0.003590403124690056,
+            -0.9978117942810059,
+            0.011764472350478172
+        ],
+        "episode_id": 10,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23164969682693481,
+            -0.12043657898902893,
+            0.08909600973129272,
+            -0.11390309780836105,
+            0.007086397148668766,
+            -0.8433641791343689,
+            0.5250839591026306
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757302522659302,
+            0.03761708736419678,
+            0.08594620227813721,
+            0.06511006504297256,
+            -0.0038056913763284683,
+            -0.9978059530258179,
+            0.01139199547469616
+        ],
+        "episode_id": 12,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2236136496067047,
+            -0.15555652976036072,
+            0.08776211738586426,
+            -0.08332299441099167,
+            0.09636853635311127,
+            -0.921276867389679,
+            -0.3674502372741699
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748730182647705,
+            0.03756580501794815,
+            0.0858495831489563,
+            0.06482996046543121,
+            -0.0035680499859154224,
+            -0.9978200793266296,
+            0.011819013394415379
+        ],
+        "episode_id": 20,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.25014644861221313,
+            -0.17879194021224976,
+            0.0869065523147583,
+            -0.14012132585048676,
+            0.861072838306427,
+            -0.48841723799705505,
+            0.019195150583982468
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748473584651947,
+            0.03756385296583176,
+            0.0858469009399414,
+            0.06482049822807312,
+            -0.003563725156709552,
+            -0.9978201985359192,
+            0.011866760440170765
+        ],
+        "episode_id": 3,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24641786515712738,
+            -0.1631557047367096,
+            0.08786988258361816,
+            -0.11383985728025436,
+            0.05602318048477173,
+            -0.9918869137763977,
+            0.007895197719335556
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27572816610336304,
+            0.037613071501255035,
+            0.08594661951065063,
+            0.06510834395885468,
+            -0.003814141731709242,
+            -0.9978057146072388,
+            0.011421787552535534
+        ],
+        "episode_id": 9,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.25629764795303345,
+            -0.16176505386829376,
+            0.08699673414230347,
+            -0.3622148334980011,
+            0.7477914094924927,
+            -0.5257027745246887,
+            0.18233342468738556
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27453553676605225,
+            0.037527017295360565,
+            0.08580893278121948,
+            0.06471717357635498,
+            -0.003440242726355791,
+            -0.9978240728378296,
+            0.012138466350734234
+        ],
+        "episode_id": 15,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464868426322937,
+            -0.13007578253746033,
+            0.08872479200363159,
+            -0.11697876453399658,
+            0.027457116171717644,
+            -0.9087831377983093,
+            0.3995940387248993
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27549296617507935,
+            0.03759343922138214,
+            0.08591771125793457,
+            0.06502800434827805,
+            -0.003719077445566654,
+            -0.9978070259094238,
+            0.011788205243647099
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.21874770522117615,
+            -0.16924302279949188,
+            0.08683723211288452,
+            0.20316122472286224,
+            0.9194647669792175,
+            -0.3220462203025818,
+            -0.09796302765607834
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27548596262931824,
+            0.03759383782744408,
+            0.08591717481613159,
+            0.06502517312765121,
+            -0.0037219268269836903,
+            -0.9978071451187134,
+            0.011793358251452446
+        ],
+        "episode_id": 2,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2236136496067047,
+            -0.15555652976036072,
+            0.08776211738586426,
+            -0.08332299441099167,
+            0.09636853635311127,
+            -0.921276867389679,
+            -0.3674502372741699
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748730182647705,
+            0.03756580501794815,
+            0.0858495831489563,
+            0.06482996046543121,
+            -0.0035680499859154224,
+            -0.9978200793266296,
+            0.011819013394415379
+        ],
+        "episode_id": 20,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2463195025920868,
+            -0.13395509123802185,
+            0.08854067325592041,
+            -0.11305055767297745,
+            0.07953114062547684,
+            -0.9902123212814331,
+            0.019345158711075783
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2746199071407318,
+            0.03754067420959473,
+            0.08582139015197754,
+            0.06474455446004868,
+            -0.0035026168916374445,
+            -0.9978229999542236,
+            0.012061923742294312
+        ],
+        "episode_id": 0,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2437519133090973,
+            -0.1555464267730713,
+            0.08784151077270508,
+            -0.08341213315725327,
+            0.09628722071647644,
+            -0.921610951423645,
+            -0.36661258339881897
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2750391662120819,
+            0.03759147226810455,
+            0.08586251735687256,
+            0.06488464772701263,
+            -0.0035358790773898363,
+            -0.9978152513504028,
+            0.011937427334487438
+        ],
+        "episode_id": 8,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22353988885879517,
+            -0.16560296714305878,
+            0.08778536319732666,
+            -0.08301379531621933,
+            0.09664752334356308,
+            -0.9200950860977173,
+            -0.3703964352607727
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27481964230537415,
+            0.0375627800822258,
+            0.08584403991699219,
+            0.06481095403432846,
+            -0.0035596902016550303,
+            -0.9978204369544983,
+            0.01189995277673006
+        ],
+        "episode_id": 23,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.25828981399536133,
+            -0.16393423080444336,
+            0.08695477247238159,
+            -0.3796927332878113,
+            0.7880472540855408,
+            -0.4575740396976471,
+            0.1595032960176468
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27549055218696594,
+            0.03759423643350601,
+            0.08591753244400024,
+            0.06502684205770493,
+            -0.0037207507994025946,
+            -0.9978070855140686,
+            0.011791623197495937
+        ],
+        "episode_id": 15,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24665406346321106,
+            -0.14970329403877258,
+            0.08797973394393921,
+            -0.12398378551006317,
+            0.016617419198155403,
+            -0.9126932621002197,
+            0.3890284299850464
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27530956268310547,
+            0.037601716816425323,
+            0.08589106798171997,
+            0.06497465819120407,
+            -0.0035849877167493105,
+            -0.9978111982345581,
+            0.011771680787205696
+        ],
+        "episode_id": 7,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23164969682693481,
+            -0.12043657898902893,
+            0.08909600973129272,
+            -0.11390309780836105,
+            0.007086397148668766,
+            -0.8433641791343689,
+            0.5250839591026306
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757302522659302,
+            0.03761708736419678,
+            0.08594620227813721,
+            0.06511006504297256,
+            -0.0038056913763284683,
+            -0.9978059530258179,
+            0.01139199547469616
+        ],
+        "episode_id": 12,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24639581143856049,
+            -0.15313401818275452,
+            0.08784627914428711,
+            -0.11394709348678589,
+            0.05580718442797661,
+            -0.9918712377548218,
+            0.009663816541433334
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27573007345199585,
+            0.03761746361851692,
+            0.08594614267349243,
+            0.06511005759239197,
+            -0.0038039155770093203,
+            -0.9978060126304626,
+            0.011387481354176998
+        ],
+        "episode_id": 6,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2501789331436157,
+            -0.1787479966878891,
+            0.0869065523147583,
+            -0.14004144072532654,
+            0.8610861301422119,
+            -0.4884185791015625,
+            0.01914992742240429
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27573105692863464,
+            0.03761627525091171,
+            0.08594638109207153,
+            0.0651104748249054,
+            -0.0038073845207691193,
+            -0.9978059530258179,
+            0.011390515603125095
+        ],
+        "episode_id": 3,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.23805898427963257,
+            -0.15929840505123138,
+            0.08782786130905151,
+            -0.11799944937229156,
+            0.04678097739815712,
+            -0.9883269667625427,
+            0.08424804359674454
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2745196223258972,
+            0.03754538297653198,
+            0.08584338426589966,
+            0.0646887794137001,
+            -0.003942037466913462,
+            -0.9978267550468445,
+            0.011913448572158813
+        ],
+        "episode_id": 21,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2463279366493225,
+            -0.13395534455776215,
+            0.08854067325592041,
+            -0.11303545534610748,
+            0.07958634942770004,
+            -0.9902176856994629,
+            0.01892266236245632
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2745301127433777,
+            0.037525031715631485,
+            0.08580821752548218,
+            0.06471477448940277,
+            -0.003438670188188553,
+            -0.99782395362854,
+            0.012161355465650558
+        ],
+        "episode_id": 0,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24659505486488342,
+            -0.1593618541955948,
+            0.08786159753799438,
+            -0.1275247037410736,
+            0.006552449427545071,
+            -0.9129032492637634,
+            0.3876888155937195
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2752872109413147,
+            0.03759950399398804,
+            0.08588939905166626,
+            0.06496737152338028,
+            -0.003590403124690056,
+            -0.9978117942810059,
+            0.011764472350478172
+        ],
+        "episode_id": 10,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.246320903301239,
+            -0.13395683467388153,
+            0.08854061365127563,
+            -0.11305178701877594,
+            0.07952218502759933,
+            -0.9902112483978271,
+            0.01942845992743969
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27552682161331177,
+            0.037594087421894073,
+            0.0859220027923584,
+            0.06503790616989136,
+            -0.0037356719840317965,
+            -0.9978063106536865,
+            0.011789134703576565
+        ],
+        "episode_id": 0,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24639581143856049,
+            -0.15313401818275452,
+            0.08784627914428711,
+            -0.11394709348678589,
+            0.05580718442797661,
+            -0.9918712377548218,
+            0.009663816541433334
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27573007345199585,
+            0.03761746361851692,
+            0.08594614267349243,
+            0.06511005759239197,
+            -0.0038039155770093203,
+            -0.9978060126304626,
+            0.011387481354176998
+        ],
+        "episode_id": 6,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.22363798320293427,
+            -0.14649909734725952,
+            0.08807647228240967,
+            -0.09415549784898758,
+            0.11574362218379974,
+            -0.9197158813476562,
+            -0.36312684416770935
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757248282432556,
+            0.0376100018620491,
+            0.08594661951065063,
+            0.06510622054338455,
+            -0.0038196956738829613,
+            -0.9978054761886597,
+            0.011450221762061119
+        ],
+        "episode_id": 17,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.21698716282844543,
+            -0.146608367562294,
+            0.08850687742233276,
+            -0.021178364753723145,
+            0.41233378648757935,
+            -0.8465253710746765,
+            -0.33604690432548523
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27573007345199585,
+            0.0376150906085968,
+            0.08594638109207153,
+            0.06510952115058899,
+            -0.003808909095823765,
+            -0.9978058338165283,
+            0.01140671968460083
+        ],
+        "episode_id": 14,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.25014644861221313,
+            -0.17879194021224976,
+            0.0869065523147583,
+            -0.14012132585048676,
+            0.861072838306427,
+            -0.48841723799705505,
+            0.019195150583982468
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2754817008972168,
+            0.03758734464645386,
+            0.08591657876968384,
+            0.0650218203663826,
+            -0.003719065338373184,
+            -0.9978061318397522,
+            0.011898313648998737
+        ],
+        "episode_id": 3,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2373194694519043,
+            -0.15051160752773285,
+            0.0878455638885498,
+            -0.11805219948291779,
+            0.05410101264715195,
+            -0.9891422986984253,
+            0.06880809366703033
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748534381389618,
+            0.037564679980278015,
+            0.08584749698638916,
+            0.06482267379760742,
+            -0.0035649731289595366,
+            -0.9978201985359192,
+            0.011849358677864075
+        ],
+        "episode_id": 18,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24634426832199097,
+            -0.13953641057014465,
+            0.08831089735031128,
+            -0.11878381669521332,
+            0.022626586258411407,
+            -0.9037137031555176,
+            0.4107069671154022
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27550581097602844,
+            0.037594541907310486,
+            0.08591979742050171,
+            0.06503144651651382,
+            -0.0037321513518691063,
+            -0.9978069067001343,
+            0.011778272688388824
+        ],
+        "episode_id": 4,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2435397207736969,
+            -0.16562245786190033,
+            0.08786427974700928,
+            -0.08302176743745804,
+            0.09664563834667206,
+            -0.9201313853263855,
+            -0.3703047037124634
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748587727546692,
+            0.03756529092788696,
+            0.08584809303283691,
+            0.06482501327991486,
+            -0.0035659694112837315,
+            -0.997820258140564,
+            0.011834654025733471
+        ],
+        "episode_id": 11,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2266084849834442,
+            -0.15936724841594696,
+            0.08778280019760132,
+            -0.12754479050636292,
+            0.006293716840445995,
+            -0.9121382236480713,
+            0.38948288559913635
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27505648136138916,
+            0.037583544850349426,
+            0.08586323261260986,
+            0.06489003449678421,
+            -0.003526119515299797,
+            -0.9978148937225342,
+            0.011940517462790012
+        ],
+        "episode_id": 22,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24638505280017853,
+            -0.15313871204853058,
+            0.08784615993499756,
+            -0.11390523612499237,
+            0.05589030683040619,
+            -0.9918778538703918,
+            0.008973401971161366
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27523374557495117,
+            0.03757738694548607,
+            0.08587968349456787,
+            0.0649472251534462,
+            -0.0035277523566037416,
+            -0.997810423374176,
+            0.012003537267446518
+        ],
+        "episode_id": 6,
+        "success": true
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.2464868426322937,
+            -0.13007578253746033,
+            0.08872479200363159,
+            -0.11697876453399658,
+            0.027457116171717644,
+            -0.9087831377983093,
+            0.3995940387248993
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2757301926612854,
+            0.03761279210448265,
+            0.08594679832458496,
+            0.06510910391807556,
+            -0.00381508469581604,
+            -0.9978057146072388,
+            0.011416040360927582
+        ],
+        "episode_id": 1,
+        "success": false
+    }
+]
