@@ -1,12 +1,17 @@
 import warnings
-from typing import (Any, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar,
+from typing import (Any, ClassVar, List, Optional, Tuple, Type, TypeVar,
                     Union)
+from gymnasium.spaces import Dict, Box
 
+from improve.data.flex import *
+
+import os
 import numpy as np
 import torch as th
+from torch.optim import lr_scheduler
 from gymnasium import spaces
 from sb3_contrib.common.utils import quantile_huber_loss
-from sb3_contrib.qrdqn.policies import (CnnPolicy, MlpPolicy, MultiInputPolicy,
+from improve.pac.qrdqn.policies import (CnnPolicy, MlpPolicy, MultiInputPolicy,
                                         QRDQNPolicy, QuantileNetwork)
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
@@ -18,6 +23,8 @@ from stable_baselines3.common.utils import (get_linear_fn,
                                             polyak_update)
 
 SelfQRDQN = TypeVar("SelfQRDQN", bound="QRDQN")
+HOME = os.path.expanduser("~")
+DATA_DIR = os.path.join(HOME, "datasets", "simpler")
 
 
 class QRDQN(OffPolicyAlgorithm):
@@ -65,7 +72,7 @@ class QRDQN(OffPolicyAlgorithm):
     :param _init_setup_model: Whether or not to build the network at the creation of the instance
     """
 
-    policy_aliases: ClassVar[Dict[str, Type[BasePolicy]]] = {
+    policy_aliases = {
         "MlpPolicy": MlpPolicy,
         "CnnPolicy": CnnPolicy,
         "MultiInputPolicy": MultiInputPolicy,
@@ -89,7 +96,7 @@ class QRDQN(OffPolicyAlgorithm):
         train_freq: Union[int, Tuple[int, str]] = 4,
         gradient_steps: int = 1,
         replay_buffer_class: Optional[Type[ReplayBuffer]] = None,
-        replay_buffer_kwargs: Optional[Dict[str, Any]] = None,
+        replay_buffer_kwargs = None,
         optimize_memory_usage: bool = False,
         target_update_interval: int = 10000,
         exploration_fraction: float = 0.005,
@@ -98,7 +105,7 @@ class QRDQN(OffPolicyAlgorithm):
         max_grad_norm: Optional[float] = None,
         stats_window_size: int = 100,
         tensorboard_log: Optional[str] = None,
-        policy_kwargs: Optional[Dict[str, Any]] = None,
+        policy_kwargs = None,
         verbose: int = 0,
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
@@ -271,7 +278,7 @@ class QRDQN(OffPolicyAlgorithm):
 
     def predict(
         self,
-        observation: Union[np.ndarray, Dict[str, np.ndarray]],
+        observation,
         state: Optional[Tuple[np.ndarray, ...]] = None,
         episode_start: Optional[np.ndarray] = None,
         deterministic: bool = False,
@@ -332,3 +339,30 @@ class QRDQN(OffPolicyAlgorithm):
         state_dicts = ["policy", "policy.optimizer"]
 
         return state_dicts, []
+
+def main():
+    dataset = HDF5IterDataset(DATA_DIR, loop = False)
+    
+    # for data in dataset:
+    #     inspect(data)
+    
+    observation_space = Dict({'agent_partial-action': Box(-float('inf'), float('inf'), (7,), np.float32), 'agent_qpos': Box(-float('inf'), float("inf"), (11,), np.float32), 'agent_qvel': Box(-float("inf"), float("inf"), (11,), np.float32), 'simpler-img': Box(low=0, high=255, shape=(3, 69, 91), dtype=np.uint8)})
+    action_space = Box(np.array([-1., -1., -1., -1.5707964, -1.5707964, -1.5707964, -1.]), np.array([1., 1., 1., 1.5707964, 1.5707964, 1.5707964, 1.]), (7,), np.float32)
+    
+    def lr_schedule(n_steps):
+        start_lr = 5e-5
+        end_lr = 1e-6
+        max_steps = 1e6
+        return start_lr - (n_steps * (start_lr - end_lr)) / max_steps
+    
+    model = MultiInputPolicy(Dict({"simpler-img": observation_space['simpler-img']}), action_space, lr_schedule)    
+    
+    example = next(iter(dataset))
+    model.set_training_mode(True)
+    # breakpoint()
+    output = model({'simpler-img': example['observation']['simpler-img'].permute(2, 0, 1)})
+    breakpoint()
+    
+
+if __name__ == "__main__":
+    main()

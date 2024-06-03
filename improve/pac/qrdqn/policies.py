@@ -35,6 +35,7 @@ class QuantileNetwork(BasePolicy):
         action_space: spaces.Discrete,
         features_extractor: BaseFeaturesExtractor,
         features_dim: int,
+        action_space_n = 10,
         n_quantiles: int = 200,
         net_arch: Optional[List[int]] = None,
         activation_fn: Type[nn.Module] = nn.ReLU,
@@ -54,7 +55,7 @@ class QuantileNetwork(BasePolicy):
         self.activation_fn = activation_fn
         self.features_dim = features_dim
         self.n_quantiles = n_quantiles
-        action_dim = int(self.action_space.n)  # number of actions
+        action_dim = int(action_space_n)  # number of actions
         quantile_net = create_mlp(self.features_dim, action_dim * self.n_quantiles, self.net_arch, self.activation_fn)
         self.quantile_net = nn.Sequential(*quantile_net)
 
@@ -168,7 +169,7 @@ class QRDQNPolicy(BasePolicy):
         self.quantile_net_target = self.make_quantile_net()
         self.quantile_net_target.load_state_dict(self.quantile_net.state_dict())
         self.quantile_net_target.set_training_mode(False)
-
+        
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(  # type: ignore[call-arg]
             self.parameters(),

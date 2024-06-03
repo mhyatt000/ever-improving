@@ -1,3 +1,3 @@
 name: "rt1"
-ckpt: "~/rtx_rt1x_checkpoint"
+ckpt: "/home/zero-shot/RLResearch/rt_1_x_tf_trained_for_002272480_step"
 task: "google_robot_pick_horizontal_coke_can"

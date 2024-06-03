@@ -22,6 +22,7 @@ from scipy.ndimage import zoom
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
 
+import os
 import improve
 import improve.config.resolver
 import improve.wrapper.dict_util as du
@@ -483,6 +484,10 @@ def main(cfg):
     warnings.filterwarnings("ignore", category=FutureWarning)
 
     env = make(cfg.env)
+    
+    
+    breakpoint()
+    
     #things = env.reset()
 
     #hist = {t: 0 for t in simpler_env.ENVIRONMENTS if "widowx" in t}
@@ -495,10 +500,14 @@ def main(cfg):
     env = make(cfg.env)
     
     episode_infos = []
+    
+    # initially add empty list to create file and initialize
+    with open("improve/wrapper/start_infos.json", "w") as file:
+        json.dump(episode_infos, file, indent=4)
 
     for _ in range(EPISODES):
         obs, initial_info = env.reset()
-        breakpoint()
+
         # perform transformations to allow for json file saving
         initial_info['episode_source_obj_init_pose_wrt_robot_base'] = list(initial_info['episode_source_obj_init_pose_wrt_robot_base'].__getstate__())
         initial_info['episode_target_obj_init_pose_wrt_robot_base'] = list(initial_info['episode_target_obj_init_pose_wrt_robot_base'].__getstate__())
@@ -526,15 +535,17 @@ def main(cfg):
         # if success:
         #     hist[t] += 1
         # pprint(hist)
+        with open('improve/wrapper/start_infos.json', 'r') as file:
+            episode_infos = json.load(file)
         
         episode_infos.append(initial_info)
+        
+        with open("improve/wrapper/start_infos.json", "w") as file:
+            json.dump(episode_infos, file, indent=4)
 
     env.close()
             
     print(allinstructions)
-    
-    with open("improve/wrapper/infos.json", "w") as file:
-        json.dump(episode_infos, file, indent=4)
 
 
 if __name__ == "__main__":

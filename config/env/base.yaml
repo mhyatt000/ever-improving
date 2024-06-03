@@ -1,5 +1,5 @@
 defaults:
-  - foundation: octo-base
+  - foundation: rtx
 
 task: ${.foundation.task}  # relative to the foundation
 bonus: False

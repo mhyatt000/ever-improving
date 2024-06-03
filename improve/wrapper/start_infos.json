@@ -1,0 +1,88 @@
+[
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24648845195770264,
+            -0.1300778090953827,
+            0.08872473239898682,
+            -0.11698059737682343,
+            0.02744860202074051,
+            -0.9087661504745483,
+            0.3996332883834839
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.27523618936538696,
+            0.0375850647687912,
+            0.08588016033172607,
+            0.06494775414466858,
+            -0.0035315260756760836,
+            -0.9978103041648865,
+            0.012007225304841995
+        ],
+        "episode_id": 1,
+        "success": false
+    },
+    {
+        "scene_name": "bridge_table_1_v2",
+        "scene_offset": null,
+        "scene_pose": null,
+        "scene_table_height": 0.87,
+        "urdf_version": "",
+        "rgb_overlay_path": "/home/zero-shot/RLResearch/SimplerEnv/ManiSkill2_real2sim/data/real_inpainting/bridge_sink.png",
+        "rgb_overlay_cameras": [
+            "3rd_view_camera"
+        ],
+        "rgb_overlay_mode": "background",
+        "disable_bad_material": false,
+        "episode_model_ids": [
+            "eggplant",
+            "dummy_sink_target_plane"
+        ],
+        "episode_model_scales": [
+            1.0,
+            1.0
+        ],
+        "episode_source_obj_name": "eggplant",
+        "episode_target_obj_name": "dummy_sink_target_plane",
+        "episode_source_obj_init_pose_wrt_robot_base": [
+            0.24634340405464172,
+            -0.139536514878273,
+            0.0883108377456665,
+            -0.11878357082605362,
+            0.022627346217632294,
+            -0.9037196636199951,
+            0.4106941521167755
+        ],
+        "episode_target_obj_init_pose_wrt_robot_base": [
+            0.2748620808124542,
+            0.03756555914878845,
+            0.08584856986999512,
+            0.06482602655887604,
+            -0.0035671861842274666,
+            -0.997820258140564,
+            0.011830810457468033
+        ],
+        "episode_id": 4,
+        "success": false
+    }
+]
