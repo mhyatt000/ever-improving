@@ -71,7 +71,7 @@ def main():
     D = HDF5IterDataset(DATA_DIR, loop=False)
     print(D.fnames)
     for data in D:
-        inspect(data)
+        # inspect(data)
 
         # print(data['reward'].item())
         # print(data['info']['is_success'].item())

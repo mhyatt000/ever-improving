@@ -1,18 +1,19 @@
-import warnings
-from typing import (Any, ClassVar, List, Optional, Tuple, Type, TypeVar,
-                    Union)
-from gymnasium.spaces import Dict, Box
-
-from improve.data.flex import *
-
 import os
+import warnings
+from typing import Any, ClassVar, List, Optional, Tuple, Type, TypeVar, Union
+
+from tqdm import tqdm
 import numpy as np
 import torch as th
-from torch.optim import lr_scheduler
+from torch.nn import functional as F
 from gymnasium import spaces
-from sb3_contrib.common.utils import quantile_huber_loss
+from gymnasium.spaces import Box, Dict
+import matplotlib.pyplot as plt
+import scipy.stats as stats
+from improve.data.flex import *
 from improve.pac.qrdqn.policies import (CnnPolicy, MlpPolicy, MultiInputPolicy,
                                         QRDQNPolicy, QuantileNetwork)
+from sb3_contrib.common.utils import quantile_huber_loss
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy
@@ -21,6 +22,8 @@ from stable_baselines3.common.type_aliases import (GymEnv, MaybeCallback,
 from stable_baselines3.common.utils import (get_linear_fn,
                                             get_parameters_by_name,
                                             polyak_update)
+from torch.optim import lr_scheduler, Adam
+from torch.utils.data import DataLoader
 
 SelfQRDQN = TypeVar("SelfQRDQN", bound="QRDQN")
 HOME = os.path.expanduser("~")
@@ -96,7 +99,7 @@ class QRDQN(OffPolicyAlgorithm):
         train_freq: Union[int, Tuple[int, str]] = 4,
         gradient_steps: int = 1,
         replay_buffer_class: Optional[Type[ReplayBuffer]] = None,
-        replay_buffer_kwargs = None,
+        replay_buffer_kwargs=None,
         optimize_memory_usage: bool = False,
         target_update_interval: int = 10000,
         exploration_fraction: float = 0.005,
@@ -105,7 +108,7 @@ class QRDQN(OffPolicyAlgorithm):
         max_grad_norm: Optional[float] = None,
         stats_window_size: int = 100,
         tensorboard_log: Optional[str] = None,
-        policy_kwargs = None,
+        policy_kwargs=None,
         verbose: int = 0,
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
@@ -339,15 +342,57 @@ class QRDQN(OffPolicyAlgorithm):
         state_dicts = ["policy", "policy.optimizer"]
 
         return state_dicts, []
+    
+def get_observation(batch):
+    batch = {"simpler-img": batch["observation"]["simpler-img"].permute(0, 3, 1, 2), "agent_partial-action": batch["observation"]["agent_partial-action"]}
+    return batch
 
-def main():
-    dataset = HDF5IterDataset(DATA_DIR, loop = False)
-    
-    # for data in dataset:
-    #     inspect(data)
-    
-    observation_space = Dict({'agent_partial-action': Box(-float('inf'), float('inf'), (7,), np.float32), 'agent_qpos': Box(-float('inf'), float("inf"), (11,), np.float32), 'agent_qvel': Box(-float("inf"), float("inf"), (11,), np.float32), 'simpler-img': Box(low=0, high=255, shape=(3, 69, 91), dtype=np.uint8)})
-    action_space = Box(np.array([-1., -1., -1., -1.5707964, -1.5707964, -1.5707964, -1.]), np.array([1., 1., 1., 1.5707964, 1.5707964, 1.5707964, 1.]), (7,), np.float32)
+def get_next(loader):
+    return next(iter(loader))
+
+def shift_batch(batch, padding_value = 0):
+    shifted_batch = {}
+    for key, value in batch.items():
+        if isinstance(value, th.Tensor):
+            shifted_value = th.roll(value, shifts=1, dims=0)
+            shifted_value = shifted_value[1:]
+            shifted_batch[key] = shifted_value
+        else:
+            shifted_batch[key] = shift_batch(value, padding_value)
+    return shifted_batch
+
+def remove_first(batch):
+    for key, value in batch.items():
+        if isinstance(value, th.Tensor):
+            batch[key] = value[1:]
+        else:
+            batch[key] = remove_first(value)
+    return batch
+
+def preprocess_batch(batch):
+    return shift_batch(batch), remove_first(batch)
+
+def load_data(batch_size=33):
+    dataset = HDF5IterDataset(DATA_DIR, loop=True)
+    loader = DataLoader(dataset, batch_size=batch_size, num_workers=4)
+    return loader
+
+def initialize_model():
+    observation_space = Dict(
+        {
+            "agent_partial-action": Box(-float("inf"), float("inf"), (7,), np.float32),
+            "agent_qpos": Box(-float("inf"), float("inf"), (11,), np.float32),
+            "agent_qvel": Box(-float("inf"), float("inf"), (11,), np.float32),
+            "simpler-img": Box(low=0, high=255, shape=(3, 69, 91), dtype=np.uint8),
+        }
+    )
+
+    action_space = Box(
+        np.array([-1.0, -1.0, -1.0, -1.5707964, -1.5707964, -1.5707964, -1.0]),
+        np.array([1.0, 1.0, 1.0, 1.5707964, 1.5707964, 1.5707964, 1.0]),
+        (7,),
+        np.float32,
+    )
     
     def lr_schedule(n_steps):
         start_lr = 5e-5
@@ -355,14 +400,140 @@ def main():
         max_steps = 1e6
         return start_lr - (n_steps * (start_lr - end_lr)) / max_steps
     
-    model = MultiInputPolicy(Dict({"simpler-img": observation_space['simpler-img']}), action_space, lr_schedule)    
-    
-    example = next(iter(dataset))
+    model = MultiInputPolicy(
+        Dict({"simpler-img": observation_space["simpler-img"], "agent_partial-action": observation_space["agent_partial-action"]}),
+        action_space,
+        lr_schedule,
+    )
+    pprint(model)
+    return model
+
+def train(model, loader):
+    ### remove the first 4 batches for eval
+    for _ in range(4):
+        batch = get_next(loader)
+
+    model = initialize_model()
+
+    # example = next(iter(dataset))
     model.set_training_mode(True)
-    # breakpoint()
-    output = model({'simpler-img': example['observation']['simpler-img'].permute(2, 0, 1)})
-    breakpoint()
     
+    optimizer = Adam(model.parameters(), lr=5e-5)
+
+    n_updates = 0
+    losses = []
+    for _ in tqdm(range(1_000)):
+        # Sample replay buffer
+        # replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
+
+        batch = get_next(loader)
+        current, next = preprocess_batch(batch)
+        current_obs = get_observation(current)
+        next_obs = get_observation(next)
+
+        with th.no_grad():
+            # Compute the quantiles of next observation
+            # next_quantiles = self.quantile_net_target(replay_data.next_observations)
+            
+            # get the next quantiles
+            next_quantiles, next_greedy_actions = model._predict(next_obs, False)
+            
+            next_greedy_actions = next_quantiles.mean(dim=1, keepdim=True).argmax(
+                dim=2, keepdim=True
+            )
+            
+            # Make "n_quantiles" copies of actions, and reshape to (batch_size, n_quantiles, 1)
+            next_greedy_actions = next_greedy_actions.expand(
+                32, 200, 1
+            )
+            
+            # Follow greedy policy: use the one with the highest Q values
+            next_quantiles = next_quantiles.gather(
+                dim=2, index=next_greedy_actions
+            ).squeeze(dim=2)
+            
+            # breakpoint()
+            # 1-step TD target
+            target_quantiles = (
+                current['reward'].unsqueeze(1)
+                + (1 - current['terminated'].long().unsqueeze(1)) * 0.99 * next_quantiles
+            )
+        
+        current_quantiles, _ = model._predict(current_obs, False)
+        
+        # grab the first n_quantiles (200)
+        current_quantiles = current_quantiles.squeeze(dim=2)
+        
+
+        # Compute Quantile Huber loss, summing over a quantile dimension as in the paper.
+        loss = quantile_huber_loss(
+            current_quantiles, target_quantiles, sum_over_quantiles=True
+        )
+        losses.append(loss.item())
+        print("loss:", loss.item())
+
+        # Optimize the policy
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        
+    import json
+    with open('losses.json', 'w') as f:
+        json.dump(losses, f)
+
+
+    torch.save(model, 'qrdqn_model/model.pth')
+
+def main():
+    
+    
+    ### Training script
+    # loader = load_data()
+    # model = initialize_model()
+    # train(model, loader)
+    
+
+    ### Evaluation script
+    loader = load_data(batch_size=1)
+    model = torch.load('qrdqn_model/model.pth')
+    
+    first = None
+    for i in tqdm(range(100)):
+        for j in tqdm(range(32)):
+            batch = get_next(loader)
+            
+            if batch['reward'].item() == 0:
+                continue
+            
+            current_obs = get_observation(batch)
+            
+            with th.no_grad():
+                current_quantiles, _ = model._predict(current_obs, False)
+
+                current_quantiles = current_quantiles.squeeze(dim=2)
+                
+                current_quantiles = current_quantiles.squeeze(0)
+                
+            
+            
+            
+            if first is not None and torch.equal(first, current_quantiles):
+                print("same")
+            else:
+                plt.figure()
+                quantile_plot = plt.scatter(np.linspace(0, 1, 200), F.softmax(current_quantiles).numpy())
+                plt.show()
+            # plt.savefig(f'qrdqn_model/quantile_plot/batch_{i}/step_{j}.png')
+            
+            if first is None:
+                first = current_quantiles
+            
+        
+        
+
+
+
 
 if __name__ == "__main__":
     main()
