@@ -19,7 +19,7 @@ DATA_DIR = os.path.join(HOME, "datasets", "simpler")
 
 class HDF5IterDataset(IterableDataset):
 
-    def __init__(self, root_dir, loop=False):
+    def __init__(self, root_dir=DATA_DIR, loop=False):
         super(HDF5IterDataset, self).__init__()
 
         self.root_dir = root_dir

@@ -26,7 +26,7 @@ from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 SelfOffPolicyAlgorithm = TypeVar("SelfOffPolicyAlgorithm", bound="OffPolicyAlgorithm")
 
 
-class CHEF(OffPolicyAlgorithm):
+class CHEF(BaseAlgorithm):
     """CHEF loop for continuous improvement
 
     :param policy: The policy model to use (MlpPolicy, CnnPolicy, ...)

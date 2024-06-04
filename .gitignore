@@ -1,4 +1,5 @@
 # custom: tensorboard wandb and others
+weights/
 runs/
 multirun/
 *.mp4
