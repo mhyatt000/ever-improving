@@ -15,16 +15,15 @@
 """GR-1 model."""
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import transformers
 from flamingo_pytorch import PerceiverResampler
-from models.transformer_utils import get_2d_sincos_pos_embed
-from models.vision_transformer import Block
 from omegaconf import OmegaConf as OC
 from transformers import GPT2Model
+
+from models.transformer_utils import get_2d_sincos_pos_embed
+from models.vision_transformer import Block
 from util.loss import masked_loss
-
-
-import torch.nn.functional as F
 
 
 class GR1(nn.Module):
@@ -217,40 +216,36 @@ class GR1(nn.Module):
     def embed_state_info(self, state, batch_size, sequence_length):
         arm_state = state["arm"]
         gripper_state = state["gripper"]
-        arm_state_embeddings = self.embed_arm_state(
+        arm_state_emb = self.embed_arm_state(
             arm_state.view(batch_size, sequence_length, self.state_dim - 1)
         )
-        gripper_state_embeddings = self.embed_gripper_state(gripper_state)
-        state_embeddings = torch.cat(
-            (arm_state_embeddings, gripper_state_embeddings), dim=2
-        )
-        return self.embed_state(state_embeddings)
+        gripper_state_emb = self.embed_gripper_state(gripper_state)
+        state_emb = torch.cat((arm_state_emb, gripper_state_emb), dim=2)
+        return self.embed_state(state_emb)
 
     def embed_language_info(self, language):
-        lang_embeddings = self.model_clip.encode_text(language)
-        lang_embeddings = lang_embeddings / (
-            lang_embeddings.norm(dim=1, keepdim=True) + 1e-6
-        )
-        return self.embed_lang(lang_embeddings.float())
+        lang_emb = self.model_clip.encode_text(language)
+        lang_emb = lang_emb / (lang_emb.norm(dim=1, keepdim=True) + 1e-6)
+        return self.embed_lang(lang_emb.float())
 
     def get_mae_features(self, rgb, hand_rgb, batch_size, sequence_length, c, h, w):
-        obs_embeddings, patch_embeddings = self.model_mae(
+        obs_emb, patch_emb = self.model_mae(
             rgb.view(batch_size * sequence_length, c, h, w)
         )
-        obs_embeddings = obs_embeddings.view(batch_size, sequence_length, -1)
-        hand_obs_embeddings, hand_patch_embeddings = None, None
+        obs_emb = obs_emb.view(batch_size, sequence_length, -1)
+
+        hand_obs_emb, hand_patch_emb = None, None
         if self.use_hand_rgb:
-            hand_obs_embeddings, hand_patch_embeddings = self.model_mae(
+            hand_obs_emb, hand_patch_emb = self.model_mae(
                 hand_rgb.view(batch_size * sequence_length, c, h, w)
             )
-            hand_obs_embeddings = hand_obs_embeddings.view(
-                batch_size, sequence_length, -1
-            )
+            hand_obs_emb = hand_obs_emb.view(batch_size, sequence_length, -1)
+
         return (
-            obs_embeddings,
-            patch_embeddings,
-            hand_obs_embeddings,
-            hand_patch_embeddings,
+            obs_emb,
+            patch_emb,
+            hand_obs_emb,
+            hand_patch_emb,
         )
 
     def prepare_forward_prediction(
@@ -284,78 +279,66 @@ class GR1(nn.Module):
             )
         return targets
 
-    def process_patch_embeddings(
-        self, patch_embeddings, batch_size, sequence_length, is_hand=False
-    ):
-        if is_hand and patch_embeddings is None:
+    def process_patch_emb(self, patch_emb, batch_size, sequence_length, is_hand=False):
+        if is_hand and patch_emb is None:
             return None
-        patch_embeddings = patch_embeddings.unsqueeze(1)
-        patch_embeddings = self.perceiver_resampler(patch_embeddings)
-        patch_embeddings = patch_embeddings.squeeze(1)
-        return patch_embeddings.view(
+        patch_emb = patch_emb.unsqueeze(1)
+        patch_emb = self.perceiver_resampler(patch_emb)
+        patch_emb = patch_emb.squeeze(1)
+        return patch_emb.view(
             batch_size, sequence_length, self.n_patch_latents, self.patch_feat_dim
         )
 
-    def add_timestep_embeddings(
+    def add_timestep_emb(
         self,
-        state_embeddings,
-        lang_embeddings,
-        patch_embeddings,
-        obs_embeddings,
-        hand_obs_embeddings,
-        hand_patch_embeddings,
-        time_embeddings,
+        state_emb,
+        lang_emb,
+        patch_emb,
+        obs_emb,
+        hand_obs_emb,
+        hand_patch_emb,
+        time_emb,
         batch_size,
     ):
-        lang_embeddings = lang_embeddings.view(batch_size, 1, -1) + time_embeddings
-        state_embeddings = state_embeddings + time_embeddings
-        patch_embeddings = patch_embeddings + time_embeddings.view(
-            self.sequence_length, 1, self.hidden_size
-        )
-        obs_embeddings = obs_embeddings + time_embeddings
+        lang_emb = lang_emb.view(batch_size, 1, -1) + time_emb
+        state_emb = state_emb + time_emb
+        patch_emb = patch_emb + time_emb.view(self.sequence_length, 1, self.hidden_size)
+        obs_emb = obs_emb + time_emb
         if self.use_hand_rgb:
-            hand_obs_embeddings = hand_obs_embeddings + time_embeddings
-            hand_patch_embeddings = hand_patch_embeddings + time_embeddings.view(
+            hand_obs_emb = hand_obs_emb + time_emb
+            hand_patch_emb = hand_patch_emb + time_emb.view(
                 self.sequence_length, 1, self.hidden_size
             )
         return (
-            state_embeddings,
-            lang_embeddings,
-            patch_embeddings,
-            obs_embeddings,
-            hand_obs_embeddings,
-            hand_patch_embeddings,
+            state_emb,
+            lang_emb,
+            patch_emb,
+            obs_emb,
+            hand_obs_emb,
+            hand_patch_emb,
         )
 
     def format_sequence(
         self,
-        lang_embeddings,
-        state_embeddings,
-        patch_embeddings,
-        obs_embeddings,
-        hand_patch_embeddings,
-        hand_obs_embeddings,
+        lang_emb,
+        state_emb,
+        patch_emb,
+        obs_emb,
+        hand_patch_emb,
+        hand_obs_emb,
         batch_size,
         sequence_length,
     ):
-        lang_embeddings = lang_embeddings.view(
-            batch_size, sequence_length, 1, self.hidden_size
-        )
-        state_embeddings = state_embeddings.view(
-            batch_size, sequence_length, 1, self.hidden_size
-        )
-        obs_embeddings = obs_embeddings.view(
-            batch_size, sequence_length, 1, self.hidden_size
-        )
-        stacked_inputs = torch.cat(
-            (lang_embeddings, state_embeddings, patch_embeddings, obs_embeddings), dim=2
-        )
+        lang_emb = lang_emb.view(batch_size, sequence_length, 1, self.hidden_size)
+        state_emb = state_emb.view(batch_size, sequence_length, 1, self.hidden_size)
+        obs_emb = obs_emb.view(batch_size, sequence_length, 1, self.hidden_size)
+        stacked_inputs = torch.cat((lang_emb, state_emb, patch_emb, obs_emb), dim=2)
         if self.use_hand_rgb:
-            hand_obs_embeddings = hand_obs_embeddings.view(
+            hand_obs_emb = hand_obs_emb.view(
                 batch_size, sequence_length, 1, self.hidden_size
             )
             stacked_inputs = torch.cat(
-                (stacked_inputs, hand_patch_embeddings, hand_obs_embeddings), dim=2
+                (stacked_inputs, hand_patch_emb, hand_obs_emb), dim=2
             )
         return self.add_action_obs_queries(stacked_inputs, batch_size, sequence_length)
 
@@ -514,54 +497,47 @@ class GR1(nn.Module):
     def forward(self, rgb, hand_rgb, state, language, attention_mask):
         batch_size, sequence_length, c, h, w = rgb.shape
 
-        state_embeddings = self.embed_state_info(state, batch_size, sequence_length)
-        lang_embeddings = self.embed_language_info(language)
+        state_emb = self.embed_state_info(state, batch_size, sequence_length)
+        lang_emb = self.embed_language_info(language)
 
-        obs_embeddings, patch_embeddings, hand_obs_embeddings, hand_patch_embeddings = (
-            self.get_mae_features(rgb, hand_rgb, batch_size, sequence_length, c, h, w)
+        obs_emb, patch_emb, hand_obs_emb, hand_patch_emb = self.get_mae_features(
+            rgb, hand_rgb, batch_size, sequence_length, c, h, w
         )
         obs_targets, obs_hand_targets = self.prepare_forward_prediction(
             rgb, hand_rgb, batch_size, sequence_length, h, w
         )
 
-        patch_embeddings = self.process_patch_embeddings(
-            patch_embeddings, batch_size, sequence_length
-        )
-        hand_patch_embeddings = self.process_patch_embeddings(
-            hand_patch_embeddings, batch_size, sequence_length, is_hand=True
+        patch_emb = self.process_patch_emb(patch_emb, batch_size, sequence_length)
+        hand_patch_emb = self.process_patch_emb(
+            hand_patch_emb, batch_size, sequence_length, is_hand=True
         )
 
-        obs_embeddings = self.embed_img(obs_embeddings.float())
-        patch_embeddings = self.embed_patch(patch_embeddings.float())
-        hand_obs_embeddings = self.embed_hand_img(hand_obs_embeddings.float())
-        hand_patch_embeddings = self.embed_hand_patch(hand_patch_embeddings.float())
+        obs_emb = self.embed_img(obs_emb.float())
+        patch_emb = self.embed_patch(patch_emb.float())
+        hand_obs_emb = self.embed_hand_img(hand_obs_emb.float())
+        hand_patch_emb = self.embed_hand_patch(hand_patch_emb.float())
 
-        time_embeddings = self.embed_timestep.weight
-        (
-            state_embeddings,
-            lang_embeddings,
-            patch_embeddings,
-            obs_embeddings,
-            hand_obs_embeddings,
-            hand_patch_embeddings,
-        ) = self.add_timestep_embeddings(
-            state_embeddings,
-            lang_embeddings,
-            patch_embeddings,
-            obs_embeddings,
-            hand_obs_embeddings,
-            hand_patch_embeddings,
-            time_embeddings,
-            batch_size,
+        time_emb = self.embed_timestep.weight
+        (state_emb, lang_emb, patch_emb, obs_emb, hand_obs_emb, hand_patch_emb) = (
+            self.add_timestep_emb(
+                state_emb,
+                lang_emb,
+                patch_emb,
+                obs_emb,
+                hand_obs_emb,
+                hand_patch_emb,
+                time_emb,
+                batch_size,
+            )
         )
 
         stacked_inputs = self.format_sequence(
-            lang_embeddings,
-            state_embeddings,
-            patch_embeddings,
-            obs_embeddings,
-            hand_patch_embeddings,
-            hand_obs_embeddings,
+            lang_emb,
+            state_emb,
+            patch_emb,
+            obs_emb,
+            hand_patch_emb,
+            hand_obs_emb,
             batch_size,
             sequence_length,
         )
@@ -601,7 +577,7 @@ class GR1(nn.Module):
         )
 
         _masked_loss = lambda x, y: masked_loss(
-            x, y, batch['mask'], 0, F.smooth_l1_loss
+            x, y, batch["mask"], 0, F.smooth_l1_loss
         )
         loss["action_arm"] = _masked_loss(
             pred["arm_action_preds"], batch["actions"][..., :6]
@@ -610,7 +586,7 @@ class GR1(nn.Module):
             pred["gripper_action_preds"], batch["actions"][..., -1:]
         )
 
-        loss['total'] = (
+        loss["total"] = (
             loss["rgb_static"]
             + loss["rgb_gripper"]
             + cfg.arm_loss_ratio * loss["action_arm"]

@@ -172,7 +172,7 @@ def main(cfg):
             progress_bar=True,
         )
 
-    rollout(model)
+    # rollout(model)
     env.close()
 
     if cfg.job.wandb.use:

@@ -15,7 +15,7 @@ training:
 paths:
   ckpt: "./snapshot_ABC.pt"
   LMDB_path: "../calvin_lmdb/"
-  save_path: "./Save/"
+  save_path: "./save/"
   mae_ckpt: "./mae_pretrain_vit_base.pth"
 
 submodel: 

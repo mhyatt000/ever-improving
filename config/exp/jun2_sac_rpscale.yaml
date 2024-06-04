@@ -1,0 +1,30 @@
+# @package _global_
+
+# help with sweepers
+# https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
+# https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
+
+defaults:
+  - override /algo: sac
+  - _self_
+
+log_dir: ${callback.log_path}
+sweep_id: "jun2_sac_rpscale"
+
+train: 
+  n_steps: ${r_toint:2e4} # 20M
+
+algo:
+  learning_starts: ${r_toint:1e4}
+  buffer_size: ${r_toint:1e6}
+
+env:
+  residual_scale: 0.1
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+

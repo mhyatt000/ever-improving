@@ -67,13 +67,17 @@ class Trainer:
         self.scheduler = scheduler
         self.cfg = cfg
 
-        self.preprocessor = PreProcess(cn=cfg.data.preprocess, device=device)
-        self.writer = SummaryWriter(cfg.save_path + "logs")
+        self.preprocessor = PreProcess(cn=cfg.data.preprocess, device=self.device)
+        self.writer = SummaryWriter(cfg.paths.save_path + "logs")
 
     def log(self, loss):
+        print(du.apply(loss, lambda x: x.detach()))
         return
         for key in self.logger:
             logger[key] += loss[key].detach() / cfg.print_steps
+
+    def save(self):
+        raise NotImplementedError
 
     def step(self, batch):
 
@@ -106,7 +110,7 @@ class Trainer:
 
     def epoch(self, epoch):
 
-        if epoch % self.cfg.save_epochs == 0:
+        if False: # epoch % self.cfg.save_epochs == 0:
             self.save()
 
         batch, load_time = self.prefetcher.next()
@@ -116,7 +120,7 @@ class Trainer:
 
     def run(self):
 
-        for epoch in range(self.cfg.num_epochs):
+        for epoch in range(self.cfg.training.num_epochs):
             self.epoch(epoch)
             self.Logger.log()
 
@@ -240,17 +244,14 @@ def main(cfg):
         model,
         optimizer,
         loader,
-        device_placement=[True, True, False, False],
+        device_placement=[True, True,  False],
     )
 
     optimizer.step = async_step
     prefetcher = DataPrefetcher(loader, device)
     # test_prefetcher = DataPrefetcher(test_loader, device)
 
-    print("ready to     run")
-    quit()
-
-    T = Trainer(acc, prefetcher, model, optimizer, scheduler, device, cfg, step)
+    T = Trainer(acc, prefetcher, model, optimizer, scheduler,  cfg)
     T.run()
 
 

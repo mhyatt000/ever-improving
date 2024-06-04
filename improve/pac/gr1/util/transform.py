@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from torchvision.transforms.v2 import Resize
+from torchvision.transforms import v2 
 
 
 def random_shift(x, pad):
@@ -59,7 +59,7 @@ class PreProcess:
         self.rgb_gripper_pad=cn.rgb_gripper_pad
 
         self.rgb_shape=cn.rgb_shape
-        self.resize = Resize(self.rgb_shape, interpolation=Image.BICUBIC, antialias=True).to(
+        self.resize = v2.Resize(self.rgb_shape, interpolation=Image.BICUBIC, antialias=True).to(
             device
         )
         self.rgb_mean = torch.tensor(cn.rgb_mean, device=device).view(1, 1, -1, 1, 1)

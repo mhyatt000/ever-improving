@@ -355,7 +355,7 @@ class SB3Wrapper(ResidualRLWrapper):
         self.device = device
 
         # filter for the desired obs space
-        spaces = du.dict_flatten(alldict(self.observation_space))
+        spaces = du.flatten(alldict(self.observation_space))
         spaces = {k: v for k, v in spaces.items() if k in keys}
         self.keys = keys
 
@@ -390,7 +390,7 @@ class SB3Wrapper(ResidualRLWrapper):
 
     def observation(self, observation):
         observation = super().observation(observation)
-        observation = du.dict_flatten(alldict(observation))
+        observation = du.flatten(alldict(observation))
         observation = {k: v for k, v in observation.items() if k in self.keys}
 
         self.image = observation["simpler-img"]  # for render
