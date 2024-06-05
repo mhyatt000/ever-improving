@@ -71,6 +71,8 @@ class Trainer:
         self.preprocessor = PreProcess(cn=cfg.data.preprocess, device=self.device)
         self.writer = SummaryWriter(cfg.paths.save_path + "logs")
 
+        self.tokenizer = clip.tokenize
+
     def log(self, loss):
         print(du.apply(loss, lambda x: x.detach()))
         return
@@ -100,25 +102,31 @@ class Trainer:
             batch["observation"]["simpler-img"], static=True, train=True
         )
 
-        state = batch["observation"]["agent_qpos"]
-        state = {"arm": state[:, :7], "gripper": state[:, 7:]}
+        # xyq quarternions
+        # state = batch["observation"]["agent_qpos"]
+        # this is wrong
+        # state = {"arm": state[:, :7], "gripper": state[:, 7:]}
 
         # TODO no wrist images rn
         # batch["rgb_static"], batch["rgb_gripper"] = self.preprocessor.rgb_process( batch["rgb_static"], batch["rgb_gripper"], train=True)
 
         # obs_mask = batch["mask"][..., 0]
         batch_size, seq_len = batch["observation"]["simpler-img"].shape[:2]
-        attn_mask = torch.ones((batch_size, seq_len, 1)).to(device)
+        attn_mask = torch.ones((batch_size, seq_len, 1)).to(self.device)
+
+        text = self.tokenizer("put eggplant in the sink").to(self.device)
+        text = text.view(1,-1)  # add two dimensions at the beginning
+        text = text.expand(batch_size, -1)  # expand along batch_size and seq_len dimensions
 
         pred = self.model(
             rgb=img,
             hand_rgb=None,  # TODO get wrist images
-            state=state,
-            language=batch["inst_token"],
+            state=None,
+            language=text,  # batch["inst_token"],
             attn_mask=attn_mask,
         )
 
-        loss = self.model.loss(pred, batch, obs_mask, cfg.skip_frame)
+        loss = self.model.loss(pred, batch, obs_mask, self.cfg.skip_frame)
         total_loss = loss["total"]
 
         self.acc.backward(total_loss)
@@ -206,7 +214,7 @@ def main(cfg):
     # and test set
     """
 
-    ds = HDF5IterDataset()
+    ds = HDF5IterDataset(loop=True, n_steps=cfg.model.seq_len)
 
     # change shuffle to True somehow
     def build_loader(ds):

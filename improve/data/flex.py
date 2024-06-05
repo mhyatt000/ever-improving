@@ -6,7 +6,9 @@ from pprint import pprint
 
 import h5py
 import hydra
+import functools
 import improve
+from improve.wrapper.dict_util import apply_both
 import improve.config.resolver
 import improve.wrapper.dict_util as du
 import numpy as np
@@ -71,7 +73,8 @@ class HDF5IterDataset(IterableDataset):
                     step = f["steps"][key]
                     trajectory.append(HDF5IterDataset.extract(step))
                     if len(trajectory) == self.n_steps:
-                        yield trajectory
+                        trajectory = [du.apply(x, lambda x: torch.unsqueeze(x,0)) for x in trajectory]
+                        yield functools.reduce(lambda a, b: apply_both(a, b, torch.cat), trajectory)
                         trajectory = []
                 trajectory = [] # reset trajectory if not enough steps
 
@@ -94,7 +97,7 @@ def main():
     n = 0
 
     # D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
-    D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=1)
+    D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
     D = iter(D)
     inspect(next(D))
 
