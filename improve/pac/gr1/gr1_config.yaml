@@ -29,7 +29,7 @@ model:
   dropout: 0.1
   n_positions: 1024
 
-  perciever:
+  perceiver:
     resampler_depth: 3
     resampler_dim_head: 128
     resampler_heads: 4

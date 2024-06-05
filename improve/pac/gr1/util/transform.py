@@ -65,18 +65,21 @@ class PreProcess:
         self.rgb_mean = torch.tensor(cn.rgb_mean, device=device).view(1, 1, -1, 1, 1)
         self.rgb_std = torch.tensor(cn.rgb_std, device=device).view(1, 1, -1, 1, 1)
 
-    def rgb_process(self, rgb_static, rgb_gripper, train=False):
-
-        rgb_static = rgb_static.float() * (1 / 255.0)
-        rgb_gripper = rgb_gripper.float() * (1 / 255.0)
+    def _process(self, image, static, train=False):
+        pad = self.rgb_static_pad if static else self.rgb_gripper_pad
+        image = image.float() * (1 / 255.0)
 
         if train:
-            rgb_static = random_shift(rgb_static, self.rgb_static_pad)
-            rgb_gripper = random_shift(rgb_gripper, self.rgb_gripper_pad)
+            image = random_shift(image, pad)
 
-        rgb_static = self.resize(rgb_static)
-        rgb_gripper = self.resize(rgb_gripper)
+        image = self.resize(image)
         # torchvision Normalize forces sync between CPU and GPU, so we use our own
-        rgb_static = (rgb_static - self.rgb_mean) / (self.rgb_std + 1e-6)
-        rgb_gripper = (rgb_gripper - self.rgb_mean) / (self.rgb_std + 1e-6)
+        image = (image - self.rgb_mean) / (self.rgb_std + 1e-6)
+
+        return image
+
+    def rgb_process(self, rgb_static, rgb_gripper, train=False):
+        rgb_static = self._process(rgb_static, True, train)
+        rgb_gripper = self._process(rgb_gripper, False, train)
+
         return rgb_static, rgb_gripper

@@ -8,7 +8,6 @@ from time import time
 import clip
 import hydra
 import improve
-import models.vision_transformer as vits
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -20,13 +19,15 @@ from improve.pac.gr1.util.optim import async_step
 from improve.pac.gr1.util.prefetch import DataPrefetcher
 from improve.pac.gr1.util.transform import PreProcess
 from improve.wrapper import dict_util as du
-from models.gr1 import GR1
 from omegaconf import OmegaConf
 from torch.profiler import (ProfilerActivity, profile, record_function,
                             tensorboard_trace_handler)
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 from transformers import get_cosine_schedule_with_warmup
+
+import models.vision_transformer as vits
+from models.gr1 import GR1
 
 # Lightning Memory-Mapped Database
 # from LMDBDataset_jpeg import LMDBDataset as LMDBdst_jpeg
@@ -77,24 +78,44 @@ class Trainer:
             logger[key] += loss[key].detach() / cfg.print_steps
 
     def save(self):
-        raise NotImplementedError
+        save_model(
+            self.acc,
+            self.model,
+            self.cfg,
+            self.epoch,
+            modules_to_exclude=["model_mae", "model_clip"],
+        )
 
     def step(self, batch):
 
         self.model.train()
         self.optimizer.zero_grad()
-        batch["rgb_static"], batch["rgb_gripper"] = self.preprocessor.rgb_process(
-            batch["rgb_static"], batch["rgb_gripper"], train=True
+
+        print(batch.keys())
+        print(batch["observation"].keys())
+
+        # TODO can this be a transform for the dataset?
+        # preprocess before prefetching
+        img = self.preprocessor._process(
+            batch["observation"]["simpler-img"], static=True, train=True
         )
 
-        obs_mask = batch["mask"][..., 0]
+        state = batch["observation"]["agent_qpos"]
+        state = {"arm": state[:, :7], "gripper": state[:, 7:]}
 
-        pred = model(
-            rgb=rgb_static,
-            hand_rgb=rgb_gripper,
-            state={"arm": batch["arm_state"], "gripper": batch["gripper_state"]},
+        # TODO no wrist images rn
+        # batch["rgb_static"], batch["rgb_gripper"] = self.preprocessor.rgb_process( batch["rgb_static"], batch["rgb_gripper"], train=True)
+
+        # obs_mask = batch["mask"][..., 0]
+        batch_size, seq_len = batch["observation"]["simpler-img"].shape[:2]
+        attn_mask = torch.ones((batch_size, seq_len, 1)).to(device)
+
+        pred = self.model(
+            rgb=img,
+            hand_rgb=None,  # TODO get wrist images
+            state=state,
             language=batch["inst_token"],
-            attention_mask=obs_mask,
+            attn_mask=attn_mask,
         )
 
         loss = self.model.loss(pred, batch, obs_mask, cfg.skip_frame)
@@ -110,7 +131,7 @@ class Trainer:
 
     def epoch(self, epoch):
 
-        if False: # epoch % self.cfg.save_epochs == 0:
+        if False:  # epoch % self.cfg.save_epochs == 0:
             self.save()
 
         batch, load_time = self.prefetcher.next()
@@ -244,14 +265,14 @@ def main(cfg):
         model,
         optimizer,
         loader,
-        device_placement=[True, True,  False],
+        device_placement=[True, True, False],
     )
 
     optimizer.step = async_step
     prefetcher = DataPrefetcher(loader, device)
     # test_prefetcher = DataPrefetcher(test_loader, device)
 
-    T = Trainer(acc, prefetcher, model, optimizer, scheduler,  cfg)
+    T = Trainer(acc, prefetcher, model, optimizer, scheduler, cfg)
     T.run()
 
 
