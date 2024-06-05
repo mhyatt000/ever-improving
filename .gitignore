@@ -1,4 +1,8 @@
 # custom: tensorboard wandb and others
+*.pth
+*.pt
+*.json
+*.png
 weights/
 runs/
 multirun/
