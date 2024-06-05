@@ -35,6 +35,7 @@ class QuantileNetwork(BasePolicy):
         action_space: spaces.Discrete,
         features_extractor: BaseFeaturesExtractor,
         features_dim: int,
+        action_space_n = 1,
         n_quantiles: int = 200,
         net_arch: Optional[List[int]] = None,
         activation_fn: Type[nn.Module] = nn.ReLU,
@@ -54,7 +55,8 @@ class QuantileNetwork(BasePolicy):
         self.activation_fn = activation_fn
         self.features_dim = features_dim
         self.n_quantiles = n_quantiles
-        action_dim = int(self.action_space.n)  # number of actions
+        self.action_space_n = action_space_n
+        action_dim = int(action_space_n)  # number of actions
         quantile_net = create_mlp(self.features_dim, action_dim * self.n_quantiles, self.net_arch, self.activation_fn)
         self.quantile_net = nn.Sequential(*quantile_net)
 
@@ -66,13 +68,23 @@ class QuantileNetwork(BasePolicy):
         :return: The estimated quantiles for each action.
         """
         quantiles = self.quantile_net(self.extract_features(obs, self.features_extractor))
-        return quantiles.view(-1, self.n_quantiles, int(self.action_space.n))
+        return quantiles.view(-1, self.n_quantiles, self.action_space_n)
 
     def _predict(self, observation: PyTorchObs, deterministic: bool = True) -> th.Tensor:
-        q_values = self(observation).mean(dim=1)
+        q_distributions = self(observation)
+        q_values = q_distributions.mean(dim=1)
+
+        # generate random actions
+        if deterministic:
+            for i in range(2):
+                random_observation = {'simpler-img': observation['simpler-img'], 'agent_partial-action': th.rand(32, 7) * 2 - 1}
+                random_q_distribution =  self(random_observation)
+                # random_q_values = random_q_distribution.mean(dim=1)
+                q_distributions = th.cat((q_distributions,random_q_distribution), dim=1)
+
         # Greedy action
-        action = q_values.argmax(dim=1).reshape(-1)
-        return action
+        action = q_values.argmax(dim=1)
+        return q_distributions, action
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
         data = super()._get_constructor_parameters()
@@ -168,7 +180,7 @@ class QRDQNPolicy(BasePolicy):
         self.quantile_net_target = self.make_quantile_net()
         self.quantile_net_target.load_state_dict(self.quantile_net.state_dict())
         self.quantile_net_target.set_training_mode(False)
-
+        
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(  # type: ignore[call-arg]
             self.parameters(),
