@@ -22,8 +22,8 @@ from flamingo_pytorch import PerceiverResampler
 from omegaconf import OmegaConf as OC
 from transformers import GPT2Model
 
-from models.transformer_utils import get_2d_sincos_pos_embed
-from models.vision_transformer import Block
+from improve.pac.gr1.models.transformer_utils import get_2d_sincos_pos_embed
+from improve.pac.gr1.models.vision_transformer import Block
 from util.loss import masked_loss
 
 
@@ -36,7 +36,7 @@ class GR1(nn.Module):
         state_dim,
         act_dim,
         hidden_size,
-        seq_leng,
+        seq_len,
         chunk_size,
         training_target,
         img_feat_dim,
@@ -51,7 +51,7 @@ class GR1(nn.Module):
 
         self.state_dim = state_dim
         self.act_dim = act_dim
-        self.seq_leng = seq_leng
+        self.seq_len = seq_len
         self.chunk_size = chunk_size
 
         # GPT
@@ -101,7 +101,7 @@ class GR1(nn.Module):
             state_dim=cn.state_dim,
             act_dim=cn.act_dim,
             hidden_size=cn.embed_dim,
-            seq_leng=cn.seq_len,
+            seq_len=cn.seq_len,
             chunk_size=cn.chunk_size,
             training_target=cn.training_target,
             img_feat_dim=cn.img_feat_dim,
@@ -149,7 +149,7 @@ class GR1(nn.Module):
         self.embed_state = nn.Linear(2 * self.hidden_size, self.hidden_size)
 
         # Relative timestep embedding
-        self.embed_timestep = nn.Embedding(self.seq_leng, self.hidden_size)
+        self.embed_timestep = nn.Embedding(self.seq_len, self.hidden_size)
         # Embedding function for languages
         self.embed_lang = nn.Linear(self.lang_feat_dim, self.hidden_size)
 
@@ -216,11 +216,14 @@ class GR1(nn.Module):
             torch.from_numpy(decoder_pos_embed).float().unsqueeze(0)
         )
 
-    def embed_state_info(self, state, batch_size, seq_leng):
+    def embed_state_info(self, state, batch_size, seq_len):
+
+        breakpoint()
+
         arm_state = state["arm"]
         gripper_state = state["gripper"]
         arm_state_emb = self.embed_arm_state(
-            arm_state.view(batch_size, seq_leng, self.state_dim - 1)
+            arm_state.view(batch_size, seq_len, self.state_dim - 1)
         )
         gripper_state_emb = self.embed_gripper_state(gripper_state)
         state_emb = torch.cat((arm_state_emb, gripper_state_emb), dim=2)
@@ -231,20 +234,20 @@ class GR1(nn.Module):
         lang_emb = lang_emb / (lang_emb.norm(dim=1, keepdim=True) + 1e-6)
         return self.embed_lang(lang_emb.float())
 
-    def get_mae_features(self, rgb, hand_rgb, batch_size, seq_leng, c, h, w):
-        obs_emb, patch_emb = self.model_mae(rgb.view(batch_size * seq_leng, c, h, w))
-        obs_emb = obs_emb.view(batch_size, seq_leng, -1)
+    def get_mae_features(self, rgb, hand_rgb, batch_size, seq_len, c, h, w):
+        obs_emb, patch_emb = self.model_mae(rgb.view(batch_size * seq_len, c, h, w))
+        obs_emb = obs_emb.view(batch_size, seq_len, -1)
 
         hand_obs_emb, hand_patch_emb = None, None
         if self.use_hand_rgb:
             hand_obs_emb, hand_patch_emb = self.model_mae(
-                hand_rgb.view(batch_size * seq_leng, c, h, w)
+                hand_rgb.view(batch_size * seq_len, c, h, w)
             )
-            hand_obs_emb = hand_obs_emb.view(batch_size, seq_leng, -1)
+            hand_obs_emb = hand_obs_emb.view(batch_size, seq_len, -1)
 
         return (obs_emb, patch_emb, hand_obs_emb, hand_patch_emb)
 
-    def prepare_forward_prediction(self, rgb, hand_rgb, batch_size, seq_leng, h, w):
+    def prepare_forward_prediction(self, rgb, hand_rgb, batch_size, seq_len, h, w):
         """
         Prepares the forward prediction for the given RGB and hand RGB images.
         Returns:
@@ -256,20 +259,20 @@ class GR1(nn.Module):
         if self.fwd_pred:
             p = self.patch_size
             h_p, w_p = h // p, w // p
-            rgb = rgb.reshape(shape=(batch_size, seq_leng, 3, h_p, p, w_p, p))
+            rgb = rgb.reshape(shape=(batch_size, seq_len, 3, h_p, p, w_p, p))
             obs_targets = self.normalize_targets(
                 rgb.permute(0, 1, 3, 5, 4, 6, 2).reshape(
-                    shape=(batch_size, seq_leng, h_p * w_p, (p**2) * 3)
+                    shape=(batch_size, seq_len, h_p * w_p, (p**2) * 3)
                 )
             )
 
             if self.fwd_pred_hand:
                 hand_rgb = hand_rgb.reshape(
-                    shape=(batch_size, seq_leng, 3, h_p, p, w_p, p)
+                    shape=(batch_size, seq_len, 3, h_p, p, w_p, p)
                 )
                 obs_hand_targets = self.normalize_targets(
                     hand_rgb.permute(0, 1, 3, 5, 4, 6, 2).reshape(
-                        shape=(batch_size, seq_leng, h_p * w_p, (p**2) * 3)
+                        shape=(batch_size, seq_len, h_p * w_p, (p**2) * 3)
                     )
                 )
 
@@ -282,7 +285,7 @@ class GR1(nn.Module):
             )
         return targets
 
-    def process_patch_emb(self, patch_emb, batch_size, seq_leng, is_hand=False):
+    def process_patch_emb(self, patch_emb, batch_size, seq_len, is_hand=False):
 
         if is_hand and patch_emb is None:
             return None
@@ -292,7 +295,7 @@ class GR1(nn.Module):
         patch_emb = patch_emb.squeeze(1)
 
         return patch_emb.view(
-            batch_size, seq_leng, self.n_patch_latents, self.patch_feat_dim
+            batch_size, seq_len, self.n_patch_latents, self.patch_feat_dim
         )
 
     def add_timestep_emb(
@@ -306,23 +309,20 @@ class GR1(nn.Module):
         time_emb,
         batch_size,
     ):
+        breakpoint()
         lang_emb = lang_emb.view(batch_size, 1, -1) + time_emb
+
         state_emb = state_emb + time_emb
-        patch_emb = patch_emb + time_emb.view(self.seq_leng, 1, self.hidden_size)
+        patch_emb = patch_emb + time_emb.view(self.seq_len, 1, self.hidden_size)
         obs_emb = obs_emb + time_emb
+
         if self.use_hand_rgb:
             hand_obs_emb = hand_obs_emb + time_emb
             hand_patch_emb = hand_patch_emb + time_emb.view(
-                self.seq_leng, 1, self.hidden_size
+                self.seq_len, 1, self.hidden_size
             )
-        return (
-            state_emb,
-            lang_emb,
-            patch_emb,
-            obs_emb,
-            hand_obs_emb,
-            hand_patch_emb,
-        )
+
+        return (state_emb, lang_emb, patch_emb, obs_emb, hand_obs_emb, hand_patch_emb)
 
     def format_sequence(
         self,
@@ -333,43 +333,43 @@ class GR1(nn.Module):
         hand_patch_emb,
         hand_obs_emb,
         batch_size,
-        seq_leng,
+        seq_len,
     ):
-        lang_emb = lang_emb.view(batch_size, seq_leng, 1, self.hidden_size)
-        state_emb = state_emb.view(batch_size, seq_leng, 1, self.hidden_size)
-        obs_emb = obs_emb.view(batch_size, seq_leng, 1, self.hidden_size)
+        lang_emb = lang_emb.view(batch_size, seq_len, 1, self.hidden_size)
+        state_emb = state_emb.view(batch_size, seq_len, 1, self.hidden_size)
+        obs_emb = obs_emb.view(batch_size, seq_len, 1, self.hidden_size)
         stacked_inputs = torch.cat((lang_emb, state_emb, patch_emb, obs_emb), dim=2)
         if self.use_hand_rgb:
-            hand_obs_emb = hand_obs_emb.view(batch_size, seq_leng, 1, self.hidden_size)
+            hand_obs_emb = hand_obs_emb.view(batch_size, seq_len, 1, self.hidden_size)
             stacked_inputs = torch.cat(
                 (stacked_inputs, hand_patch_emb, hand_obs_emb), dim=2
             )
-        return self.add_action_obs_queries(stacked_inputs, batch_size, seq_leng)
+        return self.add_action_obs_queries(stacked_inputs, batch_size, seq_len)
 
-    def add_action_obs_queries(self, stacked_inputs, batch_size, seq_leng):
+    def add_action_obs_queries(self, stacked_inputs, batch_size, seq_len):
         if self.act_pred:
             action_queries = self.action_queries.weight
             action_chunk_queries = self.action_chunk_queries.weight + action_queries
             action_chunk_queries = action_chunk_queries.view(
                 1, 1, self.chunk_size, self.hidden_size
-            ).repeat(batch_size, seq_leng, 1, 1)
+            ).repeat(batch_size, seq_len, 1, 1)
             stacked_inputs = torch.cat((stacked_inputs, action_chunk_queries), dim=2)
         if self.fwd_pred:
             obs_queries = self.obs_queries.weight
             obs_queries = obs_queries.view(
                 1, 1, self.n_patch_latents + 1, self.hidden_size
-            ).repeat(batch_size, seq_leng, 1, 1)
+            ).repeat(batch_size, seq_len, 1, 1)
             stacked_inputs = torch.cat((stacked_inputs, obs_queries), dim=2)
             if self.fwd_pred_hand:
                 obs_hand_queries = self.obs_hand_queries.weight
                 obs_hand_queries = obs_hand_queries.view(
                     1, 1, self.n_patch_latents + 1, self.hidden_size
-                ).repeat(batch_size, seq_leng, 1, 1)
+                ).repeat(batch_size, seq_len, 1, 1)
                 stacked_inputs = torch.cat((stacked_inputs, obs_hand_queries), dim=2)
         return stacked_inputs
 
-    def create_attention_mask(self, attn_mask, batch_size, seq_leng, stacked_inputs):
-        stacked_attn_mask = attn_mask.view(batch_size, seq_leng, 1)
+    def create_attention_mask(self, attn_mask, batch_size, seq_len, stacked_inputs):
+        stacked_attn_mask = attn_mask.view(batch_size, seq_len, 1)
 
         if self.use_hand_rgb:
             stacked_attn_mask = stacked_attn_mask.repeat(1, 1, self.get_total_tokens())
@@ -377,7 +377,7 @@ class GR1(nn.Module):
             stacked_attn_mask = stacked_attn_mask.repeat(1, 1, self.get_base_tokens())
 
         return self.add_query_attention_masks(
-            stacked_attn_mask, batch_size, seq_leng, stacked_inputs
+            stacked_attn_mask, batch_size, seq_len, stacked_inputs
         )
 
     def get_total_tokens(self):
@@ -387,11 +387,11 @@ class GR1(nn.Module):
         return 1 + 1 + self.n_patch_latents + 1
 
     def add_query_attention_masks(
-        self, stacked_attn_mask, batch_size, seq_leng, stacked_inputs
+        self, stacked_attn_mask, batch_size, seq_len, stacked_inputs
     ):
         if self.act_pred:
             act_query_attention_mask = torch.zeros(
-                (batch_size, seq_leng, self.chunk_size),
+                (batch_size, seq_len, self.chunk_size),
                 dtype=torch.long,
                 device=stacked_inputs.device,
             )
@@ -400,7 +400,7 @@ class GR1(nn.Module):
             )
         if self.fwd_pred:
             obs_query_attention_mask = torch.zeros(
-                (batch_size, seq_leng, self.n_patch_latents + 1),
+                (batch_size, seq_len, self.n_patch_latents + 1),
                 dtype=torch.long,
                 device=stacked_inputs.device,
             )
@@ -409,7 +409,7 @@ class GR1(nn.Module):
             )
             if self.fwd_pred_hand:
                 obs_hand_query_attention_mask = torch.zeros(
-                    (batch_size, seq_leng, self.n_patch_latents + 1),
+                    (batch_size, seq_len, self.n_patch_latents + 1),
                     dtype=torch.long,
                     device=stacked_inputs.device,
                 )
@@ -419,18 +419,18 @@ class GR1(nn.Module):
         return stacked_attn_mask.reshape(batch_size, -1)
 
     def perform_transformer_forward(
-        self, stacked_inputs, stacked_attn_mask, batch_size, seq_leng
+        self, stacked_inputs, stacked_attn_mask, batch_size, seq_len
     ):
         stacked_inputs = stacked_inputs.reshape(batch_size, -1, self.hidden_size)
         stacked_inputs = self.embed_ln(stacked_inputs)
         transformer_outputs = self.transformer(
-            inputs_embeds=stacked_inputs, attn_mask=stacked_attn_mask
+            inputs_embeds=stacked_inputs, attention_mask=stacked_attn_mask
         )
         return transformer_outputs["last_hidden_state"].reshape(
-            batch_size, seq_leng, -1, self.hidden_size
+            batch_size, seq_len, -1, self.hidden_size
         )
 
-    def predict_actions(self, x, batch_size, seq_leng):
+    def predict_actions(self, x, batch_size, seq_len):
         arm_action_preds, gripper_action_preds = None, None
         if self.act_pred:
             action_embedding = x[:, :, -self.chunk_size :]
@@ -440,25 +440,25 @@ class GR1(nn.Module):
             gripper_action_preds = self.pred_gripper_act(action_embedding)
         return arm_action_preds, gripper_action_preds
 
-    def predict_forward(self, x, batch_size, seq_leng):
+    def predict_forward(self, x, batch_size, seq_len):
         obs_preds, obs_hand_preds = None, None
         if self.fwd_pred:
             mask_tokens = self.mask_token.repeat(
                 batch_size,
-                seq_leng,
+                seq_len,
                 (self.image_size // self.patch_size) ** 2,
                 1,
-            ) + self.decoder_pos_embed.unsqueeze(0).repeat(batch_size, seq_leng, 1, 1)
+            ) + self.decoder_pos_embed.unsqueeze(0).repeat(batch_size, seq_len, 1, 1)
             obs_preds = self.decode_predictions(
-                x, mask_tokens, batch_size, seq_leng, is_hand=False
+                x, mask_tokens, batch_size, seq_len, is_hand=False
             )
             if self.fwd_pred_hand:
                 obs_hand_preds = self.decode_predictions(
-                    x, mask_tokens, batch_size, seq_leng, is_hand=True
+                    x, mask_tokens, batch_size, seq_len, is_hand=True
                 )
         return obs_preds, obs_hand_preds
 
-    def decode_predictions(self, x, mask_tokens, batch_size, seq_leng, is_hand=False):
+    def decode_predictions(self, x, mask_tokens, batch_size, seq_len, is_hand=False):
         start_idx = -self.n_patch_latents - 1 if is_hand else -self.chunk_size
         obs_pred = self.decoder_embed(x[:, :, start_idx:])
         obs_pred_ = torch.cat([obs_pred, mask_tokens], dim=2).reshape(
@@ -468,34 +468,50 @@ class GR1(nn.Module):
             obs_pred_ = blk(obs_pred_)
         obs_pred_ = self.decoder_norm(obs_pred_)
         obs_preds = self.decoder_pred(obs_pred_).reshape(
-            batch_size, seq_leng, -1, obs_pred_.shape[-1]
+            batch_size, seq_len, -1, obs_pred_.shape[-1]
         )
         return obs_preds[:, :, -self.n_patch_latents :]
 
     def _extract(self, rgb, hand_rgb, state, language):
 
-        batch_size, seq_leng, c, h, w = rgb.shape
+        batch_size, seq_len, c, h, w = rgb.shape
+        embeddings = {}
 
         # 1. EXTRACT
-        state_emb = self.embed_state_info(state, batch_size, seq_leng)
+        if state is None:
+            """
+            embeddings['state'] = {
+                # state_dim - 1 because the last element is the gripper state
+                "arm": torch.zeros(batch_size, seq_len, self.state_dim - 1),
+                "gripper": torch.zeros(batch_size, seq_len, 2),
+            }
+            """
+            state_emb = None
+        else:
+            state_emb = self.embed_state_info(state, batch_size, seq_len)
+
         lang_emb = self.embed_language_info(language)
 
         obs_emb, patch_emb, hand_obs_emb, hand_patch_emb = self.get_mae_features(
-            rgb, hand_rgb, batch_size, seq_leng, c, h, w
+            rgb, hand_rgb, batch_size, seq_len, c, h, w
         )
         obs_targets, obs_hand_targets = self.prepare_forward_prediction(
-            rgb, hand_rgb, batch_size, seq_leng, h, w
+            rgb, hand_rgb, batch_size, seq_len, h, w
         )
 
-        patch_emb = self.process_patch_emb(patch_emb, batch_size, seq_leng)
+        patch_emb = self.process_patch_emb(patch_emb, batch_size, seq_len)
         hand_patch_emb = self.process_patch_emb(
-            hand_patch_emb, batch_size, seq_leng, is_hand=True
+            hand_patch_emb, batch_size, seq_len, is_hand=True
         )
 
         obs_emb = self.embed_img(obs_emb.float())
         patch_emb = self.embed_patch(patch_emb.float())
-        hand_obs_emb = self.embed_hand_img(hand_obs_emb.float())
-        hand_patch_emb = self.embed_hand_patch(hand_patch_emb.float())
+        
+        if self.use_hand_rgb:
+            hand_obs_emb = self.embed_hand_img(hand_obs_emb.float())
+            hand_patch_emb = self.embed_hand_patch(hand_patch_emb.float())
+        else:
+            hand_obs_emb, hand_patch_emb = None, None
 
         return {
             "state_emb": state_emb,
@@ -509,10 +525,13 @@ class GR1(nn.Module):
             "obs_hand_targets": obs_hand_targets,
         }
 
-    def _stack(self, embeddings, targets, attn_mask, batch_size, seq_leng):
+    def _stack(self, embeddings, targets, attn_mask, batch_size, seq_len):
 
         # 2. STACK
         time_emb = self.embed_timestep.weight
+
+        breakpoint()
+
         (state_emb, lang_emb, patch_emb, obs_emb, hand_obs_emb, hand_patch_emb) = (
             self.add_timestep_emb(
                 embeddings["state_emb"],
@@ -534,21 +553,21 @@ class GR1(nn.Module):
             hand_patch_emb,
             hand_obs_emb,
             batch_size,
-            seq_leng,
+            seq_len,
         )
 
         stacked_attn_mask = self.create_attention_mask(
-            attn_mask, batch_size, seq_leng, stacked_inputs
+            attn_mask, batch_size, seq_len, stacked_inputs
         )
         return stacked_inputs, stacked_attn_mask
 
-    def _predict(self, x, batch_size, seq_leng):
+    def _predict(self, x, batch_size, seq_len):
 
         # 4. PREDICT
         arm_action_preds, gripper_action_preds = self.predict_actions(
-            x, batch_size, seq_leng
+            x, batch_size, seq_len
         )
-        obs_preds, obs_hand_preds = self.predict_forward(x, batch_size, seq_leng)
+        obs_preds, obs_hand_preds = self.predict_forward(x, batch_size, seq_len)
 
         return {
             "obs_preds": obs_preds,
@@ -559,23 +578,26 @@ class GR1(nn.Module):
 
     def forward(self, rgb, hand_rgb, state, language, attn_mask):
 
-        batch_size, seq_leng, c, h, w = rgb.shape
+        batch_size, seq_len, c, h, w = rgb.shape
 
+
+        self.use_hand_rgb = False # for now
+        self.fwd_pred_hand=False
         # 1. EXTRACT
         embeddings, targets = self._extract(rgb, hand_rgb, state, language)
 
         # 2. STACK
         stacked_inputs, stacked_attn_mask = self._stack(
-            embeddings, targets, attn_mask, batch_size, seq_leng
+            embeddings, targets, attn_mask, batch_size, seq_len
         )
 
         # 3. FWD
         x = self.perform_transformer_forward(
-            stacked_inputs, stacked_attn_mask, batch_size, seq_leng
+            stacked_inputs, stacked_attn_mask, batch_size, seq_len
         )
 
         # 4. PREDICT
-        predictions = self._predict(x, batch_size, seq_leng)
+        predictions = self._predict(x, batch_size, seq_len)
 
         return {**targets, **predictions}
 

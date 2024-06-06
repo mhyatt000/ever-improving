@@ -7,7 +7,9 @@ from pprint import pprint
 import h5py
 import hydra
 import functools
+import functools
 import improve
+from improve.wrapper.dict_util import apply_both
 from improve.wrapper.dict_util import apply_both
 import improve.config.resolver
 import improve.wrapper.dict_util as du
@@ -33,8 +35,6 @@ class HDF5IterDataset(IterableDataset):
             self.fnames = iter(self.fnames)
             
         self.n_steps = n_steps
-        self.lock = Lock()
-        torch.multiprocessing.set_sharing_strategy('file_system')
         
         # self.fnames = [
         #     osp.join(root_dir, f) for f in os.listdir(root_dir) if f.endswith(".h5")
@@ -116,7 +116,11 @@ def main():
 
     # D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
     D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
-    dataset = Dataloader(D, batch_size=1, num_workers=4)
+    dataset = Dataloader(D, batch_size=99, num_workers=4)
+    
+    batch = next(iter(dataset))
+    
+    breakpoint()
     
     for data in dataset:
         print(data)

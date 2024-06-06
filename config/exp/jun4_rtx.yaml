@@ -6,6 +6,7 @@
 
 defaults:
   - override /algo: sac
+  - override /buffer: base
   - override /env/foundation: rtx
   - _self_
 
@@ -20,7 +21,10 @@ algo:
   buffer_size: ${r_toint:1e6}
 
   ent_coef: 0
-  warmup_zero_action: False # gaussian
+
+env:
+  goal: 
+    use: False
 
 hydra:
   run:
@@ -33,4 +37,4 @@ hydra:
   sweeper:
     params:
       ++env.residual_scale: 0.01,0.001
-      ++algo.warmup_zero_action: True,False
+      ++algo.warmup_zero_action: True,False # gaussian

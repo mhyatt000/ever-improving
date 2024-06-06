@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from torchvision.transforms import v2 
+from torchvision.transforms import v2
 
 
 def random_shift(x, pad):
@@ -19,7 +19,12 @@ def random_shift(x, pad):
 
     x = x.float()
     b, t, c, h, w = x.size()
+
+    if h != w:
+        x = crop_square(x)
+        b, t, c, h, w = x.size()
     assert h == w
+
     x = x.view(b * t, c, h, w)  # reshape x to [B*T, C, H, W]
     padding = tuple([pad] * 4)
     x = F.pad(x, padding, "replicate")
@@ -52,22 +57,46 @@ def random_shift(x, pad):
     return output
 
 
+def crop_square(x):
+    b, t, c, h, w = x.size()
+    dim = min(h, w)
+
+    # Calculate the starting points for cropping
+    h = (h - dim) // 2
+    w = (w - dim) // 2
+
+    # Crop the x
+    cropped = x[:, :, :, h : h + dim, w : w + dim]
+    return cropped
+
+def to_channels_first(image):
+    return image.permute(0, 1, 4, 2, 3)
+
+def is_channels_first(image):
+    """ Check if the image tensor is in channels first format.
+    -3 works for both 4D and 5D tensors.
+    """
+    return image.size(-3) == 3
+
 class PreProcess:
-    def __init__( self, cn, device):
+    def __init__(self, cn, device):
 
-        self.rgb_static_pad=cn.rgb_static_pad
-        self.rgb_gripper_pad=cn.rgb_gripper_pad
+        self.rgb_static_pad = cn.rgb_static_pad
+        self.rgb_gripper_pad = cn.rgb_gripper_pad
 
-        self.rgb_shape=cn.rgb_shape
-        self.resize = v2.Resize(self.rgb_shape, interpolation=Image.BICUBIC, antialias=True).to(
-            device
-        )
+        self.rgb_shape = cn.rgb_shape
+        self.resize = v2.Resize(
+            self.rgb_shape, interpolation=Image.BICUBIC, antialias=True
+        ).to(device)
         self.rgb_mean = torch.tensor(cn.rgb_mean, device=device).view(1, 1, -1, 1, 1)
         self.rgb_std = torch.tensor(cn.rgb_std, device=device).view(1, 1, -1, 1, 1)
 
     def _process(self, image, static, train=False):
         pad = self.rgb_static_pad if static else self.rgb_gripper_pad
         image = image.float() * (1 / 255.0)
+
+        if not is_channels_first(image):
+            image = to_channels_first(image)
 
         if train:
             image = random_shift(image, pad)

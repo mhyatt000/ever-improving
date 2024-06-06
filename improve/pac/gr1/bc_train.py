@@ -28,6 +28,7 @@ from transformers import get_cosine_schedule_with_warmup
 
 import models.vision_transformer as vits
 from models.gr1 import GR1
+from models.gr2 import GR2
 
 # Lightning Memory-Mapped Database
 # from LMDBDataset_jpeg import LMDBDataset as LMDBdst_jpeg
@@ -71,6 +72,8 @@ class Trainer:
         self.preprocessor = PreProcess(cn=cfg.data.preprocess, device=self.device)
         self.writer = SummaryWriter(cfg.paths.save_path + "logs")
 
+        self.tokenizer = clip.tokenize
+
     def log(self, loss):
         print(du.apply(loss, lambda x: x.detach()))
         return
@@ -100,28 +103,38 @@ class Trainer:
             batch["observation"]["simpler-img"], static=True, train=True
         )
 
-        state = batch["observation"]["agent_qpos"]
-        state = {"arm": state[:, :7], "gripper": state[:, 7:]}
+        # xyq quarternions
+        # state = batch["observation"]["agent_qpos"]
+        # this is wrong
+        # state = {"arm": state[:, :7], "gripper": state[:, 7:]}
 
         # TODO no wrist images rn
         # batch["rgb_static"], batch["rgb_gripper"] = self.preprocessor.rgb_process( batch["rgb_static"], batch["rgb_gripper"], train=True)
 
         # obs_mask = batch["mask"][..., 0]
         batch_size, seq_len = batch["observation"]["simpler-img"].shape[:2]
-        attn_mask = torch.ones((batch_size, seq_len, 1)).to(device)
+        attn_mask = torch.ones((batch_size, seq_len, 1)).to(self.device)
 
-        pred = self.model(
-            rgb=img,
-            hand_rgb=None,  # TODO get wrist images
-            state=state,
-            language=batch["inst_token"],
-            attn_mask=attn_mask,
-        )
+        text = self.tokenizer("put eggplant in the sink").to(self.device)
+        text = text.view(1, -1)  # add two dimensions at the beginning
+        # expand along batch_size and seq_len dimensions
+        text = text.expand(batch_size, -1).to(self.device)
 
-        loss = self.model.loss(pred, batch, obs_mask, cfg.skip_frame)
-        total_loss = loss["total"]
+        batch = {
+            "rgb": img,
+            "state": {
+                # xyz and quarternions for us... or xyz and rpy
+                "arm": torch.zeros((batch_size, seq_len, 7)).to(self.device),
+                "gripper": torch.zeros((batch_size, seq_len, 2)).to(self.device),
+            },
+            "language": text,
+            "mask": attn_mask,
+        }
 
-        self.acc.backward(total_loss)
+        predictions, targets = self.model(batch)
+        loss = self.model.loss(predictions, targets, self.cfg.model_other.skip_frame)
+
+        self.acc.backward(loss['total'])
         self.optimizer.step(optimizer)
         self.logger.log(loss)
 
@@ -206,7 +219,7 @@ def main(cfg):
     # and test set
     """
 
-    ds = HDF5IterDataset()
+    ds = HDF5IterDataset(loop=True, n_steps=cfg.model.seq_len)
 
     # change shuffle to True somehow
     def build_loader(ds):
@@ -234,13 +247,15 @@ def main(cfg):
     model_mae.load_state_dict(checkpoint["model"], strict=False)
 
     # to device for fused optimizer
-    model = GR1.from_hydra(
-        model_clip,
-        model_mae,
+    model = GR2.from_hydra(
         cn=cfg.model,
+        pretrained={
+            "language": model_clip,
+            "visual": model_mae,
+        },
     ).to(device)
 
-    maybe_load(model, acc, cfg)
+    # maybe_load(model, acc, cfg)
     step = 0  # maybe_resume(model, acc, cfg)
 
     if cfg.training.compile_model:

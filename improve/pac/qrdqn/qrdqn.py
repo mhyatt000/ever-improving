@@ -362,6 +362,7 @@ def get_observation(batch):
     }
     return batch
 
+
 # @jay this function is not needed anymore
 # read dict_utils.py
 """ 
@@ -385,6 +386,7 @@ def remove_first(batch):
             batch[key] = remove_first(value)
     return batch
 """
+
 
 def preprocess_batch(batch):
     """Preprocesses batch
@@ -494,7 +496,7 @@ def train(model, loader, cfg):
             )
 
             # Make "n_quantiles" copies of actions, and reshape to (batch_size, n_quantiles, 1)
-            next_greedy_actions = next_greedy_actions.expand(cfg.batch_size-2, 200, 1)
+            next_greedy_actions = next_greedy_actions.expand(cfg.batch_size - 2, 200, 1)
 
             # Follow greedy policy: use the one with the highest Q values
             next_quantiles = next_quantiles.gather(
@@ -536,7 +538,7 @@ def train(model, loader, cfg):
         
         # f string with scientific notation
         desc = f"loss: {loss:.2e} | best: {min(losses):.2e}"
-        bar.set_description(desc)  
+        bar.set_description(desc)
         bar.update(1)
 
         # if loss <= min(losses):
@@ -547,6 +549,7 @@ def train(model, loader, cfg):
     
     if run:        
         run.finish()
+
 
 def main():
     is_training = False
@@ -579,41 +582,43 @@ def main():
         model = initialize_model()
         train(model, loader, cfg)
 
-    breakpoint()
+        breakpoint()
 
     ### Evaluation script
-    loader = load_data(batch_size=1)
-    model = th.load("qrdqn_model/model.pth")
+    loader = load_data(batch_size=256)
+    models = [x for x in os.listdir(improve.WEIGHTS) if x.startswith("qrdqn")]
+    model = th.load(osp.join(improve.WEIGHTS, models[-1]))
 
-    first = None
-    for i in tqdm(range(100)):
-        for j in tqdm(range(32)):
-            batch = next(loader)
+    print(f"Model {models[-1]} loaded")
 
-            if batch["reward"].item() == 0:
-                continue
+    has_reward = None
+    while not has_reward:
+        batch = next(loader)
+        rewards = batch["reward"]
+        has_reward = (rewards != 0).any()
 
-            current_obs = get_observation(batch)
+    current_obs = get_observation(batch)
 
-            with th.no_grad():
-                current_quantiles, _ = model._predict(current_obs, False)
+    with th.no_grad():
+        current_quantiles, _ = model._predict(current_obs, False)
+        current_quantiles = current_quantiles.squeeze(dim=2)
+        current_quantiles = current_quantiles.squeeze(0)
 
-                current_quantiles = current_quantiles.squeeze(dim=2)
+    quantiles = F.softmax(current_quantiles, dim=1)
+    lims = (quantiles.min().item(), quantiles.max().item())
+    space = np.linspace(0, 1, 200)
 
-                current_quantiles = current_quantiles.squeeze(0)
+    for i, q in tqdm(zip(range(len(quantiles)), quantiles), total=len(quantiles)):
 
-            if first is not None and th.equal(first, current_quantiles):
-                print("same")
-            else:
-                plt.figure()
-                quantile_plot = plt.scatter(
-                    np.linspace(0, 1, 200), F.softmax(current_quantiles).numpy()
-                )
-                plt.show()
-            # plt.savefig(f'qrdqn_model/quantile_plot/batch_{i}/step_{j}.png')
+        plt.figure()
+        plt.scatter(space, q.numpy())
 
-            if first is None:
-                first = current_quantiles
+        # vertical line at rewards[i]
+        plt.axvline(x=rewards[i].item(), color="r", linestyle="--")
+
+        plt.ylim(lims)
+        plt.savefig(f"step_{i}.png")
+        plt.close()
 
 
 if __name__ == "__main__":
