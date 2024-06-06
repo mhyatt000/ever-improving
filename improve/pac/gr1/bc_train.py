@@ -112,13 +112,11 @@ class Trainer:
         # batch["rgb_static"], batch["rgb_gripper"] = self.preprocessor.rgb_process( batch["rgb_static"], batch["rgb_gripper"], train=True)
 
         # obs_mask = batch["mask"][..., 0]
-        batch_size, seq_len = batch["observation"]["simpler-img"].shape[:2]
-        attn_mask = torch.ones((batch_size, seq_len, 1)).to(self.device)
+        batch_size, seq_len = img.shape[:2]
+        attn_mask = torch.ones((batch_size, seq_len, seq_len)).to(self.device)
 
         text = self.tokenizer("put eggplant in the sink").to(self.device)
-        text = text.view(1, -1)  # add two dimensions at the beginning
-        # expand along batch_size and seq_len dimensions
-        text = text.expand(batch_size, -1).to(self.device)
+        text = text.view(1, -1).expand(batch_size, -1).to(self.device)
 
         batch = {
             "rgb": img,
@@ -132,14 +130,23 @@ class Trainer:
         }
 
         predictions, targets = self.model(batch)
-        loss = self.model.loss(predictions, targets, self.cfg.model_other.skip_frame)
+        targets["arm"] = torch.zeros_like(predictions["arm"])
+        targets["gripper"] = torch.zeros_like(predictions["gripper"])
 
-        self.acc.backward(loss['total'])
-        self.optimizer.step(optimizer)
-        self.logger.log(loss)
+        loss = self.model.loss(
+            predictions,
+            targets,
+            skip_frame=self.cfg.model_other.skip_frame,
+            arm_loss_ratio=self.cfg.training.arm_loss_ratio,
+        )
 
-        step += 1
-        batch, load_time = prefetcher.next()
+        self.acc.backward(loss["total"])
+        print(type(self.optimizer))
+        self.optimizer.step(self.optimizer)
+        # self.logger.log(loss)
+        print(loss["total"].cpu().detach().numpy())
+
+        batch, load_time = self.prefetcher.next()
         return batch, load_time
 
     def epoch(self, epoch):
@@ -204,20 +211,6 @@ def main(cfg):
         kwargs_handlers=[init_pg_kwargs, ddp_kwargs],
     )
     device = acc.device
-
-    #  TODO init dataset
-    """
-    train_dataset = dict(
-        cfg.LMDB_path,
-        cfg.seq_len,
-        cfg.chunk_size,
-        cfg.action_mode,
-        cfg.act_dim,
-        start_ratio=0,
-        end_ratio=0.9,
-    )
-    # and test set
-    """
 
     ds = HDF5IterDataset(loop=True, n_steps=cfg.model.seq_len)
 

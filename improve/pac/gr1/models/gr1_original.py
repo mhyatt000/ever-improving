@@ -1,3 +1,28 @@
+import os
+import os.path as osp
+from pprint import pprint
+
+import clip
+import hydra
+import improve
+import improve.pac.gr1.models.vision_transformer as vits
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import transformers
+from accelerate import Accelerator
+from accelerate.utils import (DistributedDataParallelKwargs,
+                              InitProcessGroupKwargs)
+from flamingo_pytorch import PerceiverResampler
+from improve.pac.gr1.models.modules.extractor import MultiInExtractor
+from improve.pac.gr1.models.transformer_utils import get_2d_sincos_pos_embed
+from improve.pac.gr1.models.vision_transformer import Block
+from improve.pac.gr1.util.loss import masked_loss
+from improve.wrapper import dict_util as du
+from omegaconf import OmegaConf as OC
+from transformers import GPT2Model, get_cosine_schedule_with_warmup
+
+
 class GR1_original(nn.Module):
     def __init__(
         self,
@@ -183,6 +208,7 @@ class GR1_original(nn.Module):
         obs_embeddings = obs_embeddings.view(
             batch_size, sequence_length, -1
         )  # (b, t, img_feat_dim)
+
         if self.use_hand_rgb:
             hand_obs_embeddings, hand_patch_embeddings = self.model_mae(
                 hand_rgb.view(batch_size * sequence_length, c, h, w)
@@ -190,6 +216,7 @@ class GR1_original(nn.Module):
             hand_obs_embeddings = hand_obs_embeddings.view(
                 batch_size, sequence_length, -1
             )  # (b, t, img_feat_dim)
+
         if self.fwd_pred:
             p = self.patch_size
             h_p = h // p
@@ -199,6 +226,7 @@ class GR1_original(nn.Module):
             obs_targets = obs_targets.reshape(
                 shape=(batch_size, sequence_length, h_p * w_p, (p**2) * 3)
             )  # (b, t, n_patches, p*p*3)
+
             if not self.without_norm_pixel_loss:
                 # norm the target
                 obs_targets = (obs_targets - obs_targets.mean(dim=-1, keepdim=True)) / (
@@ -355,7 +383,12 @@ class GR1_original(nn.Module):
             stacked_attention_mask = stacked_attention_mask.repeat(
                 1,
                 1,
-                n_lang_tokens + n_state_tokens + n_hand_patch_tokens + n_hand_obs_tokens + n_patch_tokens + n_obs_tokens,
+                n_lang_tokens
+                + n_state_tokens
+                + n_hand_patch_tokens
+                + n_hand_obs_tokens
+                + n_patch_tokens
+                + n_obs_tokens,
             )
         else:
             stacked_attention_mask = stacked_attention_mask.repeat(
@@ -493,3 +526,68 @@ class GR1_original(nn.Module):
             "gripper_action_preds": gripper_action_preds,
         }
         return prediction
+
+
+CONFIG = osp.dirname(osp.dirname(__file__))
+
+print(CONFIG)
+
+
+@hydra.main(config_path=CONFIG, config_name="gr1_config", version_base="1.3.2")
+def main(cfg):
+
+    device = "cpu"
+
+    model_clip, _ = clip.load(cfg.submodel.clip_backbone, device=device)
+    model_mae = vits.__dict__["vit_base"](patch_size=16, num_classes=0).to(device)
+    checkpoint = torch.load(osp.join(improve.WEIGHTS, cfg.paths.mae_ckpt))
+    model_mae.load_state_dict(checkpoint["model"], strict=False)
+
+    pretrained = {"visual": model_mae, "language": model_clip}
+
+    resampler = {
+        "depth": 3,
+        "dim_head": 128,
+        "heads": 4,
+        "num_latents": 9,
+        "num_media_embeds": 1,
+    }
+
+    model = GR1_original(
+        model_clip,
+        model_mae,
+        cfg.model.state_dim,
+        cfg.model.act_dim,
+        cfg.model.embed_dim,  # assuming this is the hidden_size
+        cfg.model.seq_len,
+        cfg.model.chunk_size,
+        cfg.model.training_target,
+        cfg.model.img_feat_dim,
+        cfg.model.patch_feat_dim,
+        cfg.model.lang_feat_dim,
+        resampler,
+        cfg.model.without_norm_pixel_loss,
+        cfg.model.use_hand_rgb,
+        **OC.to_container(cfg.model.gpt_kwargs)  # assuming this is the kwargs
+    )
+
+    batch = {
+        "rgb": torch.zeros([4, 10, 3, 224, 224]),
+        "hand": torch.zeros([4, 10, 3, 224, 224]),
+        "state": {
+            "arm": torch.zeros([4, 10, 6]),
+            "gripper": torch.zeros([4, 10, 2]),
+        },
+        "language": torch.zeros([4, 77], dtype=torch.long),
+        "mask": torch.zeros([4, 10, 1]),
+    }
+
+    things = model.forward(
+        batch["rgb"], batch["hand"], batch["state"], batch["language"], batch["mask"]
+    )
+
+    pprint(du.apply(things, lambda x: x.shape))
+
+
+if __name__ == "__main__":
+    main()

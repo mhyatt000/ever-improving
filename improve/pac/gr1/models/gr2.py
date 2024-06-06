@@ -153,7 +153,7 @@ class Mask(nn.Module):
                 mask = torch.cat((mask, obs_hand_query_attention_mask), dim=2)
 
         mask = mask.reshape(self.bs, tokens["total"] * self.seq)
-        return stack, mask
+        return stack, mask, tokens, starts
 
 
 class MultiOutHead(nn.Module):
@@ -254,6 +254,9 @@ class MultiOutHead(nn.Module):
 
     def predict_forward(self, x):
 
+        print("decoder")
+        print(x.shape)
+
         obs_preds, obs_hand_preds = None, None
 
         if self.fwd_pred:
@@ -266,7 +269,9 @@ class MultiOutHead(nn.Module):
             pos = self.decoder_pos_embed.unsqueeze(0).repeat(self.bs, self.seq, 1, 1)
             mask_tokens = mask_tokens + pos
 
+            print(mask_tokens.shape)
             obs_preds = self.decode_predictions(x, mask_tokens, is_hand=False)
+            print(obs_preds.shape)
 
         if self.fwd_pred_hand:
             obs_hand_preds = self.decode_predictions(x, mask_tokens, is_hand=True)
@@ -284,17 +289,20 @@ class MultiOutHead(nn.Module):
 
         for blk in self.decoder_blocks:
             obs_pred_ = blk(obs_pred_)
-
+            print("blk", obs_pred_.shape)
         obs_pred_ = self.decoder_norm(obs_pred_)
         obs_preds = self.decoder_pred(obs_pred_).reshape(
             self.bs, self.seq, -1, obs_pred_.shape[-1]
         )
+
         return obs_preds[:, :, -self.n_patch_latents :]
 
-    def forward(self, x):
+    def forward(self, x, tokens, starts):
 
         arm, gripper = self.predict_actions(x)
         obs, obs_hand = self.predict_forward(x)
+
+        print(obs.shape)
 
         predictions = {
             "arm": arm,
@@ -303,6 +311,100 @@ class MultiOutHead(nn.Module):
             "obs_hand": obs_hand,
         }
         return predictions
+
+    def original(self, x, tokens, starts):
+
+        print("original")
+        print(x.shape)
+
+        # Action prediction
+        if self.act_pred:
+            action_embedding = x[
+                :,
+                :,
+                starts["act"] : (starts["act"] + self.chunk_size),
+            ]
+
+            for pred_act_mlp in self.pred_act_mlps:
+                action_embedding = pred_act_mlp(action_embedding)
+            arm_action_preds = self.pred_arm_act(
+                action_embedding
+            )  # (b, t, chunk_size, act_dim - 1)
+            gripper_action_preds = self.pred_gripper_act(
+                action_embedding
+            )  # (b, t, chunk_size, 1)
+
+        # Forward prediction
+        if self.fwd_pred:
+            mask_token = self.mask_token  # (1, 1, 1, h)
+            mask_tokens = mask_token.repeat(
+                batch_size,
+                sequence_length,
+                (self.image_size // self.patch_size) ** 2,
+                1,
+            )  # (b, l, n_patches, h)
+            mask_tokens = mask_tokens + self.decoder_pos_embed.unsqueeze(0).repeat(
+                batch_size, sequence_length, 1, 1
+            )  # (b, l, n_patches, h)
+
+            obs_pred = self.decoder_embed(
+                x[
+                    :,
+                    :,
+                    obs_query_token_start_i : (
+                        obs_query_token_start_i + self.n_patch_latents + n_obs_tokens
+                    ),
+                ]
+            )  # (b, l, n_patch_latents + 1, h)
+            obs_pred_ = torch.cat(
+                [obs_pred, mask_tokens], dim=2
+            )  # (b, l, n_patches + n_patch_latens + 1, h)
+            obs_pred_ = obs_pred_.reshape(
+                -1, obs_pred_.shape[-2], obs_pred_.shape[-1]
+            )  # (b * l, n_patches + n_patch_latens + 1, h)
+            for blk in self.decoder_blocks:
+                obs_pred_ = blk(obs_pred_)
+            obs_pred_ = self.decoder_norm(obs_pred_)
+            obs_preds = self.decoder_pred(
+                obs_pred_
+            )  # (b * l, n_patches + n_patch_latens + 1, h)
+            obs_preds = obs_preds.reshape(
+                batch_size, sequence_length, -1, obs_preds.shape[-1]
+            )  # (b, l, n_patches + n_patch_latens + 1, h)
+            obs_preds = obs_preds[
+                :, :, (self.n_patch_latents + n_obs_tokens) :
+            ]  # (b, l, n_patches, h)
+
+            if self.fwd_pred_hand:
+                obs_pred_hand = self.decoder_embed(
+                    x[
+                        :,
+                        :,
+                        obs_hand_query_token_start_i : (
+                            obs_hand_query_token_start_i
+                            + self.n_patch_latents
+                            + n_obs_tokens
+                        ),
+                    ]
+                )
+                obs_pred_hand_ = torch.cat([obs_pred_hand, mask_tokens], dim=2)
+                obs_pred_hand_ = obs_pred_hand_.reshape(
+                    -1, obs_pred_hand_.shape[-2], obs_pred_hand_.shape[-1]
+                )
+                for blk in self.decoder_blocks:
+                    obs_pred_hand_ = blk(obs_pred_hand_)
+                obs_pred_hand_ = self.decoder_norm(obs_pred_hand_)
+                obs_hand_preds = self.decoder_pred(obs_pred_hand_)
+                obs_hand_preds = obs_hand_preds.reshape(
+                    batch_size, sequence_length, -1, obs_hand_preds.shape[-1]
+                )
+                obs_hand_preds = obs_hand_preds[
+                    :, :, (self.n_patch_latents + n_obs_tokens) :
+                ]
+
+        print("original")
+        print(obs_preds.shape)
+        quit()
 
 
 class GR2(nn.Module):
@@ -337,6 +439,7 @@ class GR2(nn.Module):
         self.n_patches = 49
         self.patch_size = 16
         self.image_size = 224  # TODO: make this a parameter
+
         self.img_feat_dim = img_feat_dim
         self.lang_feat_dim = lang_feat_dim
         self.patch_feat_dim = patch_feat_dim
@@ -357,6 +460,8 @@ class GR2(nn.Module):
             hidden_size=hidden_size,
             lang_feat_dim=lang_feat_dim,
             img_feat_dim=img_feat_dim,
+            patch_size=self.patch_size,
+            without_norm_pixel_loss=self.without_norm_pixel_loss,
         )
         self.time_emb = nn.Embedding(self.seq, self.hidden_size)
 
@@ -506,8 +611,8 @@ class GR2(nn.Module):
         embed = self.add_timestep_emb(embed)
         stack = self.stack_embeddings(embed)
 
-        stack, attn_mask = self.mask(stack, attn_mask)
-        return stack, attn_mask
+        stack, attn_mask, tokens, starts = self.mask(stack, attn_mask)
+        return stack, attn_mask, tokens, starts
 
     def transformer_forward(self, stack, attn_mask):
 
@@ -530,13 +635,22 @@ class GR2(nn.Module):
         embeddings, targets = self.MI({k: v for k, v in batch.items() if k != "mask"})
         targets["mask"] = batch["mask"]
 
-        stack, attn_mask = self._stack(embeddings, batch["mask"])
+        stack, attn_mask, tokens, starts = self._stack(embeddings, batch["mask"])
 
         x = self.transformer_forward(stack, attn_mask)
-        predictions = self.MO(x)
+        predictions = self.MO(x, tokens, starts)
+
         return predictions, targets
 
-    def loss(self, pred, tgt, skip_frame=3):
+    def loss(self, pred, tgt, skip_frame=3, arm_loss_ratio=100):
+        """
+        {'arm_action_preds': torch.Size([4, 10, 10, 6]),
+         'gripper_action_preds': torch.Size([4, 10, 10, 1]),
+         'obs_hand_preds': torch.Size([4, 10, 196, 768]),
+         'obs_hand_targets': torch.Size([4, 10, 196, 768]),
+         'obs_preds': torch.Size([4, 10, 196, 768]),
+         'obs_targets': torch.Size([4, 10, 196, 768])}
+        """
 
         obs_mask = tgt["mask"][..., 0]
 
@@ -544,20 +658,20 @@ class GR2(nn.Module):
 
         pprint(du.apply(pred, lambda x: x.shape if x is not None else None))
         pprint(du.apply(tgt, lambda x: x.shape if x is not None else None))
-        quit()
 
-        _masked_loss = lambda x, y: masked_loss(x, y, obs_mask, skip_frame, F.mse_loss)
-        loss["rgb_static"] = _masked_loss(pred["obs"], tgt["obs"])
-        loss["rgb_gripper"] = _masked_loss(pred["obs_hand"], tgt["obs_hand"])
+        loss["rgb_static"], loss["rgb_gripper"] = 0, 0
+        # _masked_loss = lambda x, y: masked_loss(x, y, obs_mask, skip_frame, F.mse_loss)
+        # loss["rgb_static"] = _masked_loss(pred["obs"], tgt["obs"])
+        # loss["rgb_gripper"] = _masked_loss(pred["obs_hand"], tgt["obs_hand"])
 
         _masked_loss = lambda x, y: masked_loss(x, y, tgt["mask"], 0, F.smooth_l1_loss)
-        loss["action_arm"] = _masked_loss( pred["arm"], tgt["actions"][..., :6])
-        loss["action_gripper"] = _masked_loss( pred["gripper"], tgt["actions"][..., -1:])
+        loss["action_arm"] = _masked_loss(pred["arm"], tgt["arm"][..., :6])
+        loss["action_gripper"] = _masked_loss(pred["gripper"], tgt["gripper"][..., -1:])
 
         loss["total"] = (
             loss["rgb_static"]
             + loss["rgb_gripper"]
-            + self.cn.arm_loss_ratio * loss["action_arm"]
+            + arm_loss_ratio * loss["action_arm"]
             + loss["action_gripper"]
         )
         return loss

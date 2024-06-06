@@ -73,6 +73,8 @@ class VisualExtractor(nn.Module):
         mae,
         patch_feat_dim,
         resampler_params,
+        patch_size,
+        without_norm_pixel_loss,
     ):
         super(VisualExtractor, self).__init__()
         self.mae = mae
@@ -84,6 +86,8 @@ class VisualExtractor(nn.Module):
         self.n_patch_latents = resampler_params["num_latents"]
         self.resampler_params = resampler_params
         self.patch_feat_dim = patch_feat_dim
+        self.patch_size = patch_size
+        self.without_norm_pixel_loss = without_norm_pixel_loss
 
         self.perceiver = PerceiverResampler(
             dim=patch_feat_dim,
@@ -106,33 +110,27 @@ class VisualExtractor(nn.Module):
         return obs, patch
 
     def targets(self, x):
-        pass
-        # obs_targets, obs_hand_targets = self.prepare_forward_prediction( x)
+        """Prepares the forward prediction for the given RGB and hand RGB images."""
 
-    def prepare_forward_prediction(self, rgb):
-        """ Prepares the forward prediction for the given RGB and hand RGB images. """
+        p = self.patch_size
+        hp, wp = self.h // p, self.w // p
 
-        if self.fwd_pred:
-            p = self.patch_size
-            h_p, w_p = self.h // p, self.w // p
-            rgb = rgb.reshape(shape=(self.bs, self.seq, 3, h_p, p, w_p, p))
-            obs_targets = self.normalize_targets(
-                rgb.permute(0, 1, 3, 5, 4, 6, 2).reshape(
-                    shape=(self.bs, self.seq, h_p * w_p, (p**2) * 3)
-                )
-            )
-
-            if self.fwd_pred_hand:
-                pass
+        x = x.reshape(shape=(self.bs, self.seq, 3, hp, p, wp, p))
+        target = self.normalize_targets(x.permute(0, 1, 3, 5, 4, 6, 2))
+        target = target.reshape(shape=(self.bs, self.seq, hp * wp, (p**2) * 3))
 
         return target
 
-    def normalize_targets(self, targets):
-        if not self.without_norm_pixel_loss:
-            targets = (targets - targets.mean(dim=-1, keepdim=True)) / (
-                targets.var(dim=-1, unbiased=True, keepdim=True).sqrt() + 1e-6
-            )
-        return targets
+    def normalize_targets(self, x):
+        """Normalizes the target images."""
+
+        if self.without_norm_pixel_loss:
+            return x
+
+        x = (x - x.mean(dim=-1, keepdim=True)) / (
+            x.var(dim=-1, unbiased=True, keepdim=True).sqrt() + 1e-6
+        )
+        return x
 
     def process_patch(self, patch):
         patch = self.perceiver(patch.unsqueeze(1)).squeeze(1)
@@ -151,6 +149,8 @@ class MultiInExtractor(nn.Module):
         hidden_size,
         lang_feat_dim,
         img_feat_dim,
+        patch_size,
+        without_norm_pixel_loss,
     ):
         super(MultiInExtractor, self).__init__()
 
@@ -163,7 +163,13 @@ class MultiInExtractor(nn.Module):
         self.llm = llm
         self.mae = mae
 
-        self.visual = VisualExtractor(mae, patch_feat_dim, resampler_params)
+        self.visual = VisualExtractor(
+            mae,
+            patch_feat_dim,
+            resampler_params,
+            patch_size=patch_size,
+            without_norm_pixel_loss=without_norm_pixel_loss,
+        )
 
         self.extractor = nn.ModuleDict(
             {
