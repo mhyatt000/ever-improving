@@ -202,13 +202,13 @@ class ResidualRLWrapper(ObservationWrapper):
 
         model = self.build_model()
 
-        obs, _ = self.env.reset(seed=2022, options=dict(reconfigure=True))
+        obs, _ = self.env.reset(options=dict(reconfigure=True))
         self.observation_space = convert_observation_to_space(obs)
         self.image_space = convert_observation_to_space(self.get_image(obs))
         self.observation_space.spaces["simpler-img"] = self.image_space
 
         self.observation_space.spaces["agent"].spaces["partial-action"] = (
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
+            gym.spaces.Box(low=-1, high=1, shape=(7,), dtype=np.float32)
         )
 
     def build_model(self):

@@ -456,7 +456,7 @@ def train(model, loader, cfg):
             name=""
         )
 
-    n_steps = 1_000
+    n_steps = 100_000
 
     model = initialize_model()
     model = torch.compile(model)
@@ -549,6 +549,8 @@ def train(model, loader, cfg):
         run.finish()
 
 def main():
+    is_training = False
+    is_logging = False
     if len(sys.argv) > 1:
         is_training = sys.argv[1] == "train"
         
@@ -557,8 +559,8 @@ def main():
 
     cfg = {
         "batch_size": 256,
-        "training": is_training or False,
-        "logging": is_logging or False
+        "training": is_training,
+        "logging": is_logging
     }
     cfg = OC.create(cfg)
     

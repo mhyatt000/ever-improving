@@ -29,28 +29,36 @@ class HDF5LoggerWrapper(Wrapper):
 
         self.rootdir = rootdir
         self.file = None
+        self.dataset_info_group = None
+        self.episode_group = None
         self.step_group = None
         self.counter = 0
 
     def reset(self, **kwargs):
-
-        # Close the previous file if it exists
-        if self.file is not None:
-            self.file.close()
-
-        # Create a new file with the current date and time
-        now = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        
         os.makedirs(self.rootdir, exist_ok=True)  # Ensure the directory exists
-        fname = os.path.join(self.rootdir, f"ep_{now}.h5")
-        self.file = h5py.File(fname, "w")
-        self.step_group = self.file.create_group("steps")
+        
+        # create the dataset file if it does not exist
+        if os.path.exists(os.path.join(self.rootdir, "dataset.h5")):
+            self.file = h5py.File(os.path.join(self.rootdir, "dataset.h5"), "a", libver='latest')
+        else:
+            # create a new file called dataset.h5
+            fname = os.path.join(self.rootdir, "dataset.h5")
+            self.file = h5py.File(fname, "w", libver='latest')
+        self.dataset_info_group = self.file.require_group("dataset_info")
 
+        # Create a new group with the current date and time
+        now = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        self.episode_group = self.file.create_group(f"ep_{now}")
+
+        self.step_group = self.episode_group.create_group("steps")
         obs, info = self.env.reset(**kwargs)
+        
         self.obs = obs
         self.counter = 0
         return obs, info
 
-    def store(self, obs, reward, terminated, truncated, action, info):
+    def store(self, obs, reward, terminated, truncated, action, info, task="widowx_put_eggplant_in_basket"):
 
         step = {
             "observation": self.obs,
@@ -63,6 +71,7 @@ class HDF5LoggerWrapper(Wrapper):
         self.obs = obs
 
         step_dataset = self.step_group.create_group(f"step_{self.counter}")
+        
         for key, value in step.items():
             if key == "observation" and isinstance(value, dict):
                 # Create a subgroup for the observation dictionary
@@ -85,6 +94,20 @@ class HDF5LoggerWrapper(Wrapper):
                 info_group.create_dataset(key, data=np.array(value))
 
         self.counter += 1
+        
+        # add dataset information for that episode
+        if terminated or truncated:
+            print("called")
+            episode_info = {
+                "task": task, 
+                "n_steps": self.counter, 
+                "success": reward > 0.0
+            }
+            
+            episode_info_group = self.dataset_info_group.create_group(self.episode_group.name.split("/")[-1])
+            for key, value in episode_info.items():
+                episode_info_group.create_dataset(key, data=value)
+        
 
     def step(self, action):
         obs, reward, terminated, truncated, info = self.env.step(action)
@@ -94,7 +117,7 @@ class HDF5LoggerWrapper(Wrapper):
     def close(self):
         self.file.close()
         self.env.close()
-
+        
 
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
 def main(cfg):
@@ -102,7 +125,7 @@ def main(cfg):
     env = rrl.make(cfg.env)
     env = HDF5LoggerWrapper(env)
 
-    for i in tqdm(range(int(1e3))):
+    for i in tqdm(range(int(2))):
         obs = env.reset()
         done = False
         while not done:
