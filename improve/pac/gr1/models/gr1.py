@@ -22,8 +22,8 @@ from flamingo_pytorch import PerceiverResampler
 from omegaconf import OmegaConf as OC
 from transformers import GPT2Model
 
-from models.transformer_utils import get_2d_sincos_pos_embed
-from models.vision_transformer import Block
+from improve.pac.gr1.models.transformer_utils import get_2d_sincos_pos_embed
+from improve.pac.gr1.models.vision_transformer import Block
 from util.loss import masked_loss
 
 

@@ -28,6 +28,7 @@ from transformers import get_cosine_schedule_with_warmup
 
 import models.vision_transformer as vits
 from models.gr1 import GR1
+from models.gr2 import GR2
 
 # Lightning Memory-Mapped Database
 # from LMDBDataset_jpeg import LMDBDataset as LMDBdst_jpeg
@@ -115,21 +116,25 @@ class Trainer:
         attn_mask = torch.ones((batch_size, seq_len, 1)).to(self.device)
 
         text = self.tokenizer("put eggplant in the sink").to(self.device)
-        text = text.view(1,-1)  # add two dimensions at the beginning
-        text = text.expand(batch_size, -1)  # expand along batch_size and seq_len dimensions
+        text = text.view(1, -1)  # add two dimensions at the beginning
+        # expand along batch_size and seq_len dimensions
+        text = text.expand(batch_size, -1).to(self.device)
 
-        pred = self.model(
-            rgb=img,
-            hand_rgb=None,  # TODO get wrist images
-            state=None,
-            language=text,  # batch["inst_token"],
-            attn_mask=attn_mask,
-        )
+        batch = {
+            "rgb": img,
+            "state": {
+                # xyz and quarternions for us... or xyz and rpy
+                "arm": torch.zeros((batch_size, seq_len, 7)).to(self.device),
+                "gripper": torch.zeros((batch_size, seq_len, 2)).to(self.device),
+            },
+            "language": text,
+            "mask": attn_mask,
+        }
 
-        loss = self.model.loss(pred, batch, obs_mask, self.cfg.skip_frame)
-        total_loss = loss["total"]
+        predictions, targets = self.model(batch)
+        loss = self.model.loss(predictions, targets, self.cfg.model_other.skip_frame)
 
-        self.acc.backward(total_loss)
+        self.acc.backward(loss['total'])
         self.optimizer.step(optimizer)
         self.logger.log(loss)
 
@@ -242,13 +247,15 @@ def main(cfg):
     model_mae.load_state_dict(checkpoint["model"], strict=False)
 
     # to device for fused optimizer
-    model = GR1.from_hydra(
-        model_clip,
-        model_mae,
+    model = GR2.from_hydra(
         cn=cfg.model,
+        pretrained={
+            "language": model_clip,
+            "visual": model_mae,
+        },
     ).to(device)
 
-    maybe_load(model, acc, cfg)
+    # maybe_load(model, acc, cfg)
     step = 0  # maybe_resume(model, acc, cfg)
 
     if cfg.training.compile_model:

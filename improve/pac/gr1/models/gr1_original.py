@@ -325,16 +325,20 @@ class GR1_original(nn.Module):
         n_hand_patch_tokens = self.n_patch_latents
         n_hand_obs_tokens = 1
         n_tokens = n_lang_tokens + n_state_tokens + n_patch_tokens + n_obs_tokens
+
         if self.use_hand_rgb:
             n_tokens += n_hand_obs_tokens
             n_tokens += n_hand_patch_tokens
+
         n_act_pred_tokens = self.chunk_size
         if self.act_pred:
             act_query_token_start_i = n_tokens
             n_tokens += self.chunk_size
+
         if self.fwd_pred:
             obs_query_token_start_i = n_tokens
             n_tokens += n_patch_tokens + n_obs_tokens
+
             if self.fwd_pred_hand:
                 obs_hand_query_token_start_i = n_tokens
                 n_tokens += n_patch_tokens + n_obs_tokens
@@ -351,12 +355,7 @@ class GR1_original(nn.Module):
             stacked_attention_mask = stacked_attention_mask.repeat(
                 1,
                 1,
-                n_lang_tokens
-                + n_state_tokens
-                + n_hand_patch_tokens
-                + n_hand_obs_tokens
-                + n_patch_tokens
-                + n_obs_tokens,
+                n_lang_tokens + n_state_tokens + n_hand_patch_tokens + n_hand_obs_tokens + n_patch_tokens + n_obs_tokens,
             )
         else:
             stacked_attention_mask = stacked_attention_mask.repeat(

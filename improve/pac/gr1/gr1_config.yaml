@@ -50,13 +50,13 @@ model:
   chunk_size: 10
   act_dim: 7
   state_dim: 7
-  use_hand_rgb: true
+  use_hand_rgb: false
   without_norm_pixel_loss: false
 
   training_target:
     act_pred: true
     fwd_pred: true
-    fwd_pred_hand: true
+    fwd_pred_hand: false
 
   img_feat_dim: 768
   patch_feat_dim: 768
@@ -71,7 +71,7 @@ model_other:
 
 
 data:
-  bs_per_gpu: 19
+  bs_per_gpu: 4
   workers_per_gpu: 7
   prefetch_factor: 2
   preprocess:
