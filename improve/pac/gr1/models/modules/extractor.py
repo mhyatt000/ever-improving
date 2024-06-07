@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import transformers
+# from clip import clip
 from clip import clip
 from flamingo_pytorch import PerceiverResampler
 from improve.wrapper import dict_util as du

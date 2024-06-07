@@ -1,4 +1,5 @@
 import json
+import sys
 import os
 import os.path as osp
 import warnings
@@ -7,9 +8,11 @@ from typing import Any, ClassVar, List, Optional, Tuple, Type, TypeVar, Union
 
 import improve
 import matplotlib.pyplot as plt
+from wandb import wandb
 import numpy as np
 import scipy.stats as stats
 import torch as th
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from gymnasium import spaces
 from gymnasium.spaces import Box, Dict
 from improve.data.flex import *
@@ -30,6 +33,8 @@ from torch.nn import functional as F
 from torch.optim import Adam, lr_scheduler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import improve.pac.gr1.models.vision_transformer as vits
+
 
 SelfQRDQN = TypeVar("SelfQRDQN", bound="QRDQN")
 HOME = os.path.expanduser("~")
@@ -397,7 +402,7 @@ def preprocess_batch(batch):
 
 def load_data(batch_size=33):
     dataset = HDF5IterDataset(DATA_DIR, loop=True)
-    loader = DataLoader(dataset, batch_size=batch_size, num_workers=1)
+    loader = DataLoader(dataset, batch_size=batch_size, num_workers=1, pin_memory=True)
     return cycle(loader)
 
 
@@ -433,41 +438,51 @@ def initialize_model():
         ),
         action_space,
         lr_schedule,
-    )
+    ).to('cuda')
     pprint(model)
     return model
 
 
 def train(model, loader, cfg):
-
     # @jay we should split the data into train and eval datasets
     # I thing torch or sklearn has a function for that
 
     ### remove the first 4 batches for eval
     # for _ in range(4):
     # batch = next(loader)
-
-    model = initialize_model()
-    model.set_training_mode(True)
-    optimizer = Adam(model.parameters(), lr=5e-5)
-
-    n_updates = 0
-    losses = []
+    run = None
+    if cfg.logging:
+        fun = wandb.init(
+            project="residualrl",
+            job_type="train",
+            name=""
+        )
 
     n_steps = 100_000
+
+    model = initialize_model()
+    model = torch.compile(model)
+    model.set_training_mode(True)
+    optimizer = Adam(model.parameters(), lr=5e-4, weight_decay=1e-4)
+    scheduler = CosineAnnealingLR(optimizer, T_max=n_steps)
+    losses = []
+    
     bar = tqdm(total=n_steps)
     for _ in range(n_steps):
         # Sample replay buffer
         # replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
 
         batch = next(loader)
-
-        if batch["reward"].shape[0] < cfg.batch_size:
+        
+        if batch['reward'].shape[0] < cfg.batch_size:
             continue
-
+        
+        batch = du.apply(batch, lambda x: x.to('cuda'))
         current, future = preprocess_batch(batch)
         current_obs = get_observation(current)
         next_obs = get_observation(future)
+        
+    
 
         with th.no_grad():
             # Compute the quantiles of future observation
@@ -511,29 +526,58 @@ def train(model, loader, cfg):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
+        scheduler.step()
 
         # move to cpu and remove from computation graph
         loss = loss.detach().cpu().numpy().item()
         losses.append(loss)
+        
+        if cfg.logging:
+            wandb.log({"train/loss": loss, "train/best_loss": min(losses), "train/learning_rate": scheduler.get_last_lr()[0]})
+        
         # f string with scientific notation
         desc = f"loss: {loss:.2e} | best: {min(losses):.2e}"
         bar.set_description(desc)
         bar.update(1)
 
-        if loss <= min(losses):
-            th.save(model, osp.join(improve.WEIGHTS, f"qrdqn_{loss:.2e}.pth"))
+        # if loss <= min(losses):
+            # th.save(model.state_dict(), osp.join(improve.WEIGHTS, f"qrdqn_{loss:.2e}.pth"))
 
         with open("losses.json", "w") as f:
             json.dump(losses, f)
+    
+    if run:        
+        run.finish()
 
 
 def main():
+    is_training = False
+    is_logging = False
+    if len(sys.argv) > 1:
+        is_training = sys.argv[1] == "train"
+        
+        if len(sys.argv) > 2:
+            is_logging = sys.argv[2] == "log"
 
-    cfg = {"batch_size": 256, "use_train": False}
+    cfg = {
+        "batch_size": 256,
+        "training": is_training,
+        "logging": is_logging
+    }
     cfg = OC.create(cfg)
+    
+    # device = th.device("cuda" if th.cuda.is_available() else "cpu")
+    # model_mae = vits.__dict__["vit_base"](patch_size=16, num_classes=0).to(device)
+    # checkpoint = th.load(osp.join(improve.WEIGHTS, 'mae_pretrain_vit_base.pth'))
+    # model_mae.load_state_dict(checkpoint["model"], strict=False)
+    
+    # batch = next(iter(loader))
+    # obs = get_observation(batch)
+    # output = model_mae(obs["simpler-img"].to(th.float32).to(device))
 
-    if cfg.use_train:
-        ### Training script
+    ### Training script
+    if cfg.training:
         loader = load_data(batch_size=cfg.batch_size)
         model = initialize_model()
         train(model, loader, cfg)

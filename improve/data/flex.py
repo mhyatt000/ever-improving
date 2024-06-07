@@ -7,7 +7,9 @@ from pprint import pprint
 import h5py
 import hydra
 import functools
+import functools
 import improve
+from improve.wrapper.dict_util import apply_both
 from improve.wrapper.dict_util import apply_both
 import improve.config.resolver
 import improve.wrapper.dict_util as du
@@ -15,6 +17,7 @@ import numpy as np
 import torch
 from omegaconf import OmegaConf as OC
 from torch.utils.data import IterableDataset
+from torch.utils.data import DataLoader as Dataloader
 
 HOME = os.path.expanduser("~")
 DATA_DIR = os.path.join(HOME, "datasets", "simpler")
@@ -26,15 +29,22 @@ class HDF5IterDataset(IterableDataset):
         super(HDF5IterDataset, self).__init__()
 
         self.root_dir = root_dir
-        self.fnames = [
-            osp.join(root_dir, f) for f in os.listdir(root_dir) if f.endswith(".h5")
-        ][:-1]
+        
+        self.fnames = [osp.join(root_dir, 'dataset.h5')]
         if not loop:
             self.fnames = iter(self.fnames)
-
+            
         self.n_steps = n_steps
-        self.lock = Lock()
-        torch.multiprocessing.set_sharing_strategy('file_system')
+        
+        # self.fnames = [
+        #     osp.join(root_dir, f) for f in os.listdir(root_dir) if f.endswith(".h5")
+        # ][:-1]
+        # if not loop:
+        #     self.fnames = iter(self.fnames)
+
+        # self.n_steps = n_steps
+        # self.lock = Lock()
+        # torch.multiprocessing.set_sharing_strategy('file_system')
 
     @staticmethod
     def to_tensor(h):
@@ -59,24 +69,32 @@ class HDF5IterDataset(IterableDataset):
 
     def _iter_by_step(self):
         for fname in self.fnames:
-            with h5py.File(fname, "r") as f:
-                for key in f["steps"].keys():
-                    step = f["steps"][key]
-                    yield HDF5IterDataset.extract(step)
+            with h5py.File(fname, "r", libver='latest', swmr=True) as f:
+                # go through each episode (skip the first info section)
+                for episode in [x for x in f.keys() if x != 'dataset_info']:
+                    steps = list(f[episode]["steps"].keys())
+                    steps.sort(key = lambda x: int(x.split('_')[1]))
+                    for key in steps:
+                        step = f[episode]["steps"][key]
+                        yield HDF5IterDataset.extract(step)
 
     def _iter_by_trajectory(self):
         for fname in self.fnames:
-            with h5py.File(fname, "r") as f:
+            with h5py.File(fname, "r", libver='latest', swmr=True) as f:
                 trajectory = []
-                steps = list(f["steps"].keys())[random.randint(0, self.n_steps - 1) :]
-                for key in steps:
-                    step = f["steps"][key]
-                    trajectory.append(HDF5IterDataset.extract(step))
-                    if len(trajectory) == self.n_steps:
-                        trajectory = [du.apply(x, lambda x: torch.unsqueeze(x,0)) for x in trajectory]
-                        yield functools.reduce(lambda a, b: apply_both(a, b, torch.cat), trajectory)
-                        trajectory = []
-                trajectory = [] # reset trajectory if not enough steps
+                for episode in [x for x in f.keys() if x != 'dataset_info']:
+                    
+                    steps = list(f[episode]["steps"].keys())
+                    steps.sort(key = lambda x: int(x.split('_')[1]))
+                    steps = steps[random.randint(0, self.n_steps - 1) :]
+                    for key in steps:
+                        step = f[episode]["steps"][key]
+                        trajectory.append(HDF5IterDataset.extract(step))
+                        if len(trajectory) == self.n_steps:
+                            trajectory = [du.apply(x, lambda x: torch.unsqueeze(x,0)) for x in trajectory]
+                            yield functools.reduce(lambda a, b: apply_both(a, b, torch.cat), trajectory)
+                            trajectory = []
+                    trajectory = [] # reset trajectory if not enough steps
 
     def __iter__(self):
         if self.n_steps == 1:
@@ -98,21 +116,27 @@ def main():
 
     # D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
     D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
-    D = iter(D)
-    inspect(next(D))
+    dataset = Dataloader(D, batch_size=99, num_workers=4)
+    
+    batch = next(iter(dataset))
+    
+    breakpoint()
+    
+    for data in dataset:
+        print(data)
 
-    print(D.fnames)
-    for data in D:
-        inspect(data)
+    # print(D.fnames)
+    # for data in D:
+        # inspect(data)
 
         # print(data['reward'].item())
         # print(data['info']['is_success'].item())
         # quit()
 
         # data['info']['is_success'] and data['terminated']
-        n_success += data["reward"].item()
-        n += 1
-        print(f"n_success: {n_success} | n: {n}")
+        # n_success += data["reward"].item()
+        # n += 1
+        # print(f"n_success: {n_success} | n: {n}")
 
 
 if __name__ == "__main__":

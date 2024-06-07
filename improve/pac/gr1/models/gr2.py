@@ -22,6 +22,13 @@ from improve.wrapper import dict_util as du
 from omegaconf import OmegaConf as OC
 from transformers import GPT2Model, get_cosine_schedule_with_warmup
 
+from torch.utils.data import DataLoader
+from sb3_contrib.common.utils import quantile_huber_loss
+import improve
+from improve.pac.gr1.models.modules.value_head import QuantileNetwork
+from improve.data.flex import *
+from tqdm import tqdm
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 class Mask(nn.Module):
 
@@ -192,6 +199,10 @@ class MultiOutHead(nn.Module):
             "gripper": None,  # yet
         }
 
+        self.n_quantiles = 200
+        self.q_sample = nn.Linear(self.hidden_size, 64, bias=True)
+        self.qnet = nn.Linear(64*32, self.n_quantiles, bias=True)
+        
     def init_action_prediction(self):
 
         hid2 = self.hidden_size // 2
@@ -272,6 +283,15 @@ class MultiOutHead(nn.Module):
             obs_hand_preds = self.decode_predictions(x, mask_tokens, is_hand=True)
 
         return obs_preds, obs_hand_preds
+    
+    def predict_quantiles(self, x):
+        bs, seq, *other = x.shape
+        x = self.q_sample(x)
+        x = x.view(bs,seq, -1)
+        x = self.qnet(x)
+        
+        return x
+        
 
     def decode_predictions(self, x, mask_tokens, is_hand=False):
 
@@ -295,12 +315,14 @@ class MultiOutHead(nn.Module):
 
         arm, gripper = self.predict_actions(x)
         obs, obs_hand = self.predict_forward(x)
+        quantiles = self.predict_quantiles(x)
 
         predictions = {
             "arm": arm,
             "gripper": gripper,
             "obs": obs,
             "obs_hand": obs_hand,
+            "quantiles": quantiles
         }
         return predictions
 
@@ -564,14 +586,33 @@ class GR2(nn.Module):
 
 
 CONFIG = osp.dirname(osp.dirname(__file__))
+HOME = os.path.expanduser("~")
+DATA_DIR = os.path.join(HOME, "datasets", "simpler")
+
 
 print(CONFIG)
 
+def preprocess_batch(batch):
+    batch_size, seq_len = batch['observation']["simpler-img"].shape[:2]
+    state = batch['observation']["agent_partial-action"].to(torch.float32)
+    batch = {
+        "rgb": batch['observation']["simpler-img"].permute(0, 1, 4, 2, 3).to(torch.float32),
+        "state": {
+            'arm': state[:,:,:-1].to(torch.float32),
+            'gripper': torch.nn.functional.one_hot(state[:,:,-1].to(int), num_classes=2).to(torch.float32)
+        },
+        "language": clip.tokenize("put eggplant in the sink"),
+        "mask": torch.ones((batch_size, seq_len, 1))
+    }
+    batch = du.apply(batch, lambda x: x.to("cuda"))
+    return batch
 
 @hydra.main(config_path=CONFIG, config_name="gr1_config", version_base="1.3.2")
 def main(cfg):
 
-    device = "cpu"
+    device = "cuda"
+    batch_size=1
+    n_steps = 1_000
 
     model_clip, _ = clip.load(cfg.submodel.clip_backbone, device=device)
     model_mae = vits.__dict__["vit_base"](patch_size=16, num_classes=0).to(device)
@@ -579,7 +620,96 @@ def main(cfg):
     model_mae.load_state_dict(checkpoint["model"], strict=False)
 
     pretrained = {"visual": model_mae, "language": model_clip}
-    model = GR2.from_hydra(cfg.model, pretrained)
+    
+    
+    model = GR2.from_hydra(cfg.model, pretrained).to(device)
+    # model = torch.compile(model)
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, weight_decay=1e-5)
+    scheduler = CosineAnnealingLR(optimizer, T_max=n_steps)
+    
+    
+    dataset = HDF5IterDataset(DATA_DIR, n_steps=10, loop=True)
+    loader = DataLoader(dataset, batch_size=batch_size, num_workers=4, pin_memory=True)
+    
+    losses = []
+    bar = tqdm(total=n_steps)
+    for _ in range(n_steps):
+        
+        print("start")
+        batch = next(iter(loader))
+        
+        # breakpoint()
+        print("checking shape:", batch['reward'].shape[0], batch_size, batch['reward'].shape[0] < batch_size)
+        reward, terminated = batch['reward'], batch['terminated']
+        if reward.shape[0] < batch_size:
+            continue
+        
+        batch = preprocess_batch(batch)
+        
+        
+        print("preprocess_batch")
+        
+        predictions, targets = model(batch)
+        
+        print("forward_pass")
+        
+        current_quantiles = predictions['quantiles']
+        
+        with torch.no_grad():
+            next_quantiles = current_quantiles.clone().detach()
+            
+            # breakpoint()
+            
+            next_greedy_actions = next_quantiles.mean(dim=1, keepdim=True).argmax(
+                dim=2, keepdim=True
+            )
+
+            # Make "n_quantiles" copies of actions, and reshape to (batch_size, n_quantiles, 1)
+            next_greedy_actions = next_greedy_actions.expand(batch_size-2, 10, 200)
+
+            # Follow greedy policy: use the one with the highest Q values
+            next_quantiles = next_quantiles.gather(
+                dim=2, index=next_greedy_actions
+            ).squeeze(dim=2)
+
+            # breakpoint()
+            
+            target_quantiles = (
+                reward.to('cuda').unsqueeze(2)
+                + (1 - terminated.to('cuda').long().unsqueeze(2))
+                * 0.99
+                * next_quantiles
+            )
+            
+        current_quantiles = current_quantiles.squeeze(dim=2)
+        loss = quantile_huber_loss(
+            current_quantiles, target_quantiles, sum_over_quantiles=True
+        )
+
+        # Optimize the policy
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        scheduler.step()
+
+        # move to cpu and remove from computation graph
+        loss = loss.detach().cpu().numpy().item()
+        losses.append(loss)
+        
+        # f string with scientific notation
+        desc = f"loss: {loss:.2e} | best: {min(losses):.2e}"
+        bar.set_description(desc)  
+        bar.update(1)
+
+    # breakpoint()
+    
+    
+    # breakpoint()
+    # octo actions -> state, obs -> rgb
+    
+    breakpoint()
 
 
 if __name__ == "__main__":

@@ -2,16 +2,17 @@ from typing import Any, Dict, List, Optional, Type
 
 import torch as th
 from gymnasium import spaces
+from improve.pac.qrdqn.torch_layers import CombinedExtractor
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.torch_layers import (
     BaseFeaturesExtractor,
-    CombinedExtractor,
     FlattenExtractor,
     NatureCNN,
     create_mlp,
 )
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 from torch import nn
+from improve.pac.gr1.models.vision_transformer import Block
 
 
 class QuantileNetwork(BasePolicy):
@@ -67,7 +68,14 @@ class QuantileNetwork(BasePolicy):
         :param obs: Observation
         :return: The estimated quantiles for each action.
         """
-        quantiles = self.quantile_net(self.extract_features(obs, self.features_extractor))
+        hidden = self.extract_features(obs, self.features_extractor)
+        # print(hidden.shape)
+        
+        # Block -> Flatten
+        hidden = hidden.view(hidden.size(0), -1)
+        quantiles = self.quantile_net(hidden)
+        # print(quantiles.shape)
+        
         return quantiles.view(-1, self.n_quantiles, self.action_space_n)
 
     def _predict(self, observation: PyTorchObs, deterministic: bool = True) -> th.Tensor:
