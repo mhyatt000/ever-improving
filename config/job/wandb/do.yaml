@@ -8,5 +8,5 @@ name: ${job.name}
 group: ${algo.name}
 tags:
   - ${algo.name}
-  - ${env.foundation.name}
+  - ${r_tostring:${env.foundation.name}}
   - ${r_tag_bonus:${env.bonus}}

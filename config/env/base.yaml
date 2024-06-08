@@ -22,3 +22,7 @@ residual_scale: 1
 use_original_space: ${algo.use_original_space}
 # should add foundation_key: agent_partial-action ?
 use_wandb: ${job.wandb.use}
+
+seed:
+  force: False
+  value: ${job.seed}

@@ -19,11 +19,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import transformers
 from flamingo_pytorch import PerceiverResampler
+from improve.pac.models.transformer_utils import get_2d_sincos_pos_embed
+from improve.pac.models.vision_transformer import Block
 from omegaconf import OmegaConf as OC
 from transformers import GPT2Model
 
-from improve.pac.gr1.models.transformer_utils import get_2d_sincos_pos_embed
-from improve.pac.gr1.models.vision_transformer import Block
 from util.loss import masked_loss
 
 
@@ -506,7 +506,7 @@ class GR1(nn.Module):
 
         obs_emb = self.embed_img(obs_emb.float())
         patch_emb = self.embed_patch(patch_emb.float())
-        
+
         if self.use_hand_rgb:
             hand_obs_emb = self.embed_hand_img(hand_obs_emb.float())
             hand_patch_emb = self.embed_hand_patch(hand_patch_emb.float())
@@ -580,9 +580,8 @@ class GR1(nn.Module):
 
         batch_size, seq_len, c, h, w = rgb.shape
 
-
-        self.use_hand_rgb = False # for now
-        self.fwd_pred_hand=False
+        self.use_hand_rgb = False  # for now
+        self.fwd_pred_hand = False
         # 1. EXTRACT
         embeddings, targets = self._extract(rgb, hand_rgb, state, language)
 

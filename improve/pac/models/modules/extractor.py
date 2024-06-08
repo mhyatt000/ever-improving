@@ -45,8 +45,7 @@ class StateExtractor(nn.Module):
 
         self.fc_arm = nn.Linear(self.state_dim, self.hidden_size)
 
-        # one-hot gripper state
-        self.fc_gripper = nn.Linear(2, self.hidden_size)
+        self.fc_gripper = nn.Linear(1, self.hidden_size)
         self.fc = nn.Linear(2 * self.hidden_size, self.hidden_size)
 
         self.extractor = {

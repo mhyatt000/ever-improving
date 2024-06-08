@@ -440,13 +440,6 @@ def initialize_model():
 
 def train(model, loader, cfg):
 
-    # @jay we should split the data into train and eval datasets
-    # I thing torch or sklearn has a function for that
-
-    ### remove the first 4 batches for eval
-    # for _ in range(4):
-    # batch = next(loader)
-
     model = initialize_model()
     model.set_training_mode(True)
     optimizer = Adam(model.parameters(), lr=5e-5)

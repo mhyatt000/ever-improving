@@ -2,15 +2,16 @@ training:
   evaluate_during_training: false
   record_evaluation_video: false
   compile_model: false
-  num_epochs: 20
+  num_epochs: 0 # 20
+  num_steps: 20000
   num_sequences: 1000
   ep_len: 360
   print_steps: 100
   lr_max: 0.0009
   weight_decay: 0.0001
-  arm_loss_ratio: 100
+  arm_loss_ratio: 1 # 100
   num_warmup_epochs: 1
-  gradient_accumulation_steps: 3
+  gradient_accumulation_steps: 8
 
 paths:
   ckpt: "./snapshot_ABC.pt"
@@ -49,7 +50,7 @@ model:
 
   chunk_size: 10
   act_dim: 7
-  state_dim: 7
+  state_dim: 6
   use_hand_rgb: false
   without_norm_pixel_loss: false
 
@@ -71,7 +72,7 @@ model_other:
 
 
 data:
-  bs_per_gpu: 4
+  bs_per_gpu: 32
   workers_per_gpu: 7
   prefetch_factor: 2
   preprocess:

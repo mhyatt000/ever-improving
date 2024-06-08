@@ -13,6 +13,7 @@ def masked_loss(pred, target, mask, skip_frame=0, loss_func=F.mse_loss):
     new_target = target[:, skip_frame:]
     new_mask = mask[:, skip_frame:]
     data_shape, mask_shape = new_pred.shape, new_mask.shape
+
     loss = loss_func(new_pred, new_target, reduction="none")
 
     for _ in range(len(data_shape) - len(mask_shape)):

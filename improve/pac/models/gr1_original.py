@@ -5,7 +5,7 @@ from pprint import pprint
 import clip
 import hydra
 import improve
-import improve.pac.gr1.models.vision_transformer as vits
+import improve.pac.models.vision_transformer as vits
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,10 +14,10 @@ from accelerate import Accelerator
 from accelerate.utils import (DistributedDataParallelKwargs,
                               InitProcessGroupKwargs)
 from flamingo_pytorch import PerceiverResampler
-from improve.pac.gr1.models.modules.extractor import MultiInExtractor
-from improve.pac.gr1.models.transformer_utils import get_2d_sincos_pos_embed
-from improve.pac.gr1.models.vision_transformer import Block
-from improve.pac.gr1.util.loss import masked_loss
+from improve.pac.models.modules.extractor import MultiInExtractor
+from improve.pac.models.transformer_utils import get_2d_sincos_pos_embed
+from improve.pac.models.vision_transformer import Block
+from improve.pac.util.loss import masked_loss
 from improve.wrapper import dict_util as du
 from omegaconf import OmegaConf as OC
 from transformers import GPT2Model, get_cosine_schedule_with_warmup

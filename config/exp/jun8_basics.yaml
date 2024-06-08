@@ -1,0 +1,41 @@
+# @package _global_
+
+# help with sweepers
+# https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
+# https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
+
+defaults:
+  - override /algo: sac
+  - override /buffer: base
+  - override /env/foundation: dont
+  - _self_
+
+log_dir: ${callback.log_path}
+sweep_id: "jun8_basics"
+
+train: 
+  n_steps: ${r_toint:2e5} # 20k
+
+algo:
+  learning_starts: ${r_toint:1e4}
+  buffer_size: ${r_toint:1e6}
+  warmup_zero_action: False # gaussian
+
+  ent_coef: 0
+
+env:
+  goal: 
+    use: False
+  seed:
+    force: True
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+  mode: MULTIRUN # needed or else -m flag
+  sweeper:
+    params:

@@ -18,6 +18,8 @@ def r_toint(val):
 def r_tofloat(val):
     return float(val)
 
+def r_tostring(val):
+    return str(val)
 
 def r_home(s):
     return osp.join(osp.expanduser("~"), s)
@@ -65,6 +67,7 @@ OmegaConf.register_new_resolver("r_tag_bonus", r_tag_bonus)
 OmegaConf.register_new_resolver("r_toint", r_toint)
 OmegaConf.register_new_resolver("r_tofloat", r_tofloat)
 OmegaConf.register_new_resolver("r_home", r_home)
+OmegaConf.register_new_resolver("r_tostring", r_tostring)
 
 OmegaConf.register_new_resolver("r_instantiate", r_instantiate)
 OmegaConf.register_new_resolver("r_typeof", r_typeof)

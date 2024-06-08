@@ -23,34 +23,6 @@ import improve
 import improve.config.resolver
 import improve.wrapper.dict_util as du
 
-"""
-from gymnasium.envs.registration import (make, make_vec, pprint_registry,
-                                         register, register_envs, registry,
-                                         spec)
-env = gym.make(
-    "GraspSingleDummy-v0",
-    control_mode=control_mode,
-    obs_mode="rgbd",
-    robot="widowx_bridge_dataset_camera_setup",
-    sim_freq=sim_freq,
-    control_freq=control_freq,
-    max_episode_steps=50,
-    camera_cfgs={"add_segmentation": True},
-    rgb_overlay_path=f"ManiSkill2_real2sim/data/real_inpainting/bridge/bridge_{episode_id}_cleanup.png",
-    rgb_overlay_cameras=[overlay_camera],
-)
-
-
-def make(task_name):
-    assert (
-        task_name in ENVIRONMENTS
-    ), f"Task {task_name} is not supported. Environments: \n {ENVIRONMENTS}"
-    env_name, kwargs = ENVIRONMENT_MAP[task_name]
-    kwargs["prepackaged_config"] = True
-    env = gym.make(env_name, obs_mode="rgbd", **kwargs)
-    return env
-"""
-
 
 # ---------------------------------------------------------------------------- #
 # OpenAI gym
@@ -184,6 +156,8 @@ class ResidualRLWrapper(ObservationWrapper):
         ckpt,
         use_original_space=False,
         residual_scale=1,
+        force_seed=False,
+        seed=None,
     ):
         """Constructor for the observation wrapper."""
         Wrapper.__init__(self, env)
@@ -200,9 +174,12 @@ class ResidualRLWrapper(ObservationWrapper):
         self.use_original_space = use_original_space
         self.residual_scale = residual_scale
 
+        self.force_seed = force_seed
+        self.seed = seed
+
         model = self.build_model()
 
-        obs, _ = self.env.reset(seed=2022, options=dict(reconfigure=True))
+        obs, _ = self.env.reset(options=dict(reconfigure=True))
         self.observation_space = convert_observation_to_space(obs)
         self.image_space = convert_observation_to_space(self.get_image(obs))
         self.observation_space.spaces["simpler-img"] = self.image_space
@@ -222,22 +199,24 @@ class ResidualRLWrapper(ObservationWrapper):
         else:
             raise NotImplementedError()
 
-        if self.policy == "rt1":
-            from simpler_env.policies.rt1.rt1_model import RT1Inference
+        self.model = None
+        if self.policy is not None:
+            if self.policy == "rt1":
+                from simpler_env.policies.rt1.rt1_model import RT1Inference
 
-            self.model = RT1Inference(
-                saved_model_path=self.ckpt, policy_setup=policy_setup
-            )
+                self.model = RT1Inference(
+                    saved_model_path=self.ckpt, policy_setup=policy_setup
+                )
 
-        elif "octo" in self.policy:
-            from improve.simpler_mod.octo import OctoInference
+            elif "octo" in self.policy:
+                from improve.simpler_mod.octo import OctoInference
 
-            self.model = OctoInference(
-                model_type=self.ckpt, policy_setup=policy_setup, init_rng=0
-            )
+                self.model = OctoInference(
+                    model_type=self.ckpt, policy_setup=policy_setup, init_rng=0
+                )
 
-        else:
-            raise NotImplementedError()
+            else:
+                raise NotImplementedError()
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
         """Modifies the :attr:`env` after calling :meth:`reset`, returning a modified observation using :meth:`self.observation`."""
@@ -246,8 +225,13 @@ class ResidualRLWrapper(ObservationWrapper):
         self.truncated = False
         self.success = False
 
+        if self.force_seed:
+            print(f'forcing seed to {self.seed}')
+            seed = self.seed
+
         obs, info = self.env.reset(seed=seed, options=options)
-        self.model.reset(self.instruction)
+        if self.model is not None:
+            self.model.reset(self.instruction)
 
         return self.observation(obs), info
 
@@ -287,6 +271,14 @@ class ResidualRLWrapper(ObservationWrapper):
 
     def observation(self, observation):
         """Returns a modified observation."""
+        
+        # early return if no model
+        if self.model is None:
+            self.partial = np.zeros(7)
+            observation["agent"]["partial-action"] = self.partial
+            image = self.get_image(observation)
+            observation["simpler-img"] = image
+            return observation
 
         image = self.get_image(observation)
 
@@ -342,13 +334,24 @@ class SB3Wrapper(ResidualRLWrapper):
         keys=None,
         use_original_space=False,
         residual_scale=1,
+        force_seed=False,
+        seed=None,
     ):
-        super().__init__(env, task, policy, ckpt, use_original_space, residual_scale)
+        super().__init__(
+            env,
+            task,
+            policy,
+            ckpt,
+            use_original_space,
+            residual_scale,
+            force_seed,
+            seed,
+        )
         self.use_wandb = use_wandb
         self.bonus = bonus
         self.downscale = downscale
 
-        if device:
+        if device and self.model is not None:
             params = jax.device_put(self.model.params, jax.devices("gpu")[device])
             del self.model.params
             self.model.params = params
@@ -466,6 +469,8 @@ def make(cn):
         downscale=cn.downscale,
         keys=cn.obs_keys,
         use_original_space=cn.use_original_space,
+        force_seed=cn.seed.force,
+        seed=cn.seed.value if cn.seed.force else None,
     )
 
 
@@ -480,46 +485,25 @@ def main(cfg):
     warnings.filterwarnings("ignore", category=FutureWarning)
 
     env = make(cfg.env)
-    things = env.reset()
-    # print(things[-1])
 
-    print(env.observation_space.sample)
-    quit()
+    for _ in range(10):
+        obs,info = env.reset()
 
-    hist = {t: 0 for t in simpler_env.ENVIRONMENTS if "widowx" in t}
-    allinstructions = set()
-    for t in hist:
+        print(info)
 
-        env = make(**cfg, kind="sb3")
+        continue
+        for i in range(2000):
 
-        for _ in range(10):
-            env.reset()
-            for i in range(2000):
+            zeros = np.zeros(env.action_space.shape)
+            randoms =  env.action_space.sample()
+            observation, reward, success, truncated, info = env.step(action)
 
-                # zero action
-                action = np.zeros(env.action_space.shape)
-                # random action
-                # env.action_space.sample()
+            print(f"{i:003}", reward, success, truncated)
 
-                observation, reward, success, truncated, info = env.step(action)
+            if truncated:  # or success:
+                break
 
-                # print i as formatted for 3 decimals 001 - 100
-                print(f"{i:003}", reward, success, truncated)
-
-                allinstructions.add(env.instruction)
-                if not (env.instruction in allinstructions):
-                    print(env.instruction)
-
-                if truncated:  # or success:
-                    break
-
-            if success:
-                hist[t] += 1
-            pprint(hist)
-
-        env.close()
-    print(allinstructions)
-
+    env.close()
 
 if __name__ == "__main__":
     main()

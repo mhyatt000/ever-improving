@@ -3,6 +3,7 @@ import math
 import os
 import os.path as osp
 from datetime import timedelta
+from pprint import pprint
 from time import time
 
 import clip
@@ -14,19 +15,21 @@ import torch.nn.functional as F
 from accelerate import Accelerator
 from accelerate.utils import (DistributedDataParallelKwargs,
                               InitProcessGroupKwargs)
-from improve.data.flex import HDF5IterDataset
-from improve.pac.gr1.util.optim import async_step
-from improve.pac.gr1.util.prefetch import DataPrefetcher
-from improve.pac.gr1.util.transform import PreProcess
+from improve.data.flex import HDF5Dataset
+from improve.pac.util.optim import async_step
+from improve.pac.util.prefetch import DataPrefetcher
+from improve.pac.util.transform import PreProcess
 from improve.wrapper import dict_util as du
 from omegaconf import OmegaConf
 from torch.profiler import (ProfilerActivity, profile, record_function,
                             tensorboard_trace_handler)
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 from transformers import get_cosine_schedule_with_warmup
 
 import models.vision_transformer as vits
+import wandb
 from models.gr1 import GR1
 from models.gr2 import GR2
 
@@ -73,12 +76,18 @@ class Trainer:
         self.writer = SummaryWriter(cfg.paths.save_path + "logs")
 
         self.tokenizer = clip.tokenize
+        self.nstep = 0
 
-    def log(self, loss):
-        print(du.apply(loss, lambda x: x.detach()))
-        return
-        for key in self.logger:
-            logger[key] += loss[key].detach() / cfg.print_steps
+        wandb.init(
+            project="gr2",
+            config=OmegaConf.to_container(cfg),
+        )
+
+    def log(self, d, step):
+        """Log dictionary d to wandb"""
+        d = du.apply(d, lambda x: x.cpu().detach() if x is torch.Tensor else x)
+        d = du.flatten(d, delim="/")
+        wandb.log(d, step=step)
 
     def save(self):
         save_model(
@@ -94,14 +103,23 @@ class Trainer:
         self.model.train()
         self.optimizer.zero_grad()
 
-        print(batch.keys())
-        print(batch["observation"].keys())
+        """
+        'observation': {'agent_partial-action': (torch.float64,
+                                              torch.Size([8, 10, 7])),
+                     'agent_qpos': (torch.float32, torch.Size([8, 10, 8])),
+                     'agent_qvel': (torch.float32, torch.Size([8, 10, 8])),
+                     'simpler-img': (torch.uint8,
+                                     torch.Size([8, 10, 480, 640, 3]))},
+        'reward': (torch.float64, torch.Size([8, 10])),
+        """
 
         # TODO can this be a transform for the dataset?
         # preprocess before prefetching
         img = self.preprocessor._process(
             batch["observation"]["simpler-img"], static=True, train=True
         )
+
+        _batch = batch
 
         # xyq quarternions
         # state = batch["observation"]["agent_qpos"]
@@ -112,39 +130,44 @@ class Trainer:
         # batch["rgb_static"], batch["rgb_gripper"] = self.preprocessor.rgb_process( batch["rgb_static"], batch["rgb_gripper"], train=True)
 
         # obs_mask = batch["mask"][..., 0]
-        batch_size, seq_len = img.shape[:2]
-        attn_mask = torch.ones((batch_size, seq_len, seq_len)).to(self.device)
+        bs, seq = img.shape[:2]
+        attn_mask = torch.ones((bs, seq, 1)).to(self.device)
 
         text = self.tokenizer("put eggplant in the sink").to(self.device)
-        text = text.view(1, -1).expand(batch_size, -1).to(self.device)
+        text = text.view(1, -1).expand(bs, -1).to(self.device)
 
+        action = batch["observation"]["agent_partial-action"].float()
         batch = {
             "rgb": img,
-            "state": {
-                # xyz and quarternions for us... or xyz and rpy
-                "arm": torch.zeros((batch_size, seq_len, 7)).to(self.device),
-                "gripper": torch.zeros((batch_size, seq_len, 2)).to(self.device),
-            },
+            # xyz and quarternions for us... or xyz and rpy
+            "state": {"arm": action[:, :, :-1], "gripper": action[:, :, -1:]},
             "language": text,
             "mask": attn_mask,
         }
 
         predictions, targets = self.model(batch)
-        targets["arm"] = torch.zeros_like(predictions["arm"])
-        targets["gripper"] = torch.zeros_like(predictions["gripper"])
+
+        action = torch.roll(action, -1, 1).view(bs, seq, 1, -1).repeat(1, 1, 10, 1)
+        targets["arm"] = action[..., :-1]
+
+        targets["gripper"] = (action[..., -1:] / 2) + 0.5
 
         loss = self.model.loss(
             predictions,
             targets,
+            _batch,
             skip_frame=self.cfg.model_other.skip_frame,
             arm_loss_ratio=self.cfg.training.arm_loss_ratio,
         )
 
         self.acc.backward(loss["total"])
-        print(type(self.optimizer))
-        self.optimizer.step(self.optimizer)
-        # self.logger.log(loss)
-        print(loss["total"].cpu().detach().numpy())
+        self.optimizer.step()
+        self.scheduler.step()
+        self.log({"loss": loss}, self.nstep)
+        self.nstep += 1
+
+        lr = self.optimizer.param_groups[0]["lr"]
+        self.log({"train/lr": lr}, self.nstep)
 
         batch, load_time = self.prefetcher.next()
         return batch, load_time
@@ -161,9 +184,21 @@ class Trainer:
 
     def run(self):
 
-        for epoch in range(self.cfg.training.num_epochs):
-            self.epoch(epoch)
-            self.Logger.log()
+        # by epochs
+        if self.cfg.training.num_epochs > 0:
+            for epoch in range(self.cfg.training.num_epochs):
+                self.epoch(epoch)
+                self.log({"time/epoch": epoch}, self.nstep)
+                # self.Logger.log()
+
+        # by steps
+        else:
+            epoch = 0
+            while self.nstep < self.cfg.training.num_steps:
+                self.epoch(epoch)
+                self.log({"time/epoch": epoch}, self.nstep)
+                epoch += 1
+                # self.Logger.log()
 
 
 def print_model_params(model, trainable=True):
@@ -212,7 +247,7 @@ def main(cfg):
     )
     device = acc.device
 
-    ds = HDF5IterDataset(loop=True, n_steps=cfg.model.seq_len)
+    ds = HDF5Dataset(n_steps=cfg.model.seq_len)
 
     # change shuffle to True somehow
     def build_loader(ds):
@@ -221,7 +256,7 @@ def main(cfg):
             batch_size=cfg.data.bs_per_gpu,  # to be flattened in prefetcher
             num_workers=cfg.data.workers_per_gpu,
             pin_memory=True,  # Accelerate data reading
-            shuffle=False,
+            shuffle=True,
             prefetch_factor=cfg.data.prefetch_factor,
             persistent_workers=True,
         )
@@ -230,7 +265,6 @@ def main(cfg):
 
     # for batch in loader:
     # print("batch", du.apply(batch, lambda x: (x.dtype, x.shape)))
-    # quit()
 
     # test_loader = build_loader(test_dataset)
 
@@ -265,8 +299,8 @@ def main(cfg):
 
     scheduler = get_cosine_schedule_with_warmup(
         optimizer,
-        num_warmup_steps=10_000,  # cfg.num_warmup_epochs * total_prints_per_epoch,
-        num_training_steps=100_000,  # cfg.num_epochs * total_prints_per_epoch,
+        num_warmup_steps=100,  # 10_000,  # cfg.num_warmup_epochs * total_prints_per_epoch,
+        num_training_steps=6_000,  # cfg.num_epochs * total_prints_per_epoch,
     )
 
     (model, optimizer, loader) = acc.prepare(
@@ -276,12 +310,14 @@ def main(cfg):
         device_placement=[True, True, False],
     )
 
-    optimizer.step = async_step
+    # optimizer.step = async_step
     prefetcher = DataPrefetcher(loader, device)
     # test_prefetcher = DataPrefetcher(test_loader, device)
 
     T = Trainer(acc, prefetcher, model, optimizer, scheduler, cfg)
     T.run()
+
+    wandb.finish()
 
 
 if __name__ == "__main__":
