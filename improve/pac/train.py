@@ -2,14 +2,16 @@ import json
 import math
 import os
 import os.path as osp
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pprint import pprint
 from time import time
 
 import clip
 import hydra
 import improve
+import matplotlib.pyplot as plt
 import numpy as np
+import simpler_env as simpler
 import torch
 import torch.nn.functional as F
 from accelerate import Accelerator
@@ -20,6 +22,7 @@ from improve.pac.util.optim import async_step
 from improve.pac.util.prefetch import DataPrefetcher
 from improve.pac.util.transform import PreProcess
 from improve.wrapper import dict_util as du
+from improve.wrapper.eval import EvalWrapper
 from omegaconf import OmegaConf
 from torch.profiler import (ProfilerActivity, profile, record_function,
                             tensorboard_trace_handler)
@@ -37,27 +40,38 @@ from models.gr2 import GR2
 # from LMDBDataset_jpeg import LMDBDataset as LMDBdst_jpeg
 
 
-def save_model(acc, model, cfg, epoch, modules_to_exclude=["model_mae", "model_clip"]):
-    acc.wait_for_everyone()
-    unwrapped_model = acc.unwrap_model(model)
+def plot_values(pred):
+    bs, seq, bins = pred.shape
+    pred = pred.cpu().numpy()
 
-    if hasattr(unwrapped_model, "_orig_mod"):
-        state_dict = {
-            k: v
-            for k, v in unwrapped_model._orig_mod.state_dict().items()
-            if not any(module_name in k for module_name in modules_to_exclude)
-        }
-    else:
-        state_dict = {
-            k: v
-            for k, v in unwrapped_model.state_dict().items()
-            if not any(module_name in k for module_name in modules_to_exclude)
-        }
+    # Cumulative probabilities to calculate quantiles.
+    quantiles = np.linspace(0, 1, bins) + 0.5 / bins
 
-    acc.save(
-        {"state_dict": state_dict},
-        cfg.save_path + "GR1_{}.pth".format(epoch + cfg.load_epoch),
-    )
+    plt.switch_backend("Agg")
+    # pred = pred.cumsum(-1)
+    # print(pred[0,0,-1])
+    for b in tqdm(range(bs), desc="plotting values...", leave=False):
+        for t in tqdm(range(seq), leave=False):
+
+            plt.title("Quantile Regression over Values")
+            plt.ylabel("Estimated Value")
+            plt.xlabel("Quantiles - probability space")
+
+            plt.bar(quantiles, pred[b, t], label=f"relative t={t}", width=1 / bins)
+            plt.axhline(
+                y=pred[b, t].mean(), color="r", linestyle="--", label="mean value"
+            )
+
+            plt.ylim(0, 1)
+            plt.legend()
+            plt.tight_layout()
+
+            now = datetime.now().strftime("%Y-%m-%d")
+            path = osp.join(improve.RESULTS, now)
+            os.makedirs(path, exist_ok=True)
+            path = osp.join(path, f"value_cdf_sample{b}_t{t}.png")
+            plt.savefig(path)
+            plt.close()
 
 
 class Trainer:
@@ -78,25 +92,34 @@ class Trainer:
         self.tokenizer = clip.tokenize
         self.nstep = 0
 
-        wandb.init(
-            project="gr2",
-            config=OmegaConf.to_container(cfg),
-        )
+        if self.cfg.exp.wandb:
+            wandb.init(
+                project="gr2",
+                config=OmegaConf.to_container(cfg),
+            )
 
     def log(self, d, step):
+        if not self.cfg.exp.wandb:
+            return
         """Log dictionary d to wandb"""
         d = du.apply(d, lambda x: x.cpu().detach() if x is torch.Tensor else x)
         d = du.flatten(d, delim="/")
         wandb.log(d, step=step)
 
     def save(self):
-        save_model(
-            self.acc,
-            self.model,
-            self.cfg,
-            self.epoch,
-            modules_to_exclude=["model_mae", "model_clip"],
+        self.acc.wait_for_everyone()
+        model = self.acc.unwrap_model(self.model)
+
+        state_dict = {k: v.cpu() for k, v in model.state_dict().items()}
+        self.acc.save(
+            {"state_dict": state_dict},
+            osp.join(improve.WEIGHTS, f"GR1_{self.step}.pth"),
         )
+
+    def load(self):
+        path = osp.join(improve.WEIGHTS, self.cfg.paths.ckpt)
+        self.model.load_state_dict(torch.load(path)["state_dict"], strict=False)
+        self.model = self.acc.prepare(self.model, device_placement=[True])[0]
 
     def step(self, batch):
 
@@ -119,8 +142,6 @@ class Trainer:
             batch["observation"]["simpler-img"], static=True, train=True
         )
 
-        _batch = batch
-
         # xyq quarternions
         # state = batch["observation"]["agent_qpos"]
         # this is wrong
@@ -137,7 +158,7 @@ class Trainer:
         text = text.view(1, -1).expand(bs, -1).to(self.device)
 
         action = batch["observation"]["agent_partial-action"].float()
-        batch = {
+        obs = {
             "rgb": img,
             # xyz and quarternions for us... or xyz and rpy
             "state": {"arm": action[:, :, :-1], "gripper": action[:, :, -1:]},
@@ -145,7 +166,7 @@ class Trainer:
             "mask": attn_mask,
         }
 
-        predictions, targets = self.model(batch)
+        predictions, targets = self.model(obs)
 
         action = torch.roll(action, -1, 1).view(bs, seq, 1, -1).repeat(1, 1, 10, 1)
         targets["arm"] = action[..., :-1]
@@ -155,7 +176,7 @@ class Trainer:
         loss = self.model.loss(
             predictions,
             targets,
-            _batch,
+            batch,
             skip_frame=self.cfg.model_other.skip_frame,
             arm_loss_ratio=self.cfg.training.arm_loss_ratio,
         )
@@ -164,13 +185,110 @@ class Trainer:
         self.optimizer.step()
         self.scheduler.step()
         self.log({"loss": loss}, self.nstep)
-        self.nstep += 1
+
+        if self.nstep % 500 == 0:
+            with torch.no_grad():
+                plot_values(predictions["value"])
 
         lr = self.optimizer.param_groups[0]["lr"]
         self.log({"train/lr": lr}, self.nstep)
+        self.nstep += 1
 
         batch, load_time = self.prefetcher.next()
         return batch, load_time
+
+    def rollout(self):
+        with torch.no_grad():
+
+            env = EvalWrapper(
+                simpler.make(self.cfg.eval.task),
+                nstep=self.nstep,
+                device=self.device,
+                render=True,
+            )
+
+            success_rate = []
+            lengths = []
+            for _ in tqdm(range(10), desc="eval rollouts"):
+                obs, info = env.reset()
+
+                process = lambda x: self.preprocessor._process(
+                    x.view([1, 1] + list(x.shape)), static=True, train=False
+                )
+                img = process(obs["rgb"])
+                bs, seq = 1, 10
+
+                action = torch.zeros(bs, 1, 7).to(self.device)
+                state = {"arm": action[..., :-1], "gripper": action[..., -1:]}
+                instruction = env.instruction
+                text = self.tokenizer("put eggplant in the sink").to(self.device)
+                text = text.view(1, -1).expand(bs, -1).to(self.device)
+                attn_mask = torch.ones((bs, seq, 1)).to(self.device)
+
+                buffer = {
+                    "rgb": img,
+                    "state": state,
+                    "mask": torch.ones(1, 1, 1).to(self.device),
+                }
+
+                successes = []
+                success, truncated, done = False, False, False
+                while not done:
+                    if seq - buffer["rgb"].shape[1] > 0:
+                        n = buffer["rgb"].shape[1]
+                        remain = seq - n
+                        trajectory = du.apply(
+                            buffer,
+                            lambda x: torch.zeros_like(x[:, 0]).repeat(
+                                [1, remain] + [1 for i in x.shape[2:]]
+                            ),
+                        )
+
+                        trajectory = du.apply_both(
+                            trajectory, buffer, lambda x, y: torch.cat([x, y], dim=1)
+                        )
+
+                    else:
+                        trajectory = du.apply(buffer, lambda x: x[:, -seq:])
+
+                    # does not repeat over time
+                    trajectory["language"] = text
+
+                    predictions, targets = self.model(trajectory)
+                    actions = torch.cat(
+                        [predictions["arm"], predictions["gripper"]], dim=-1
+                    )
+
+                    # this is a hack to undo action chunking until its optimized
+                    idx = min(buffer["rgb"].shape[1], seq) - 1
+                    action = actions[0, idx, 0, :]
+
+                    obs, reward, success, truncated, info = env.step(action)
+                    done = success or truncated
+                    successes.append(success)
+
+                    img = process(obs["rgb"])
+
+                    action = action.view(1, 1, -1)
+                    timestep = {
+                        "rgb": img,
+                        "state": {"arm": action[..., :-1], "gripper": action[..., -1:]},
+                        "mask": torch.ones(1, 1, 1).to(self.device),
+                    }
+                    buffer = du.apply_both(
+                        buffer, timestep, lambda x, y: torch.cat([x, y], dim=1)
+                    )
+
+                lengths.append(len(successes))
+                success_rate.append(any(successes))
+
+            success_rate = np.mean(success_rate)
+            lengths = np.mean(lengths)
+
+            self.log(
+                {"eval": {"mean SR": success_rate, "mean length": lengths}}, self.nstep
+            )
+            env.close()
 
     def epoch(self, epoch):
 
@@ -178,9 +296,10 @@ class Trainer:
             self.save()
 
         batch, load_time = self.prefetcher.next()
-        while batch is not None:
+        for _ in tqdm(range(len(self.prefetcher.loader)), desc="epoch"):
             with self.acc.accumulate(self.model):
                 batch, load_time = self.step(batch)
+        self.rollout()
 
     def run(self):
 
@@ -188,13 +307,17 @@ class Trainer:
         if self.cfg.training.num_epochs > 0:
             for epoch in range(self.cfg.training.num_epochs):
                 self.epoch(epoch)
+                # self.save()
                 self.log({"time/epoch": epoch}, self.nstep)
                 # self.Logger.log()
 
         # by steps
         else:
             epoch = 0
-            while self.nstep < self.cfg.training.num_steps:
+            for _ in tqdm(
+                range(self.cfg.training.num_steps // len(self.prefetcher.loader)),
+                desc="steps",
+            ):
                 self.epoch(epoch)
                 self.log({"time/epoch": epoch}, self.nstep)
                 epoch += 1
@@ -300,7 +423,7 @@ def main(cfg):
     scheduler = get_cosine_schedule_with_warmup(
         optimizer,
         num_warmup_steps=100,  # 10_000,  # cfg.num_warmup_epochs * total_prints_per_epoch,
-        num_training_steps=6_000,  # cfg.num_epochs * total_prints_per_epoch,
+        num_training_steps=cfg.training.num_steps,  # cfg.num_epochs * total_prints_per_epoch,
     )
 
     (model, optimizer, loader) = acc.prepare(
@@ -317,7 +440,8 @@ def main(cfg):
     T = Trainer(acc, prefetcher, model, optimizer, scheduler, cfg)
     T.run()
 
-    wandb.finish()
+    if cfg.exp.wandb:
+        wandb.finish()
 
 
 if __name__ == "__main__":

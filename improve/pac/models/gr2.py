@@ -18,10 +18,10 @@ from improve.pac.models.modules.extractor import MultiInExtractor
 from improve.pac.models.modules.value_net import QRNet
 from improve.pac.models.transformer_utils import get_2d_sincos_pos_embed
 from improve.pac.models.vision_transformer import Block
-from improve.pac.util.loss import masked_loss
+from improve.pac.util.loss import old_masked_loss as masked_loss
+from improve.pac.util.loss import quantile_huber_loss
 from improve.wrapper import dict_util as du
 from omegaconf import OmegaConf as OC
-from sb3_contrib.common.utils import quantile_huber_loss
 from transformers import GPT2Model, get_cosine_schedule_with_warmup
 
 
@@ -194,7 +194,7 @@ class MultiOutHead(nn.Module):
             "gripper": None,  # yet
         }
 
-        self.value_net = QRNet(num_quantiles=200, num_actions=act_dim)
+        self.value_net = QRNet(num_quantiles=32, num_actions=act_dim)
 
     def init_action_prediction(self):
 
@@ -258,8 +258,8 @@ class MultiOutHead(nn.Module):
 
     def predict_forward(self, x):
 
-        print("decoder")
-        print(x.shape)
+        # print("decoder")
+        # print(x.shape)
 
         obs_preds, obs_hand_preds = None, None
 
@@ -273,9 +273,9 @@ class MultiOutHead(nn.Module):
             pos = self.decoder_pos_embed.unsqueeze(0).repeat(self.bs, self.seq, 1, 1)
             mask_tokens = mask_tokens + pos
 
-            print(mask_tokens.shape)
+            # print(mask_tokens.shape)
             obs_preds = self.decode_predictions(x, mask_tokens, is_hand=False)
-            print(obs_preds.shape)
+            # print(obs_preds.shape)
 
         if self.fwd_pred_hand:
             obs_hand_preds = self.decode_predictions(x, mask_tokens, is_hand=True)
@@ -293,7 +293,7 @@ class MultiOutHead(nn.Module):
 
         for blk in self.decoder_blocks:
             obs_pred_ = blk(obs_pred_)
-            print("blk", obs_pred_.shape)
+            # print("blk", obs_pred_.shape)
         obs_pred_ = self.decoder_norm(obs_pred_)
         obs_preds = self.decoder_pred(obs_pred_).reshape(
             self.bs, self.seq, -1, obs_pred_.shape[-1]
@@ -685,9 +685,11 @@ class GR2(nn.Module):
         # current_quantiles = current_quantiles.squeeze(dim=2)
 
         # Compute Quantile Huber loss, summing over a quantile dimension as in the paper.
-        value_loss = quantile_huber_loss(
-            pred["value"], tgt["value"], sum_over_quantiles=True
+        obs_mask = batch["info"]["will_succeed"]  # tgt["mask"][..., 0]
+        value_loss = masked_loss(
+            pred["value"], tgt["value"], obs_mask, 0, quantile_huber_loss
         )
+
         return value_loss
 
     def loss(self, pred, tgt, batch, skip_frame=3, arm_loss_ratio=100):
@@ -704,9 +706,9 @@ class GR2(nn.Module):
 
         loss = {}
 
-        pprint(du.apply(pred, lambda x: x.shape if x is not None else None))
-        pprint(du.apply(tgt, lambda x: x.shape if x is not None else None))
-        pprint(du.apply(batch, lambda x: x.shape if x is not None else None))
+        # pprint(du.apply(pred, lambda x: x.shape if x is not None else None))
+        # pprint(du.apply(tgt, lambda x: x.shape if x is not None else None))
+        # pprint(du.apply(batch, lambda x: x.shape if x is not None else None))
 
         loss["rgb_static"], loss["rgb_gripper"] = 0, 0
         _masked_loss = lambda x, y: masked_loss(x, y, obs_mask, skip_frame, F.mse_loss)
@@ -726,12 +728,18 @@ class GR2(nn.Module):
         print(tgt["arm"].shape, pred["arm"].shape, tgt["mask"].shape)
         """
 
-        _masked_loss = lambda x, y: masked_loss(x, y, tgt["mask"], 0, F.smooth_l1_loss)
+        obs_mask = batch["info"]["will_succeed"]
+
+        _masked_loss = lambda x, y: masked_loss(x, y, obs_mask, 0, F.smooth_l1_loss)
         loss["action_arm"] = _masked_loss(pred["arm"], tgt["arm"][..., :6])
         loss["action_gripper"] = _masked_loss(pred["gripper"], tgt["gripper"][..., -1:])
 
         loss["value"] = self.value_loss(pred, tgt, batch)
 
+        loss = du.apply(
+            loss,
+            lambda x: (0 if torch.isnan(x) else x) if type(x) == torch.Tensor else x,
+        )
         loss["total"] = (
             loss["rgb_static"]
             + loss["rgb_gripper"]
