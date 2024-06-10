@@ -12,6 +12,7 @@ obs_keys: # anything besides the expected image
   - agent_qvel
   - agent_partial-action
   - simpler-img
+  - obj-wrt-eef
 
 goal:
   use: True

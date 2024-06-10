@@ -5,10 +5,8 @@ from typing import Any
 
 import gymnasium as gym
 import hydra
-import improve
-import improve.config.resolver
-import improve.wrapper.dict_util as du
 import numpy as np
+import simpler_env
 from gymnasium import logger, spaces
 from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
                             RewardWrapper, Wrapper)
@@ -20,11 +18,13 @@ from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
 from scipy.ndimage import zoom
-from tqdm import tqdm
-
-import simpler_env
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
+from tqdm import tqdm
+
+import improve
+import improve.config.resolver
+import improve.wrapper.dict_util as du
 
 
 # ---------------------------------------------------------------------------- #
@@ -171,6 +171,9 @@ class ResidualRLWrapper(ObservationWrapper):
         self.observation_space = convert_observation_to_space(obs)
         self.image_space = convert_observation_to_space(self.get_image(obs))
         self.observation_space.spaces["simpler-img"] = self.image_space
+        self.observation_space.spaces["obj-wrt-eef"] = Box(
+            low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
+        )
 
         self.observation_space.spaces["agent"].spaces["partial-action"] = (
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
@@ -234,12 +237,6 @@ class ResidualRLWrapper(ObservationWrapper):
         # self.obj.pose.transform(self.obj.cmass_local_pose)
         return self.env.obj_pose
 
-    @property
-    def agent_pose(self):
-        """Get the agent pose."""
-        return self.env.agent.robot.pose
-        raise NotImplementedError()
-
     def get_tcp(self):
         """tool-center point, usually the midpoint between the gripper fingers"""
         eef = self.agent.config.ee_link_name
@@ -282,15 +279,15 @@ class ResidualRLWrapper(ObservationWrapper):
     def observation(self, observation):
         """Returns a modified observation."""
 
+        observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
+        image = self.get_image(observation)
+        observation["simpler-img"] = image
+
         # early return if no model
         if self.model is None:
             self.partial = np.zeros(7)
             observation["agent"]["partial-action"] = self.partial
-            image = self.get_image(observation)
-            observation["simpler-img"] = image
             return observation
-
-        image = self.get_image(observation)
 
         if self.maybe_break():
             pass  # this is fine for now
@@ -303,7 +300,6 @@ class ResidualRLWrapper(ObservationWrapper):
             [action["world_vector"], action["rot_axangle"], action["gripper"]]
         )
         observation["agent"]["partial-action"] = self.partial
-        observation["simpler-img"] = image
 
         """
         # going to force observation to be just the intended image and partial for now
