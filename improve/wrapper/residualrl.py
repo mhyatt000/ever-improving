@@ -5,23 +5,26 @@ from typing import Any
 
 import gymnasium as gym
 import hydra
+import improve
+import improve.config.resolver
+import improve.wrapper.dict_util as du
 import numpy as np
-import simpler_env
 from gymnasium import logger, spaces
 from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
                             RewardWrapper, Wrapper)
 from gymnasium.spaces.box import Box
 from gymnasium.spaces.dict import Dict
 from gymnasium.spaces.space import Space
+from mani_skill2_real2sim.utils.sapien_utils import get_entity_by_name
+from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
 from scipy.ndimage import zoom
+from tqdm import tqdm
+
+import simpler_env
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
-
-import improve
-import improve.config.resolver
-import improve.wrapper.dict_util as du
 
 
 # ---------------------------------------------------------------------------- #
@@ -82,21 +85,6 @@ def alldict(thing):
         return {k: alldict(v) for k, v in thing.spaces.items()}
     else:
         return thing
-
-
-def dict_walk(d, func):
-    """Recursively apply func to items in d."""
-
-    if isinstance(d, gym.spaces.dict.Dict):
-        return gym.spaces.dict.Dict(
-            {k: dict_walk(v, func) for k, v in d.spaces.items()}
-        )
-    elif isinstance(d, dict):
-        return {k: dict_walk(v, func) for k, v in d.items()}
-    elif isinstance(d, list):
-        return [dict_walk(item, func) for item in d]
-    else:
-        return func(d)
 
 
 class ResidualRLWrapper(ObservationWrapper):
@@ -226,7 +214,7 @@ class ResidualRLWrapper(ObservationWrapper):
         self.success = False
 
         if self.force_seed:
-            print(f'forcing seed to {self.seed}')
+            print(f"forcing seed to {self.seed}")
             seed = self.seed
 
         obs, info = self.env.reset(seed=seed, options=options)
@@ -239,6 +227,28 @@ class ResidualRLWrapper(ObservationWrapper):
     def final(self):
         """returns whether the current subtask is the final subtask"""
         return self.env.is_final_subtask()
+
+    @property
+    def obj_pose(self):
+        """Get the center of mass (COM) pose."""
+        # self.obj.pose.transform(self.obj.cmass_local_pose)
+        return self.env.obj_pose
+
+    @property
+    def agent_pose(self):
+        """Get the agent pose."""
+        return self.env.agent.robot.pose
+        raise NotImplementedError()
+
+    def get_tcp(self):
+        """tool-center point, usually the midpoint between the gripper fingers"""
+        eef = self.agent.config.ee_link_name
+        tcp = get_entity_by_name(self.agent.robot.get_links(), eef)
+        return tcp
+
+    def obj_wrt_eef(self):
+        """Get the object pose with respect to the end-effector frame"""
+        return self.obj_pose.p - self.get_tcp().pose.p
 
     @property
     def instruction(self):
@@ -271,7 +281,7 @@ class ResidualRLWrapper(ObservationWrapper):
 
     def observation(self, observation):
         """Returns a modified observation."""
-        
+
         # early return if no model
         if self.model is None:
             self.partial = np.zeros(7)
@@ -485,25 +495,49 @@ def main(cfg):
     warnings.filterwarnings("ignore", category=FutureWarning)
 
     env = make(cfg.env)
+    obs, info = env.reset()
 
-    for _ in range(10):
-        obs,info = env.reset()
+    eefs, objs, dists = [], [], []
+    for _ in range(1):
+        obs, info = env.reset()
 
-        print(info)
+        # print(info)
 
-        continue
-        for i in range(2000):
+        for i in tqdm(range(120)):
 
             zeros = np.zeros(env.action_space.shape)
-            randoms =  env.action_space.sample()
-            observation, reward, success, truncated, info = env.step(action)
+            randoms = env.action_space.sample()
+            observation, reward, success, truncated, info = env.step(randoms)
 
-            print(f"{i:003}", reward, success, truncated)
+            # print(f"{i:003}", reward, success, truncated)
+            eefs.append(env.get_tcp().pose.p)
+            objs.append(env.obj_pose.p)
+            dists.append(env.obj_wrt_eef())
 
             if truncated:  # or success:
                 break
 
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10))
+    eefs = np.array(eefs)
+    objs = np.array(objs)
+    dists = np.array(dists)
+    names = ["x", "y", "z"]
+
+    for i in range(3):
+        axs[i].plot(eefs[:, i], label="eef")
+        axs[i].plot(objs[:, i], label="obj")
+        axs[i].plot(dists[:, i], label="obj wrt eef")
+
+        axs[i].set_title(names[i])
+        axs[i].legend()
+
+        axs[i].axhline(0, color="red", linestyle="--")
+        # axs[i].set_ylim(-1, 1)
+
     env.close()
+    plt.savefig("obj_wrt_eef.png")
+    # plt.show()
+
 
 if __name__ == "__main__":
     main()
