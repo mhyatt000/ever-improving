@@ -15,8 +15,7 @@ import torch
 from improve.wrapper.dict_util import apply_both
 from omegaconf import OmegaConf as OC
 from torch.utils.data import DataLoader as Dataloader
-from torch.utils.data import IterableDataset
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, IterableDataset
 
 HOME = os.path.expanduser("~")
 DATA_DIR = os.path.join(HOME, "datasets", "simpler")
@@ -49,7 +48,10 @@ class HDF5Dataset(Dataset):
 
                     # add remaining windows to idxs
                     offset = random.randint(0, rem)
-
+                    idxs += [
+                        (episode, (i, i + seq_len))
+                        for i in range(0, episode_len - rem, seq_len)
+                    ]
                     for i in range(n):
                         idxs.append((episode, (offset + i, offset + i + seq_len)))
 
@@ -62,10 +64,15 @@ class HDF5Dataset(Dataset):
             if isinstance(data, np.ndarray):
                 return torch.from_numpy(data)
             else:
-                return torch.tensor(data)
+                return HDF5Dataset.to_tensor(data)
 
-        elif isinstance(h, (int, float, bool, str)):
+        if isinstance(h, (int, float, bool)):
             return torch.tensor(h)
+        if isinstance(h, (np.ndarray, np.generic)):
+            return torch.tensor(h)
+        if isinstance(h, bytes):
+            return torch.tensor(list(h), dtype=torch.uint8)
+
         else:
             raise TypeError(f"Unsupported type: {type(h)}")
 
@@ -86,17 +93,20 @@ class HDF5Dataset(Dataset):
                 steps = list(f[episode]["steps"].keys())
                 steps.sort(key=lambda x: int(x.split("_")[1]))
 
+                will_succeed = HDF5Dataset.extract(f["dataset_info"][episode])['success']
+
                 trajectory = []
                 for key in steps[start:end]:
                     step = f[episode]["steps"][key]
                     trajectory.append(HDF5Dataset.extract(step))
 
-                trajectory = [
-                    du.apply(x, lambda x: torch.unsqueeze(x, 0)) for x in trajectory
-                ]
-                return functools.reduce(
-                    lambda a, b: apply_both(a, b, torch.cat), trajectory
+                trajectory = [du.apply(x, lambda x: x.unsqueeze(0)) for x in trajectory]
+                trajectory =  functools.reduce(
+                    lambda a, b: apply_both(a, b, lambda x, y: torch.cat([x, y])),
+                    trajectory,
                 )
+                trajectory['info']['will_succeed'] = will_succeed.repeat(self.n_steps, 1)
+                return trajectory 
 
 
 class HDF5IterDataset(IterableDataset):
@@ -197,9 +207,12 @@ def main():
 
     # D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
     D = HDF5Dataset(DATA_DIR, n_steps=10)
-    loader = Dataloader(D, batch_size=8, num_workers=4)
+    loader = Dataloader(D, batch_size=64, num_workers=4, shuffle=True)
 
     batch = next(iter(loader))
+    print(batch['info']['will_succeed'].view(-1))
+    print(batch['info']['will_succeed'].shape)
+    quit()
 
     print(len(D))
     quit()
