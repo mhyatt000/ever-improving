@@ -24,7 +24,6 @@ def apply(d, func):
         return func(d)
 
 def apply_both(a, b, func):
-    # breakpoint()
     if isinstance(a, Dict) and isinstance(b, Dict):
         return Dict(
             {k1: apply_both((v1, v2), func) for (k1, v1), (k2, v2) in zip(a.spaces.items(), b.spaces.items())}
@@ -34,7 +33,7 @@ def apply_both(a, b, func):
     elif isinstance(a, list) and isinstance(b, list):
         return [apply_both(a, b, func) for a, b in zip(a, b)]
     else:
-        return func((a, b))
+        return func(a, b)
 
 def flatten(d, delim="_"):
     """flattens a dict. the opposite of dict_nest"""
