@@ -108,7 +108,7 @@ def rollout(model):
 
 
 
-@hydra.main(config_path=improve.CONFIG, config_name="config")
+@hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
 def main(cfg):
 
     if cfg.job.wandb.use:

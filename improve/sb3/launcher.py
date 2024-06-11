@@ -1,11 +1,17 @@
 import json
-import time
-import os.path as osp
-import hydra
-from omegaconf import OmegaConf
+
+from hydra.core.hydra_config import HydraConfig
 import os
+import os.path as osp
 import subprocess
+import time
+from pprint import pprint
+
+import hydra
 import improve
+from improve.config import resolver
+from omegaconf import OmegaConf as OC
+
 
 def list_gpus():
     """List all the GPUs on the machine."""
@@ -75,8 +81,14 @@ def run_script_on_free_gpu(script_path, script_options):
 
     _run(command)
 
+
 @hydra.main(config_path=improve.CONFIG, config_name="config")
 def main(cfg):
+    base = HydraConfig.get()
+
+    pprint(OC.to_container(base, resolve=True))  # keep after wandb so it logs
+    # print(cfg.hydra.sweeper)
+    quit()
 
     _main = osp.join(osp.dirname(__file__), "main.py")
     script_options = "--option1 value1 --option2 value2"

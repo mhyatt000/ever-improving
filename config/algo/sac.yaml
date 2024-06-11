@@ -3,20 +3,14 @@ name: "sac"
 policy_kwargs:
   share_features_extractor: True
 
-learning_rate:
-  name: 'cosine'
-  cls: ${r_typeof:improve.sb3.util.CosineAnnealingLRSchedule}
-  args:
-    initial: ${r_tofloat:3e-4}
-    n_steps: ${train.n_steps}
-    eta_min: ${r_tofloat:1e-6}
+learning_rate: ${r_tofloat:3e-4}
 
 # 1m samples was too many (858GB) for 24GB.
 buffer_size: ${buffer.size} 
 # 120 * 50 epiisodes = 6000 steps
 learning_starts: ${r_toint:1e3} # n env steps to collect transitions for before learning 
 
-batch_size: 16
+batch_size: 256
 tau: 0.005
 gamma: 0.99
 train_freq: 1
@@ -28,7 +22,7 @@ replay_buffer_class: ${buffer.cls}
 replay_buffer_kwargs: ${buffer.args}
 optimize_memory_usage: false
 
-ent_coef: auto_0.1
+ent_coef: auto_0.5
 # target_entropy: 'auto'
 
 target_update_interval: 1

@@ -13,16 +13,17 @@ defaults:
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jun8_basics"
+sweep_id: "jun10_basics_dist"
 
 train: 
-  n_steps: ${r_toint:5e4} # 20k
+  n_steps: ${r_toint:3e5} # 300k
   use_zero_init: False # cant zero without foundation model
 
 algo:
   buffer_size: ${r_toint:1e6}
   warmup_zero_action: False # gaussian
   batch_size: 256
+  learning_starts: ${r_toint:1e4}
 
 env:
   goal: 
@@ -40,9 +41,7 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      algo.learning_starts: ${r_toint:1e4}
       algo.learning_rate: ${r_tofloat:3e-4},${r_tofloat:1e-4},${r_tofloat:1e-3}
-      algo.gradient_steps: 1,10,50
       algo.ent_coef: auto_0.5,auto_1
       algo.use_sde: False,True
-      algo.target_update_interval: 1,5,10,100
+      algo.target_update_interval: 1,5,10

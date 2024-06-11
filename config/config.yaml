@@ -5,6 +5,10 @@ defaults:
   - job: base
   - train: base
   - callback: base
+  - _self_
+
+  - override hydra/sweeper: basic
+# - override hydra/launcher: basic
 
 log_dir: ${callback.log_path}
 hydra:

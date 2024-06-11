@@ -5,3 +5,5 @@ torchvision
 torchaudio
 stable-baselines3[extra]
 sb3-contrib
+hydra-submitit-launcher
+submitit
