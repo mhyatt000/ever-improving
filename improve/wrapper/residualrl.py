@@ -5,6 +5,9 @@ from typing import Any
 
 import gymnasium as gym
 import hydra
+import improve
+import improve.config.resolver
+import improve.wrapper.dict_util as du
 import numpy as np
 import simpler_env
 from gymnasium import logger, spaces
@@ -21,10 +24,6 @@ from scipy.ndimage import zoom
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
 from tqdm import tqdm
-
-import improve
-import improve.config.resolver
-import improve.wrapper.dict_util as du
 
 
 # ---------------------------------------------------------------------------- #
@@ -171,10 +170,27 @@ class ResidualRLWrapper(ObservationWrapper):
         self.observation_space = convert_observation_to_space(obs)
         self.image_space = convert_observation_to_space(self.get_image(obs))
         self.observation_space.spaces["simpler-img"] = self.image_space
+
+        # other low dim obs
+        qpos = obs["agent"]["qpos"]
+        self.observation_space.spaces["agent"]["qpos-sin"] = Box(
+            low=-np.inf, high=np.inf, shape=qpos.shape, dtype=np.float32
+        )
+        self.observation_space.spaces["agent"]["qpos-cos"] = Box(
+            low=-np.inf, high=np.inf, shape=qpos.shape, dtype=np.float32
+        )
+
         self.observation_space.spaces["obj-wrt-eef"] = Box(
             low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
         )
+        self.observation_space.spaces["eef-pose"] = Box(
+            low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
+        )
+        self.observation_space.spaces["obj-pose"] = Box(
+            low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
+        )
 
+        # agent partial action
         self.observation_space.spaces["agent"].spaces["partial-action"] = (
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
         )
@@ -279,7 +295,16 @@ class ResidualRLWrapper(ObservationWrapper):
     def observation(self, observation):
         """Returns a modified observation."""
 
+        # add sin and cos of qpos
+        qpos = observation["agent"]["qpos"]
+        observation["agent"]["qpos-sin"] = np.sin(qpos)
+        observation["agent"]["qpos-cos"] = np.cos(qpos)
+        # eef and obj pose
+        tcp, obj = self.get_tcp().pose, self.obj_pose
+        observation["eef-pose"] = np.array([*tcp.p, *tcp.q])
+        observation["obj-pose"] = np.array([*obj.p, *obj.q])
         observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
+
         image = self.get_image(observation)
         observation["simpler-img"] = image
 
@@ -327,6 +352,8 @@ class ResidualRLWrapper(ObservationWrapper):
 
 class SB3Wrapper(ResidualRLWrapper):
 
+    metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 5}
+
     def __init__(
         self,
         env,
@@ -353,6 +380,7 @@ class SB3Wrapper(ResidualRLWrapper):
             force_seed,
             seed,
         )
+
         self.use_wandb = use_wandb
         self.bonus = bonus
         self.downscale = downscale
@@ -369,7 +397,7 @@ class SB3Wrapper(ResidualRLWrapper):
         self.keys = keys
 
         self.observation_space = Dict(spaces)
-        if self.downscale:
+        if self.downscale and "simpler-img" in self.keys:
 
             sample = self.observation_space.spaces["simpler-img"].sample()
             shape = self.scale_image(
@@ -400,23 +428,23 @@ class SB3Wrapper(ResidualRLWrapper):
     def observation(self, observation):
         observation = super().observation(observation)
         observation = du.flatten(alldict(observation))
+        self.image = observation["simpler-img"]  # for render only
         observation = {k: v for k, v in observation.items() if k in self.keys}
 
-        self.image = observation["simpler-img"]  # for render
+        if self.downscale and "simpler-img" in self.keys:
+            observation["simpler-img"] = self.scale_image(
+                self.image, 1 / self.downscale
+            )
 
-        # scale image !!! doesnt return the scaled image
-        if self.downscale:
-            self.image = self.scale_image(self.image, 1 / self.downscale)
-
-        observation["simpler-img"] = self.image
         return observation
 
-    def render(self, mode="headless"):
-        if mode == "rgb_array":
-            return self.image
-        if mode == "headless":
-            # to be submitted during the next reset
-            self.render_arr.append(self.image)
+    def render(self, mode="human"):
+        if mode == "human":
+            plt.imshow(self.image())
+            plt.title("SIMPLER")
+            plt.show()
+        elif mode == "rgb_array":
+            return self.image()
 
     def step(self, action):
         observation, reward, terminated, truncated, info = super().step(action)
@@ -462,7 +490,10 @@ def make(cn):
     """Creates simulated eval environment from task name.
     param: cn: config node
     """
-    env = simpler_env.make(cn.task)
+    env = simpler_env.make(
+        cn.task,
+        # **{ "renderer_kwargs": { "device": "cuda:0", "offscreen_only": True, } },
+    )
     wrapper = SB3Wrapper if cn.kind == "sb3" else ResidualRLWrapper
 
     return wrapper(
@@ -494,24 +525,31 @@ def main(cfg):
     obs, info = env.reset()
 
     eefs, objs, dists = [], [], []
-    for _ in range(1):
-        obs, info = env.reset()
+    for _ in tqdm(range(10)):
 
-        # print(info)
+        randoms = env.action_space.sample()
+        zeros = np.zeros(env.action_space.shape)
+        zeros[-1] = 0.1
 
-        for i in tqdm(range(120)):
+        observation, reward, success, truncated, info = env.step(zeros)
+        print(observation)
 
-            zeros = np.zeros(env.action_space.shape)
-            randoms = env.action_space.sample()
-            observation, reward, success, truncated, info = env.step(randoms)
+    quit()
+    # print(info)
 
-            # print(f"{i:003}", reward, success, truncated)
-            eefs.append(env.get_tcp().pose.p)
-            objs.append(env.obj_pose.p)
-            dists.append(env.obj_wrt_eef())
+    for i in tqdm(range(120)):
 
-            if truncated:  # or success:
-                break
+        zeros = np.zeros(env.action_space.shape)
+        randoms = env.action_space.sample()
+        observation, reward, success, truncated, info = env.step(randoms)
+
+        # print(f"{i:003}", reward, success, truncated)
+        eefs.append(env.get_tcp().pose.p)
+        objs.append(env.obj_pose.p)
+        dists.append(env.obj_wrt_eef())
+
+        if truncated:  # or success:
+            break
 
     fig, axs = plt.subplots(3, 1, figsize=(10, 10))
     eefs = np.array(eefs)
