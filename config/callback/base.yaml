@@ -2,5 +2,5 @@ defaults:
   - ckpt: base
   - rezero: dont
 
-freq: ${r_toint:1e4}
+freq: ${r_toint:5e3}
 log_path: ${r_home:improve_logs}
