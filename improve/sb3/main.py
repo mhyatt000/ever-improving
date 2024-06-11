@@ -55,13 +55,17 @@ def build_callbacks(env, cfg):
         render=True,  # TODO does this work?
         verbose=1,
     )
-    wandbCb = callback=WandbCallback(
-        gradient_save_freq=1,
-        log='gradients',
-        verbose=2,
-    )
+    
+    callbacks = [checkpoint_callback, eval_callback]
 
-    callbacks = [checkpoint_callback, eval_callback, wandbCb]
+    if cfg.job.wandb.use:
+        wandbCb = callback=WandbCallback(
+            gradient_save_freq=1,
+            log='gradients',
+            verbose=2,
+        )
+        callbacks += [wandbCb]
+
 
     if cfg.callback.rezero.use:
         rezero = ReZeroCallback(
@@ -121,7 +125,8 @@ def main(cfg):
             project="residualrl",
             dir=cfg.callback.log_path,
             job_type="train",
-            sync_tensorboard=True,
+            # sync_tensorboard=True,
+            monitor_gym=True,
             name=cfg.job.wandb.name,
             group=cfg.job.wandb.group,
             tags=[t for t in cfg.job.wandb.tags],

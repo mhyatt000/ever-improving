@@ -1,0 +1,56 @@
+# @package _global_
+
+# help with sweepers
+# https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
+# https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
+
+defaults:
+# - /launcher: base
+  - override /algo: sac
+  - override /buffer: base # no HER for now!
+  - override /env/foundation: rtx
+
+  - _self_
+
+log_dir: ${callback.log_path}
+sweep_id: "jun11_lowdim"
+
+train: 
+  n_steps: ${r_toint:3e5} # 300k
+  use_zero_init: False # cant zero without foundation model
+
+algo:
+  buffer_size: ${r_toint:1e6}
+  # warmup_zero_action: False # gaussian
+  batch_size: 256
+  learning_starts: ${r_toint:1e4}
+
+  learning_rate: ${r_tofloat:3e-4}
+  ent_coef: auto_0.5
+  warmup_zero_action: True
+
+env:
+  goal: 
+    use: False
+  seed:
+    force: True # only one environment starting point for now
+
+  obs_keys: # anything besides the expected image
+    - agent_qpos-sin
+    - agent_qpos-cos
+    - agent_qvel
+    - agent_partial-action
+    - eef-pose
+    - obj-wrt-eef
+    - obj-pose
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+  mode: MULTIRUN # needed or else -m flag
+  sweeper:
+    params:      

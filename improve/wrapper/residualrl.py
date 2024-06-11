@@ -1,4 +1,9 @@
 from __future__ import annotations
+import mediapy
+from datetime import datetime
+import os.path as osp
+import os
+import wandb
 
 from pprint import pprint
 from typing import Any
@@ -410,12 +415,32 @@ class SB3Wrapper(ResidualRLWrapper):
             )
 
         self.image = None
-        self.render_arr = []
+        self.images = []
+        self.render_every = 55
+        self.render_counter = 0
+
+    def finish_render(self):
+        if self.images and self.use_wandb:
+            n =self.render_counter % self.render_every 
+            now = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            now = datetime.now().strftime("%Y-%m-%d")
+
+            dirname = osp.join(improve.RESULTS, now)
+            # os.makedirs(osp.dirname(dirname), exist_ok=True)
+            path = f"ep_{n}_success-.mp4"
+            # path = osp.join(dirname, path)
+
+            mediapy.write_video(path, self.images, fps=5)
+
+            wandb.log(
+                {f"video/buffer{n}": wandb.Video(path, fps=5)},
+                # step=self.nstep,
+            )
+            self.images = []
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
-        if self.render_arr and self.use_wandb:
-            wandb.log({"video/buffer": wandb.Video(self.render_arr, fps=5)})
-            self.render_arr = []
+        self.images = []
+        self.render_counter += 1
         return super().reset(seed=seed, options=options)
 
     def scale_image(self, image, scale):
@@ -438,19 +463,24 @@ class SB3Wrapper(ResidualRLWrapper):
 
         return observation
 
-    def render(self, mode="human"):
+    def render(self, mode=None):
         if mode == "human":
-            plt.imshow(self.image())
+            plt.imshow(self.image)
             plt.title("SIMPLER")
-            plt.show()
-        elif mode == "rgb_array":
-            return self.image()
+            plt.pause(0.1)
+        else:
+            self.images.append(self.image)
+            return self.image
 
     def step(self, action):
         observation, reward, terminated, truncated, info = super().step(action)
 
         # for sb3 EvalCallback
         info["is_success"] = info["success"]
+
+        self.render()
+        if terminated or truncated and (self.render_counter % self.render_every )< 10:
+            self.finish_render()
 
         if self.bonus:
             val = 0.01
