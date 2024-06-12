@@ -513,12 +513,9 @@ class SB3Wrapper(ResidualRLWrapper):
 
         # for sb3 EvalCallback
         info["is_success"] = info["success"]
-        return observation, reward, terminated, truncated, info
-
-        # for sb3 EvalCallback
-        info["is_success"] = info["success"]
 
         self.render()
+        # print(f'{terminated or truncated } {(self.render_counter % self.render_every)}')
         if terminated or truncated and (self.render_counter % self.render_every) < 10:
             self.finish_render()
 
