@@ -27,3 +27,5 @@ use_wandb: ${job.wandb.use}
 seed:
   force: False
   value: ${job.seed}
+
+reward: sparse

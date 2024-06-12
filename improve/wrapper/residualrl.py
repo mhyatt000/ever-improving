@@ -1,10 +1,8 @@
 from __future__ import annotations
-import mediapy
-from datetime import datetime
-import os.path as osp
-import os
-import wandb
 
+import os
+import os.path as osp
+from datetime import datetime
 from pprint import pprint
 from typing import Any
 
@@ -13,8 +11,10 @@ import hydra
 import improve
 import improve.config.resolver
 import improve.wrapper.dict_util as du
+import mediapy
 import numpy as np
 import simpler_env
+import wandb
 from gymnasium import logger, spaces
 from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
                             RewardWrapper, Wrapper)
@@ -365,7 +365,6 @@ class SB3Wrapper(ResidualRLWrapper):
         task,
         policy,
         ckpt,
-        bonus=False,
         use_wandb=False,
         downscale=None,
         device=None,
@@ -374,6 +373,7 @@ class SB3Wrapper(ResidualRLWrapper):
         residual_scale=1,
         force_seed=False,
         seed=None,
+        _reward_type="sparse",
     ):
         super().__init__(
             env,
@@ -387,7 +387,7 @@ class SB3Wrapper(ResidualRLWrapper):
         )
 
         self.use_wandb = use_wandb
-        self.bonus = bonus
+        self._reward_type = _reward_type
         self.downscale = downscale
 
         if device and self.model is not None:
@@ -421,7 +421,7 @@ class SB3Wrapper(ResidualRLWrapper):
 
     def finish_render(self):
         if self.images and self.use_wandb:
-            n =self.render_counter % self.render_every 
+            n = self.render_counter % self.render_every
             now = datetime.now().strftime("%Y-%m-%d_%H%M%S")
             now = datetime.now().strftime("%Y-%m-%d")
 
@@ -472,22 +472,56 @@ class SB3Wrapper(ResidualRLWrapper):
             self.images.append(self.image)
             return self.image
 
+    def compute_reward(self, observation, action, reward, terminated, truncated, info):
+        """Compute the reward."""
+
+        if self._reward_type == "sparse":
+            return reward
+
+        if self._reward_type == "transic":  # but customized
+            # small penalty for large actions/join velocities (1e-5)
+            # 0.1 * reward for shorter distance/lifting object
+            # large reward for succeeding
+            return (
+                200 * reward
+                + (0.1)
+                * (1 - torch.tanh(10 * np.linalg.norm(observation["obj-wrt-eef"])))
+                + (info["lifted_object"])
+                + (0.25 * info["is_grasped"])
+                + (1e-3) * sum(observation["q_vel"])
+                + (1e-3) * sum(action) if self.model is not None else 0 # RP shouldnt help too much
+            )
+
+        if self._reward_type == "robosuite":
+            # reward function from robosuite cube pickup task
+            if info["success"]:
+                return 2.25
+            else:
+                return (
+                    1
+                    - np.tanh(10.0 * np.linalg.norm(observation["obj-wrt-eef"]))
+                    + (0.25 * info["is_grasped"])
+                    + (info["lifted_object"])
+                )  # additional lifting reward
+
+        return reward
+
     def step(self, action):
         observation, reward, terminated, truncated, info = super().step(action)
+        reward = self.compute_reward(
+            observation, action, reward, terminated, truncated, info
+        )
+
+        # for sb3 EvalCallback
+        info["is_success"] = info["success"]
+        return observation, reward, terminated, truncated, info
 
         # for sb3 EvalCallback
         info["is_success"] = info["success"]
 
         self.render()
-        if terminated or truncated and (self.render_counter % self.render_every )< 10:
+        if terminated or truncated and (self.render_counter % self.render_every) < 10:
             self.finish_render()
-
-        if self.bonus:
-            val = 0.01
-            stats = info["episode_stats"].keys()
-            bonus = [info[k] for k in stats]
-            bonus = [val if b else 0 for b in bonus]
-            reward += sum(bonus)
 
         return observation, reward, terminated, truncated, info
 
@@ -531,13 +565,13 @@ def make(cn):
         cn.task,
         cn.foundation.name,
         cn.foundation.ckpt,
-        bonus=cn.bonus,
         use_wandb=cn.use_wandb,
         downscale=cn.downscale,
         keys=cn.obs_keys,
         use_original_space=cn.use_original_space,
         force_seed=cn.seed.force,
         seed=cn.seed.value if cn.seed.force else None,
+        _reward_type=cn.reward,
     )
 
 
