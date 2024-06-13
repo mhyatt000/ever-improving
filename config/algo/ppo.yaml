@@ -11,3 +11,10 @@ vf_coef: 0.5
 
 batch_size: 32
 n_steps: 2048
+
+stats_window_size: 10 # was 100 ... for logging only
+seed: 0
+
+
+use_original_space: False
+warmup_zero_action: False

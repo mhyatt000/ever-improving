@@ -6,23 +6,22 @@
 
 defaults:
 # - /launcher: base
-  - override /algo: sac
+  - override /algo: ppo
   - override /buffer: base # no HER for now!
   - override /env/foundation: dont
 
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jun12_lowdim_hugebatch"
+sweep_id: "jun13_lowdim_lowtaulr"
 
 train: 
   n_steps: ${r_toint:3e5} # 300k
   use_zero_init: False # cant zero without foundation model
 
 algo:
-  buffer_size: ${r_toint:1e6}
-  warmup_zero_action: False # gaussian
-  batch_size: 8192
+  batch_size: 256
+  # warmup_zero_action: False # gaussian
   learning_starts: ${r_toint:1e4}
 
   # SUPER low LR
@@ -55,5 +54,5 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      algo.learning_rate: 1e-5,1e-4,3e-4
-      algo.tau: 0.0005,0.0001,0.01
+      algo.learning_rate: 1e-4,1e-6,5e-5
+      algo.tau: 0.00001,0.0005,0.0001

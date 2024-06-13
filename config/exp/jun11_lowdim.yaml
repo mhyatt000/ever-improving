@@ -27,12 +27,14 @@ algo:
 
   learning_rate: ${r_tofloat:3e-4}
   ent_coef: auto_0.5
+  target_entropy: -7.0 # from SAC applications
 
 env:
   goal: 
     use: False
   seed:
     force: True # only one environment starting point for now
+  reward: sparse
 
   obs_keys: # anything besides the expected image
     - agent_qpos-sin
@@ -52,5 +54,5 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      env/foundation: dont,rtx
-        # ++env.use_dense: False,True
+      # env/foundation: dont,rtx
+      # ++env.use_dense: False,True
