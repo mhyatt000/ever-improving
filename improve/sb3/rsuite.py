@@ -1,18 +1,20 @@
-import os
 import math
+from robosuite.wrappers import GymWrapper
+
+import os
 import os.path as osp
 import warnings
 from functools import partial
 from pprint import pprint
 
 import gymnasium as gym
-from improve.wrapper.probe import ProbeEnv
 import hydra
 import improve
 import improve.config.prepare
 import improve.config.resolver
 import mediapy as media
 import numpy as np
+import robosuite as suite
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,6 +23,8 @@ from improve.sb3 import util
 from improve.sb3.custom.sac import SAC
 from improve.sb3.util import MyCallback, ReZeroCallback, WandbLogger
 from improve.wrapper import residualrl as rrl
+from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
+from improve.wrapper.probe import ProbeEnv
 from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
 from stable_baselines3 import A2C, PPO, HerReplayBuffer
@@ -30,8 +34,6 @@ from stable_baselines3.common.callbacks import (CallbackList,
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from tqdm import tqdm
 from wandb.integration.sb3 import WandbCallback
-
-from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -135,8 +137,17 @@ def main(cfg):
         )
     pprint(OC.to_container(cfg, resolve=True))  # keep after wandb so it logs
 
-    env = rrl.make(cfg.env)
-    env = NormalizeObservation(NormalizeReward(env))
+    # env = rrl.make(cfg.env)
+    # env = NormalizeObservation(NormalizeReward(env))
+
+    env = suite.make(
+        env_name="Lift",  # try with other tasks like "Stack" and "Door"
+        robots="Panda",  # try with other robots like "Sawyer" and "Jaco"
+        has_renderer=True,
+        has_offscreen_renderer=True,
+        use_camera_obs=False,
+    )
+    env = GymWrapper(env)
 
     if cfg.env.goal.use:  # use GoalEnvWrapper?
         env = cfg.env.goal.cls(env, cfg.env.goal.key)
@@ -168,7 +179,7 @@ def main(cfg):
     del algo_kwargs["policy_kwargs"]
 
     model = algo(
-        "MultiInputPolicy",
+        "MlpPolicy",#  "MultiInputPolicy",
         env,
         verbose=1,
         **algo_kwargs,
