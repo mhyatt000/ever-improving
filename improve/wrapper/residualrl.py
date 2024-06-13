@@ -483,11 +483,11 @@ class SB3Wrapper(ResidualRLWrapper):
             # 0.1 * reward for shorter distance/lifting object
             # large reward for succeeding
             return (
-                200 * reward
-                + ((0.1) * (1 - torch.tanh(10 * np.linalg.norm(observation["obj-wrt-eef"]))))
+                10 * reward
+                + ((0.1) * (1 - np.tanh(10 * np.linalg.norm(observation["obj-wrt-eef"]))))
                 + int(info["lifted_object"])
                 + (0.25 * info["is_grasped"])
-                + ((1e-3) * sum(observation["q_vel"]))
+                + ((1e-3) * sum(observation["agent_qvel"]))
                 + ((1e-3) * sum(action) if self.model is not None else 0) # RP shouldnt help too much
             )
 

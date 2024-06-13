@@ -13,7 +13,7 @@ defaults:
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jun13_lowdim_lowtaulr"
+sweep_id: "jun13_ppo"
 
 train: 
   n_steps: ${r_toint:3e5} # 300k
@@ -22,19 +22,16 @@ train:
 algo:
   batch_size: 256
   # warmup_zero_action: False # gaussian
-  learning_starts: ${r_toint:1e4}
 
   # SUPER low LR
-  learning_rate: ${r_tofloat:1e-6}
-  ent_coef: auto_0.5
-  target_entropy: -7.0 # from SAC applications
+  # learning_rate: ${r_tofloat:1e-6}
 
 env:
   goal: 
     use: False
   seed:
     force: True # only one environment starting point for now
-  reward: transic
+  use_original_space: False # ppo doesnt support this rn
 
   obs_keys: # anything besides the expected image
     - agent_qpos-sin
@@ -54,5 +51,7 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      algo.learning_rate: 1e-4,1e-6,5e-5
-      algo.tau: 0.00001,0.0005,0.0001
+      algo.learning_rate: 3e-4,1e-4,1e-6,5e-5
+      algo.target_kl: 0.001,0.01,0.02,0.05
+      env.reward: sparse,transic
+      algo.ent_coef: 0,0.01
