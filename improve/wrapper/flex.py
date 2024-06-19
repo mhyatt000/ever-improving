@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections
 import os
+import os.path as osp
 import time
 from datetime import datetime
 
@@ -25,29 +26,29 @@ DATA_DIR = os.path.join(HOME, "datasets", "simpler")
 
 class HDF5LoggerWrapper(Wrapper):
 
-    def __init__(self, env, rootdir=DATA_DIR):
+    def __init__(self, env, rootdir=DATA_DIR, id=None, cfg=None):
         super(HDF5LoggerWrapper, self).__init__(env)
 
+        now = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         self.rootdir = rootdir
+        self.fname = osp.join(self.rootdir, f"dataset_{now}.h5")
         self.file = None
         self.dataset_info_group = None
         self.episode_group = None
         self.step_group = None
         self.counter = 0
 
-    def reset(self, **kwargs):
-
         os.makedirs(self.rootdir, exist_ok=True)  # Ensure the directory exists
 
-        # create the dataset file if it does not exist
-        if os.path.exists(os.path.join(self.rootdir, "dataset.h5")):
-            self.file = h5py.File(
-                os.path.join(self.rootdir, "dataset.h5"), "a", libver="latest"
-            )
+        if os.path.exists(self.fname):
+            self.file = h5py.File(self.fname, "a", libver="latest")
         else:
-            # create a new file called dataset.h5
-            fname = os.path.join(self.rootdir, "dataset.h5")
-            self.file = h5py.File(fname, "w", libver="latest")
+            self.file = h5py.File(self.fname, "w", libver="latest")
+
+    def reset(self, **kwargs):
+
+        self.wait_for_break()
+
         self.dataset_info_group = self.file.require_group("dataset_info")
 
         # Create a new group with the current date and time
@@ -129,25 +130,32 @@ class HDF5LoggerWrapper(Wrapper):
         self.file.close()
         self.env.close()
 
-
-def wait_for_break():
-    desc = "press exit to break the loop"
-    try:
-        for _ in tqdm(range(30), desc=desc, leave=False):
-            time.sleep(0.1)
-        return False
-    except KeyboardInterrupt:
-        print("break")
-        return True
+    def wait_for_break():
+        desc = "press exit to break the loop"
+        try:
+            for _ in tqdm(range(30), desc=desc, leave=False):
+                time.sleep(0.1)
+            return False
+        except KeyboardInterrupt:
+            print("break")
+            self.close()
+            return True
 
 
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
 def main(cfg):
 
     env = rrl.make(cfg.env)
+
+    obs,info = env.reset()
+    print(info)
+    quit()
+
     env = HDF5LoggerWrapper(env)
 
-    for i in tqdm(range(int(1e3)), desc='collecting data... do not disturb', leave=False):
+    for i in tqdm(
+        range(int(1e3)), desc="collecting data... do not disturb", leave=False
+    ):
         obs = env.reset()
         done = False
         while not done:
@@ -156,7 +164,7 @@ def main(cfg):
             obs, reward, terminated, truncated, info = env.step(zero)
 
             done = terminated or truncated
-        if wait_for_break():
+        if env.wait_for_break():
             break
 
     env.close()

@@ -43,6 +43,7 @@ class EvalWrapper(Wrapper):
         self.render = render
         self.render_arr = []
         self.n_reset = 0
+        self.paths = []
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
         self.render_arr = []
@@ -74,15 +75,15 @@ class EvalWrapper(Wrapper):
 
                 dirname = osp.join(improve.RESULTS, now)
                 os.makedirs(osp.dirname(dirname), exist_ok=True)
-                path = f"ep_{self.n_reset}_success-{info['success']}.mp4"
+                path = f"ep_{self.n_reset}_success-{info['success']}.gif"
                 path = osp.join(dirname, path)
 
-                mediapy.write_video(path, self.render_arr, fps=5)
+                mediapy.write_video(path, self.render_arr, fps=5, codec="gif")
+                self.paths.append(path)
 
-                wandb.log(
-                    {f"video/buffer{self.n_reset}": wandb.Video(path, fps=5)},
-                    step=self.nstep,
-                )
+    def to_wandb(self):
+        wandb.log({"eval/video": [wandb.Video(p) for p in self.paths]}, commit=False)
+        self.paths = []
 
     @property
     def instruction(self):

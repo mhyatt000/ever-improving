@@ -1,3 +1,3 @@
 use_zero_init: True
 use_train: True
-n_steps: ${r_toint:1e7} # total steps to train
+n_steps: ${r_toint:1e8} # total steps to train

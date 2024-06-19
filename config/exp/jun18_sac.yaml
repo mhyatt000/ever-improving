@@ -6,32 +6,35 @@
 
 defaults:
 # - /launcher: base
-  - override /algo: ppo
+  - override /algo: sac
   - override /buffer: base # no HER for now!
   - override /env/foundation: dont
 
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jun13_ppo"
+sweep_id: "jun18_sac"
 
 train: 
-  n_steps: ${r_toint:1e6} # 1M
+  n_steps: ${r_toint:1e7} # 10M
   use_zero_init: False # cant zero without foundation model
 
 algo:
-  batch_size: 256
-  # warmup_zero_action: False # gaussian
+  buffer_size: ${r_toint:1e7}
+  warmup_zero_action: False # gaussian
+  batch_size: 512
+  learning_starts: ${r_toint:1e4}
 
-  # SUPER low LR
-  # learning_rate: ${r_tofloat:1e-6}
+  learning_rate: ${r_tofloat:3e-4}
+  ent_coef: auto_0.5
+  target_entropy: -7.0 # from SAC applications
 
 env:
   goal: 
     use: False
   seed:
     force: True # only one environment starting point for now
-  use_original_space: False # ppo doesnt support this rn
+  reward: sparse
 
   obs_keys: # anything besides the expected image
     - agent_qpos-sin
@@ -51,7 +54,7 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      algo.learning_rate: 3e-4,1e-4,1e-6,5e-5
-      algo.target_kl: 0.01,0.02,0.05
-      env.reward: sparse,transic
-      algo.ent_coef: 0,0.01
+      algo.learning_rate: 1e-4,3e-4
+      algo.tau: 1e-3,5e-4,1e-5
+      algo.ent_coef: 0,0.01,auto_0.5
+      env.no_quarternion: True,False

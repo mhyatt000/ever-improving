@@ -167,6 +167,12 @@ def main(cfg):
     del algo_kwargs["name"]
     del algo_kwargs["policy_kwargs"]
 
+
+    obs, info = env.reset()
+    print(obs)
+    quit()
+
+
     model = algo(
         "MultiInputPolicy",
         env,

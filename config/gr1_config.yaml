@@ -4,17 +4,17 @@ exp:
 training:
   evaluate_during_training: false
   record_evaluation_video: false
-  compile_model: false
+  compile_model: true
   num_epochs: 0 # 20
-  num_steps: 100000
+  num_steps: 20000 # 100000
   num_sequences: 1000
-  ep_len: 360
+  ep_len: 120 # was 360
   print_steps: 100
-  lr_max: 0.0009
+  lr_max: 0.0001
   weight_decay: 0.0001
   arm_loss_ratio: 1 # 100
-  num_warmup_epochs: 1
-  gradient_accumulation_steps: 32 # 8
+  num_warmup_steps: 1000
+  gradient_accumulation_steps: 4 # dont know how important this is
 
 eval:
   task: widowx_put_eggplant_in_basket

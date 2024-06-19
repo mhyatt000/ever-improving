@@ -29,3 +29,6 @@ seed:
   value: ${job.seed}
 
 reward: sparse
+max_episode_steps: 20
+n_envs: 16
+no_quarternion: False

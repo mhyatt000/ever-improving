@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from gymnasium.spaces.dict import Dict
 
 
@@ -5,6 +7,8 @@ def todict(thing):
     """gymnasium.spaces.dict.Dict to dict"""
     if type(thing) is Dict:
         return {k: todict(v) for k, v in thing.spaces.items()}
+    if type(thing) is OrderedDict:
+        return {k: todict(v) for k, v in thing.items()}
     else:
         return thing
 

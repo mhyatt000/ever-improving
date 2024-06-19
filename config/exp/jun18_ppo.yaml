@@ -13,10 +13,10 @@ defaults:
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jun13_ppo"
+sweep_id: "jun18_ppo"
 
 train: 
-  n_steps: ${r_toint:1e6} # 1M
+  n_steps: ${r_toint:1e7} # 10M
   use_zero_init: False # cant zero without foundation model
 
 algo:
@@ -51,7 +51,8 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      algo.learning_rate: 3e-4,1e-4,1e-6,5e-5
-      algo.target_kl: 0.01,0.02,0.05
-      env.reward: sparse,transic
-      algo.ent_coef: 0,0.01
+      algo.learning_rate: 1e-4,3e-4
+      algo.target_kl: 0.02,0.05
+      env.reward: sparse
+      algo.ent_coef: 0.01,0.05,0.1
+      env.no_quarternion: True,False

@@ -8,13 +8,9 @@ from typing import Any
 
 import gymnasium as gym
 import hydra
-import improve
-import improve.config.resolver
-import improve.wrapper.dict_util as du
 import mediapy
 import numpy as np
 import simpler_env
-import wandb
 from gymnasium import logger, spaces
 from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
                             RewardWrapper, Wrapper)
@@ -29,6 +25,11 @@ from scipy.ndimage import zoom
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
 from tqdm import tqdm
+
+import improve
+import improve.config.resolver
+import improve.wrapper.dict_util as du
+import wandb
 
 
 # ---------------------------------------------------------------------------- #
@@ -173,8 +174,11 @@ class ResidualRLWrapper(ObservationWrapper):
 
         obs, _ = self.env.reset(options=dict(reconfigure=True))
         self.observation_space = convert_observation_to_space(obs)
-        self.image_space = convert_observation_to_space(self.get_image(obs))
-        self.observation_space.spaces["simpler-img"] = self.image_space
+
+        self.use_img = "image" in self.observation_space.spaces
+        if self.use_img:
+            self.image_space = convert_observation_to_space(self.get_image(obs))
+            self.observation_space.spaces["simpler-img"] = self.image_space
 
         # other low dim obs
         qpos = obs["agent"]["qpos"]
@@ -239,7 +243,7 @@ class ResidualRLWrapper(ObservationWrapper):
 
         if self.force_seed:
             print(f"forcing seed to {self.seed}")
-            seed = self.seed
+            # seed = self.seed
 
         obs, info = self.env.reset(seed=seed, options=options)
         if self.model is not None:
@@ -310,8 +314,9 @@ class ResidualRLWrapper(ObservationWrapper):
         observation["obj-pose"] = np.array([*obj.p, *obj.q])
         observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
 
-        image = self.get_image(observation)
-        observation["simpler-img"] = image
+        if self.use_img:
+            image = self.get_image(observation)
+            observation["simpler-img"] = image
 
         # early return if no model
         if self.model is None:
@@ -331,16 +336,6 @@ class ResidualRLWrapper(ObservationWrapper):
         )
         observation["agent"]["partial-action"] = self.partial
 
-        """
-        # going to force observation to be just the intended image and partial for now
-        # update: add qpos and qvel for PPO
-        obs = (
-            np.expand_dims(image, axis=0),
-            np.expand_dims(self.partial, axis=0),
-        )
-        # return obs
-        """
-
         return observation  # just the tuple gets returned for now
 
     def get_image(self, obs):
@@ -353,6 +348,10 @@ class ResidualRLWrapper(ObservationWrapper):
         if self.terminated and (not self.final):
             self.terminated = False
             self.env.advance_to_next_subtask()
+
+    def render(self):
+        """Renders the environment."""
+        return self.env.render()
 
 
 class SB3Wrapper(ResidualRLWrapper):
@@ -374,6 +373,7 @@ class SB3Wrapper(ResidualRLWrapper):
         force_seed=False,
         seed=None,
         _reward_type="sparse",
+        no_quarternion=False,
     ):
         super().__init__(
             env,
@@ -398,26 +398,47 @@ class SB3Wrapper(ResidualRLWrapper):
 
         # filter for the desired obs space
         spaces = du.flatten(alldict(self.observation_space))
-        spaces = {k: v for k, v in spaces.items() if k in keys}
         self.keys = keys
+        if self.keys:
+            spaces = {k: v for k, v in spaces.items() if k in keys}
 
         self.observation_space = Dict(spaces)
-        if self.downscale and "simpler-img" in self.keys:
+        if self.keys:
+            if self.downscale and "simpler-img" in self.keys and self.use_img:
 
-            sample = self.observation_space.spaces["simpler-img"].sample()
-            shape = self.scale_image(
-                sample,
-                1 / self.downscale,
-            ).shape
-            dtype = sample.dtype
-            self.observation_space.spaces["simpler-img"] = gym.spaces.Box(
-                low=0, high=255, shape=shape, dtype=dtype
-            )
+                sample = self.observation_space.spaces["simpler-img"].sample()
+                shape = self.scale_image(
+                    sample,
+                    1 / self.downscale,
+                ).shape
+                dtype = sample.dtype
+                self.observation_space.spaces["simpler-img"] = gym.spaces.Box(
+                    low=0, high=255, shape=shape, dtype=dtype
+                )
 
         self.image = None
         self.images = []
         self.render_every = 55
         self.render_counter = 0
+
+        self.no_quarternion = no_quarternion
+        if self.no_quarternion:
+            qpos = np.array(
+                [
+                    -0.065322585,
+                    0.12452538,
+                    0.47524214,
+                    1.0814414,
+                    -0.19315898,
+                    1.7895244,
+                    -0.98058003,
+                    -5.158836e-08,
+                    2.2535543e-08,
+                    -0.00285961,
+                    0.7851361,
+                ]
+            )
+            env.agent.reset(qpos)
 
     def finish_render(self):
         if self.images and self.use_wandb:
@@ -432,10 +453,7 @@ class SB3Wrapper(ResidualRLWrapper):
 
             mediapy.write_video(path, self.images, fps=5)
 
-            wandb.log(
-                {f"video/buffer{n}": wandb.Video(path, fps=5)},
-                # step=self.nstep,
-            )
+            # wandb.log( {f"video/buffer{n}": wandb.Video(path, fps=5)},)
             self.images = []
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
@@ -453,24 +471,20 @@ class SB3Wrapper(ResidualRLWrapper):
     def observation(self, observation):
         observation = super().observation(observation)
         observation = du.flatten(alldict(observation))
-        self.image = observation["simpler-img"]  # for render only
-        observation = {k: v for k, v in observation.items() if k in self.keys}
+        if self.use_img:
+            self.image = observation["simpler-img"]  # for render only
+        if self.keys:
+            observation = {k: v for k, v in observation.items() if k in self.keys}
 
-        if self.downscale and "simpler-img" in self.keys:
-            observation["simpler-img"] = self.scale_image(
-                self.image, 1 / self.downscale
-            )
+            if self.downscale and "simpler-img" in self.keys and self.use_img:
+                observation["simpler-img"] = self.scale_image(
+                    self.image, 1 / self.downscale
+                )
 
         return observation
 
-    def render(self, mode=None):
-        if mode == "human":
-            plt.imshow(self.image)
-            plt.title("SIMPLER")
-            plt.pause(0.1)
-        else:
-            self.images.append(self.image)
-            return self.image
+    def render(self):
+        return self.env.render()
 
     def compute_reward(self, observation, action, reward, terminated, truncated, info):
         """Compute the reward."""
@@ -484,11 +498,16 @@ class SB3Wrapper(ResidualRLWrapper):
             # large reward for succeeding
             return (
                 10 * reward
-                + ((0.1) * (1 - np.tanh(10 * np.linalg.norm(observation["obj-wrt-eef"]))))
+                + (
+                    (0.1)
+                    * (1 - np.tanh(10 * np.linalg.norm(observation["obj-wrt-eef"])))
+                )
                 + int(info["lifted_object"])
                 + (0.25 * info["is_grasped"])
                 + ((1e-3) * sum(observation["agent_qvel"]))
-                + ((1e-3) * sum(action) if self.model is not None else 0) # RP shouldnt help too much
+                + (
+                    (1e-3) * sum(action) if self.model is not None else 0
+                )  # RP shouldnt help too much
             )
 
         if self._reward_type == "robosuite":
@@ -506,6 +525,10 @@ class SB3Wrapper(ResidualRLWrapper):
         return reward
 
     def step(self, action):
+
+        if self.no_quarternion:
+            action[3:5] = 0
+
         observation, reward, terminated, truncated, info = super().step(action)
         reward = self.compute_reward(
             observation, action, reward, terminated, truncated, info
@@ -514,10 +537,10 @@ class SB3Wrapper(ResidualRLWrapper):
         # for sb3 EvalCallback
         info["is_success"] = info["success"]
 
-        self.render()
         # print(f'{terminated or truncated } {(self.render_counter % self.render_every)}')
         if terminated or truncated and (self.render_counter % self.render_every) < 10:
-            self.finish_render()
+            pass
+            # self.finish_render()
 
         return observation, reward, terminated, truncated, info
 
@@ -546,12 +569,13 @@ class SB3Wrapper(ResidualRLWrapper):
         super().close()
 
 
-def make(cn):
+def make(cn, **kwargs):
     """Creates simulated eval environment from task name.
     param: cn: config node
     """
     env = simpler_env.make(
         cn.task,
+        **kwargs,
         # **{ "renderer_kwargs": { "device": "cuda:0", "offscreen_only": True, } },
     )
     wrapper = SB3Wrapper if cn.kind == "sb3" else ResidualRLWrapper
@@ -568,6 +592,7 @@ def make(cn):
         force_seed=cn.seed.force,
         seed=cn.seed.value if cn.seed.force else None,
         _reward_type=cn.reward,
+        no_quarternion=cn.no_quarternion,
     )
 
 

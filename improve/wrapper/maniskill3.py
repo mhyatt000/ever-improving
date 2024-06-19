@@ -1,25 +1,14 @@
 import gymnasium as gym
-import mani_skill2.envs
-import simpler_env as simpler
+import mani_skill.envs
 from tqdm import tqdm
 
-if False:
-    env = gym.make(
-        "PickCube-v0",  # there are more tasks e.g. "PushCube-v1", "PegInsertionSide-v1", ...
-        # num_envs=1024,
-        obs_mode="state",  # there is also "state_dict", "rgbd", ...
-        control_mode="pd_ee_delta_pos",
-        render_mode="rgb_array",  # "rgb_array", # there is also "human", "rgb_array", ...
-        renderer_kwargs={
-            "offscreen_only": True,
-            "device": "cuda:0",
-        },
-    )
-
-env = simpler.make(
-    "google_robot_pick_coke_can",
-    obs_mode="state_dict",
-    render_mode="rgb_array",  # "rgb_array", # there is also "human", "rgb_array", ...
+env = gym.make(
+    "PickCube-v1",  # there are more tasks e.g. "PushCube-v1", "PegInsertionSide-v1", ...
+    num_envs=1024,
+    obs_mode="state",  # there is also "state_dict", "rgbd", ...
+    control_mode="pd_ee_delta_pos",
+    render_mode="camera",  # "rgb_array", # there is also "human", "rgb_array", ...
+    # sim_backend='gpu',
     # renderer_kwargs={ "offscreen_only": True, "device": "cuda:0", },
 )
 
