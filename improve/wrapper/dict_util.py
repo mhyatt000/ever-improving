@@ -1,19 +1,53 @@
+import functools
 from collections import OrderedDict
 
+import numpy as np
 from gymnasium.spaces.dict import Dict
 
 
 def todict(thing):
     """gymnasium.spaces.dict.Dict to dict"""
+    if type(thing) is dict:
+        return {k: todict(v) for k, v in thing.items()}
+    if type(thing) is list:
+        return [todict(v) for v in thing]
+
     if type(thing) is Dict:
         return {k: todict(v) for k, v in thing.spaces.items()}
     if type(thing) is OrderedDict:
         return {k: todict(v) for k, v in thing.items()}
+
     else:
         return thing
 
 
 gym2dict = todict
+
+
+def concat(arr):
+    """Concatenate a list of Dicts."""
+
+    def _concat_helper(x, y):
+        if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
+            return np.concatenate([x, y])
+        elif isinstance(x, np.ndarray):
+            return np.concatenate([x, np.array([y])])
+        elif isinstance(y, np.ndarray):
+            return np.concatenate([np.array([x]), y])
+        else:
+            return np.array([x, y])
+
+    return merge(arr, _concat_helper)
+
+
+def merge(arr, func):
+    """Merge a list of Dicts using func
+    the more general version of concat
+    """
+    return functools.reduce(
+        lambda a, b: apply_both(a, b, lambda x, y: func(x, y)),
+        arr,
+    )
 
 
 def apply(d, func):

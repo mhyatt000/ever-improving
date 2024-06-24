@@ -1,4 +1,5 @@
 # custom: tensorboard wandb and others
+*.ini
 *.gif
 *.pth
 *.pt
