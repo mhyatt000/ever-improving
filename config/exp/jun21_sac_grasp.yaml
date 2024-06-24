@@ -6,40 +6,35 @@
 
 defaults:
 # - /launcher: base
-  - override /algo: ppo
+  - override /algo: sac
   - override /buffer: base # no HER for now!
   - override /env/foundation: dont
 
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jun18_ppo"
+sweep_id: "jun21_sac_grasp"
 
 train: 
-  n_steps: ${r_toint:1e7} # 10M
+  n_steps: ${r_toint:3e5} # 300k
   use_zero_init: False # cant zero without foundation model
 
-algo:
-  batch_size: 256
-  # warmup_zero_action: False # gaussian
 
-  # SUPER low LR
-  # learning_rate: ${r_tofloat:1e-6}
+algo:
+  buffer_size: ${r_toint:3e5}
+  warmup_zero_action: False # gaussian
+  batch_size: 512
+  learning_starts: ${r_toint:1e3}
+
+  learning_rate: ${r_tofloat:3e-4}
+  ent_coef: auto_0.0001
+  target_entropy: -7.0 # from SAC applications
 
 env:
   goal: 
     use: False
-  seed:
-    force: True # only one environment starting point for now
-  use_original_space: False # ppo doesnt support this rn
-
-  obs_keys: # anything besides the expected image
-    - agent_qpos-sin
-    - agent_qpos-cos
-    - agent_qvel
-    - eef-pose
-    - obj-wrt-eef
-    - obj-pose
+  # seed: force: False  # used in sweep
+  reach: False
 
 hydra:
   run:
@@ -51,8 +46,6 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      algo.learning_rate: 1e-4,3e-4
-      algo.target_kl: 0.02,0.05
-      env.reward: sparse
-      algo.ent_coef: 0.01,0.05,0.1
-      env.no_quarternion: True
+      env.reward: dense
+      env/obs_mode: lowdim,image
+      env.seed.force: True, False

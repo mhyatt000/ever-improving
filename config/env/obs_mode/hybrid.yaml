@@ -1,0 +1,8 @@
+name: hybrid
+mode: rgb
+obs_keys:
+  - agent_qpos
+  - agent_qvel
+  - agent_partial-action
+  - simpler-img
+  - obj-wrt-eef

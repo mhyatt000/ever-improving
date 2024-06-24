@@ -13,18 +13,18 @@ defaults:
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jun18_ppo"
+sweep_id: "jun20_ppo"
 
 train: 
-  n_steps: ${r_toint:1e7} # 10M
+  n_steps: ${r_toint:1e6} # 300k
   use_zero_init: False # cant zero without foundation model
 
 algo:
   batch_size: 256
   # warmup_zero_action: False # gaussian
-
-  # SUPER low LR
-  # learning_rate: ${r_tofloat:1e-6}
+  ent_coef: 0.01
+  learning_rate: 3e-4
+  target_kl: 0.02
 
 env:
   goal: 
@@ -32,14 +32,6 @@ env:
   seed:
     force: True # only one environment starting point for now
   use_original_space: False # ppo doesnt support this rn
-
-  obs_keys: # anything besides the expected image
-    - agent_qpos-sin
-    - agent_qpos-cos
-    - agent_qvel
-    - eef-pose
-    - obj-wrt-eef
-    - obj-pose
 
 hydra:
   run:
@@ -51,8 +43,7 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      algo.learning_rate: 1e-4,3e-4
-      algo.target_kl: 0.02,0.05
       env.reward: sparse
-      algo.ent_coef: 0.01,0.05,0.1
-      env.no_quarternion: True
+      env.no_quarternion: False,True
+      env.reach: False
+      env/obs_mode: image,lowdim

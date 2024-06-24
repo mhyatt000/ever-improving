@@ -1,4 +1,7 @@
 import os
+from improve.wrapper.simpler.reach_task import ReachTaskWrapper
+from improve.wrapper.simpler.rescale import RTXRescaleWrapper
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 import math
 import os.path as osp
 import warnings
@@ -62,7 +65,7 @@ def build_callbacks(env, cfg):
     callbacks = [checkpoint_callback, eval_callback]
 
     if cfg.job.wandb.use:
-        wandbCb = callback = WandbCallback(
+        wandbCb = WandbCallback(
             gradient_save_freq=1,
             log="gradients",
             verbose=2,
@@ -118,6 +121,15 @@ def rollout(model):
         wandb.log({f"video/{ep_id}": wandb.Video(fname, fps=5)})
 
 
+
+class SuccessInfoWrapper(gym.Wrapper):
+    """ A simple wrapper that adds a is_success key which SB3 tracks"""
+    def step(self, action):
+        ob, rew, terminated, truncated, info = super().step(action)
+        info["is_success"] = info["success"]
+        return ob, rew, terminated, truncated, info
+
+
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
 def main(cfg):
 
@@ -135,43 +147,79 @@ def main(cfg):
         )
     pprint(OC.to_container(cfg, resolve=True))  # keep after wandb so it logs
 
-    env = rrl.make(cfg.env)
-    env = NormalizeObservation(NormalizeReward(env))
+    def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
+        def _init() -> gym.Env:
+            # NOTE: Import envs here so that they are registered with gym in subprocesses
+            # this was for maniskill2 only
+            import improve.wrapper.residualrl as rrl
 
-    if cfg.env.goal.use:  # use GoalEnvWrapper?
-        env = cfg.env.goal.cls(env, cfg.env.goal.key)
+            env = rrl.make(
+                cfg.env,
+                obs_mode="state_dict",
+                render_mode="cameras",
+                max_episode_steps=max_episode_steps,
+                renderer_kwargs={
+                    "offscreen_only": True,
+                    "device": "cuda:0",
+                },
+            )
 
-    if not type(cfg.algo.learning_rate) is float:
-        learning_rate = cfg.algo.learning_rate.cls(
-            **OC.to_container(cfg.algo.learning_rate.args, resolve=True)
-        )
+            env = RTXRescaleWrapper(env)
+            if cfg.env.reach:
+                env = ReachTaskWrapper(env, use_sparse_reward=False, thresh=0.01)
+
+            # env = WandbActionStatWrapper( env, logger, names=["x", "y", "z", "rx", "ry", "rz", "gripper"],)
+
+            # For training, we regard the task as a continuous task with infinite horizon.
+            # you can use the ContinuousTaskWrapper here for that
+
+            # if max_episode_steps is not None:
+            # env = ContinuousTaskWrapper(env)
+            env = SuccessInfoWrapper(env)
+            if record_dir is not None:
+                env = RecordEpisode(env, record_dir, info_on_video=True)
+            return env
+
+        env = NormalizeObservation(NormalizeReward(env))
+        # if cfg.job.wandb.use:
+        # env = WandbInfoStatWrapper(env, logger)
+
+        return _init
+
+    eval_only = not cfg.train.use_train
+    # create eval environment
+    record_dir = osp.join(log_dir, f"videos{'/eval' if eval_only else ''}")
+
+    eval_env = SubprocVecEnv([make_env(cfg, record_dir=record_dir) for _ in range(1)])
+    eval_env = VecMonitor(eval_env)  # attach this so SB3 can log reward metrics
+    eval_env.seed(cfg.job.seed)
+    eval_env.reset()
+
+    if eval_only:
+        env = eval_env
     else:
-        learning_rate = cfg.algo.learning_rate
+        # Create vectorized environments for training
+        env = SubprocVecEnv(
+            [
+                make_env(cfg, max_episode_steps=max_episode_steps)
+                for _ in range(num_envs)
+            ]
+        )
+        env = VecMonitor(env)
+        env.seed(cfg.job.seed)
+        env.reset()
 
-    # from torch.optim.lr_scheduler import CosineAnnealingLR
-    def cosine_lr_schedule(initial_lr, min_lr, total_steps, current_step):
-        cosine_decay = 0.5 * (1 + math.cos(math.pi * current_step / total_steps))
-        decayed_lr = (initial_lr - min_lr) * cosine_decay + min_lr
-        return decayed_lr
+    # if cfg.env.goal.use:  env = cfg.env.goal.cls(env, cfg.env.goal.key)
 
-    coslr = partial(cosine_lr_schedule, cfg.algo.learning_rate, 1e-6, cfg.train.n_steps)
+    learning_rate = cfg.algo.learning_rate
     del cfg.algo.learning_rate
     betas = (0.999, 0.999)
 
-    # TODO add cosine schedule
-    # not priority
-    # torch lr schedule as cosine lr schedule
     algo = build_algo(cfg.algo)
     algo_kwargs = OC.to_container(cfg.algo, resolve=True)
     policy_kwargs = algo_kwargs.get("policy_kwargs", {})
     del algo_kwargs["name"]
     del algo_kwargs["policy_kwargs"]
-
-
-    obs, info = env.reset()
-    print(obs)
-    quit()
-
 
     model = algo(
         "MultiInputPolicy",
@@ -186,7 +234,7 @@ def main(cfg):
             },
             **policy_kwargs,
         },
-        learning_rate=coslr,
+        learning_rate=learning_rate,
     )
 
     if cfg.train.use_zero_init:

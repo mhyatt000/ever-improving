@@ -20,7 +20,8 @@ train:
   use_zero_init: False # cant zero without foundation model
 
 algo:
-  batch_size: 256
+  batch_size: 4
+  n_steps: 64
   # warmup_zero_action: False # gaussian
 
   # SUPER low LR
@@ -33,7 +34,6 @@ env:
     force: True # only one environment starting point for now
   use_original_space: False # ppo doesnt support this rn
 
-  obs_keys: null # anything besides the expected image
   n_envs: 1
 
 hydra:

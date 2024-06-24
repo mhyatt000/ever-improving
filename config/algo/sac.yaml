@@ -22,7 +22,7 @@ replay_buffer_class: ${buffer.cls}
 replay_buffer_kwargs: ${buffer.args}
 optimize_memory_usage: false
 
-ent_coef: auto_0.5
+ent_coef: auto_0.05
 # target_entropy: 'auto'
 
 target_update_interval: 1

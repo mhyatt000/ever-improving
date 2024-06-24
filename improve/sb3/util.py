@@ -3,10 +3,12 @@ from pprint import pprint
 from typing import (Any, Dict, List, Mapping, Optional, Sequence, TextIO,
                     Tuple, Union)
 
-import wandb
-from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.logger import KVWriter, Logger
 import numpy as np
+import wandb
+from stable_baselines3.common.callbacks import (BaseCallback, CallbackList,
+                                                CheckpointCallback,
+                                                EvalCallback)
+from stable_baselines3.common.logger import KVWriter, Logger
 
 """ for EvalCallback
 
@@ -21,20 +23,6 @@ import numpy as np
 - render: Whether to render or not the environment during evaluation
 - verbose: Verbosity level: 0 for no output, 1 for indicating information about evaluation results
 """
-
-class CosineAnnealingLRSchedule:
-    def __init__(self, initial: float, n_steps: int, eta_min: float = 0.0):
-        self.initial = initial
-        self.n_steps = n_steps
-        self.eta_min = eta_min
-
-    def __call__(self, step: int) -> float:
-        return self.annealing_lr(step)
-
-    def annealing_lr(self, step: int) -> float:
-        lr = self.eta_min + (self.initial - self.eta_min) * (1 + np.cos(np.pi * step / self.n_steps)) / 2
-        return lr
-
 
 
 class PlottingCallback(BaseCallback):
@@ -163,6 +151,45 @@ class MyCallback(BaseCallback):
         ** custom
         """
         pass
+
+
+class ReZeroAfterFailure(BaseCallback):
+    """
+    Rezero the last layer of the model after
+    mean success rate drops below a threshold.
+
+    It must be used with the ``EvalCallback``.
+
+    :param threshold: The threshold value for the mean success rate.
+    :param verbose: Verbosity level: 0 for no output, 1 for verbose
+    """
+
+    parent: EvalCallback
+
+    def __init__(self, threshold: float, verbose: int = 0):
+        super().__init__(verbose=verbose)
+        self.threshold = threshold
+
+    def _on_step(self) -> bool:
+        assertion = "``StopTrainingOnMinimumReward`` callback must be used with an ``EvalCallback``"
+        assert ( self.parent is not None), assertion
+
+        results = self.parent.evaluations_results[-1]
+        results = sum(results) / len(results)
+        use_rezero = bool(results <= self.threshold)
+
+        if not use_rezero:
+            return True
+
+        if self.verbose >= 1:
+            print(
+                f"ReZero last layer because the mean success {results} "
+                f" is below the threshold {self.threshold}"
+            )
+
+        zero_init(self.model, "ppo")
+
+        return True # so that training continues
 
 
 class ReZeroCallback(BaseCallback):

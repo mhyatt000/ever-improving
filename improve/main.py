@@ -11,8 +11,10 @@ import improve.config.resolver
 def main(cfg: OmegaConf) -> None:
 
     cfg = OmegaConf.to_container(cfg, resolve=True)
-    pprint(cfg)
-    # pprint(cfg['env'])
+
+    pprint(cfg['env'])
+    # pprint(cfg)
+    print('\n\n\n')
 
 
 if __name__ == "__main__":

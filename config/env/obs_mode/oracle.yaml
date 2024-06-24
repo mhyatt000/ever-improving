@@ -1,0 +1,11 @@
+name: oracle
+mode: rgb
+obs_keys:
+  # - agent_qpos # not needed if sin/cos
+  - agent_qpos-sin
+  - agent_qpos-cos
+  - agent_qvel
+  - agent_partial-action
+    # - simpler-img
+  - eef-pose
+  - obj-wrt-eef
