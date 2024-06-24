@@ -307,6 +307,7 @@ def main(cfg):
         # define callbacks to periodically save our model and evaluate it to help monitor training
         # the below freq values will save every 10 rollouts
 
+        # this might negatively affect training
         post_eval = (
             util.ReZeroAfterFailure(threshold=0.2, verbose=1)
             if cfg.train.use_zero_init
@@ -315,7 +316,7 @@ def main(cfg):
 
         eval_callback = EvalCallback(
             eval_env,
-            callback_after_eval=post_eval,
+            callback_after_eval=None,
             best_model_save_path=log_dir,
             log_path=log_dir,
             eval_freq=5 * rollout_steps // num_envs,

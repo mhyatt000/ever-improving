@@ -10,7 +10,6 @@ runs/
 multirun/
 *.mp4
 logs/
-wandb/
 outputs/
 
 # Byte-compiled / optimized / DLL files
