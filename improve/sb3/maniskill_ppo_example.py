@@ -30,7 +30,8 @@ from improve.wrapper.simpler.rescale import RTXRescaleWrapper
 from improve.wrapper.wandb.vec import WandbVecMonitor
 from mani_skill2.utils.wrappers import RecordEpisode
 from omegaconf import OmegaConf as OC
-from stable_baselines3 import A2C, PPO, SAC
+from stable_baselines3 import A2C, SAC
+from improve.sb3.custom import PPO
 from stable_baselines3.common.callbacks import (CallbackList,
                                                 CheckpointCallback,
                                                 EvalCallback)
