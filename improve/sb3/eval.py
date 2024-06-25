@@ -1,4 +1,5 @@
 import os.path as osp
+import os
 import warnings
 from pprint import pprint
 
@@ -14,7 +15,7 @@ import stable_baselines3 as sb3
 import wandb
 from improve.log.wandb import WandbLogger
 from improve.sb3 import util
-from improve.sb3.custom import PPO
+from improve.sb3 import custom 
 from improve.wrapper import dict_util as du
 from improve.wrapper.force_seed import ForceSeedWrapper
 from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
@@ -166,7 +167,7 @@ def main(cfg):
         run = wandb.init(
             project="residualrl-maniskill2demo",
             dir=cfg.callback.log_path,
-            job_type="train",
+            job_type="eval",
             # sync_tensorboard=True,
             monitor_gym=True,
             name=cfg.job.wandb.name,
@@ -181,7 +182,10 @@ def main(cfg):
     # args = parse_args()
     num_envs = cfg.env.n_envs
     max_episode_steps = cfg.env.max_episode_steps
-    log_dir = osp.join(cfg.callback.log_path, wandb.run.name)
+
+    assert cfg.run_name is not None, "run_name must be set"
+    log_dir = osp.join(cfg.callback.log_path, cfg.run_name)
+
     rollout_steps = cfg.algo.get("n_steps", None) or 4800
 
     if cfg.job.seed is not None:
@@ -197,11 +201,10 @@ def main(cfg):
     print(f"fm_name: {cfg.env.foundation.name}")
 
     eval_only = not cfg.train.use_train
+    assert eval_only, "Training is not supported in this script"
+
     # create eval environment
-    if eval_only:
-        record_dir = osp.join(log_dir, "videos/eval")
-    else:
-        record_dir = osp.join(log_dir, "videos")
+    record_dir = osp.join(log_dir, "videos/eval")
 
     if cfg.env.foundation.name is None:
         eval_env = SubprocVecEnv(
@@ -213,20 +216,6 @@ def main(cfg):
 
         if eval_only:
             env = eval_env
-        else:
-            # Create vectorized environments for training
-            env = SubprocVecEnv(
-                [
-                    make_env(cfg, max_episode_steps=max_episode_steps)
-                    for _ in range(num_envs)
-                ]
-            )
-            env = VecMonitor(env)
-            if cfg.job.wandb.use:
-                env = WandbVecMonitor(env, logger)
-
-            env.seed(cfg.job.seed)
-            env.reset()
 
     if cfg.env.foundation.name:  # using foundation model ... only one env allowed
         print(cfg.env.foundation.name)
@@ -281,7 +270,7 @@ def main(cfg):
 
     # Define the policy configuration and algorithm configuration
     algo = {
-        "ppo": PPO,
+        "ppo": custom.PPO,
         "a2c": A2C,
         "sac": SAC,
     }[cfg.algo.name]
@@ -299,85 +288,35 @@ def main(cfg):
 
     n_eval = 1 if (cfg.env.seed.force and cfg.env.seed.seeds is None) else 10
 
-    if eval_only:
-        model_path = cfg.job.name
-        if model_path is None:
-            model_path = osp.join(log_dir, "latest_model")
+    model_path = cfg.job.name
+    if model_path is None:
+        paths = [p for p in os.listdir(log_dir) if p.endswith(".zip")]
+        paths = [p for p in paths if "rl_model" in p]
+        paths = sorted(paths, key=lambda x: int(x.split("_")[-2]))
+        paths = [osp.join(log_dir, p) for p in paths]
+
+
+    for p in paths:
         # Load the saved model
-        model = model.load(model_path)
+        model = model.load(p)
 
-    else:
-        # define callbacks to periodically save our model and evaluate it to help monitor training
-        # the below freq values will save every 10 rollouts
-
-        # this might negatively affect training
-        post_eval = (
-            util.ReZeroAfterFailure(threshold=0.2, verbose=1)
-            if cfg.train.use_zero_init
-            else None
-        )
-        # post_eval if cfg.env.foundation.name == 'octo-base' else None
-        post_eval = None
-        print("WARN: using post eval callback")
-        print(type(post_eval))
-
-        eval_callback = EvalCallback(
+        # Evaluate the model
+        returns, ep_lens = custom.evaluate_policy(
+            model,
             eval_env,
-            callback_after_eval=post_eval,
-            best_model_save_path=log_dir,
-            log_path=log_dir,
-            eval_freq=5 * rollout_steps // num_envs,
+            logger if cfg.job.wandb.use else model.logger,
+            step = int(p.split("_")[-2]),
             deterministic=True,
             render=True,
+            return_episode_rewards=True,
             n_eval_episodes=n_eval,
         )
 
-        checkpoint_callback = CheckpointCallback(
-            save_freq=10 * rollout_steps // num_envs,
-            save_path=log_dir,
-            name_prefix="rl_model",
-            save_replay_buffer=True,
-            save_vecnormalize=True,
-        )
-
-        callbacks = [checkpoint_callback, eval_callback]
-
-        if cfg.job.wandb.use:
-            wandbCb = WandbCallback(
-                gradient_save_freq=rollout_steps // num_envs,
-                log="gradients",
-                verbose=2,
-            )
-            callbacks += [wandbCb]
-
-        if cfg.train.use_zero_init:
-            util.zero_init(model, cfg.algo.name)
-
-        print("Training model")
-        # Train an agent with PPO for args.total_timesteps interactions
-        model.learn(
-            cfg.train.n_steps,
-            callback=callbacks,
-            progress_bar=True,
-        )
-        # Save the final model
-        model.save(osp.join(log_dir, "latest_model"))
-
-    # Evaluate the model
-    returns, ep_lens = evaluate_policy(
-        model,
-        eval_env,
-        deterministic=True,
-        render=True,
-        return_episode_rewards=True,
-        n_eval_episodes=n_eval,
-    )
-
-    print("Returns", returns)
-    print("Episode Lengths", ep_lens)
-    success = np.array(ep_lens) < 200
-    success_rate = success.mean()
-    print("Success Rate:", success_rate)
+        print("Returns", returns)
+        print("Episode Lengths", ep_lens)
+        success = np.array(ep_lens) < 200
+        success_rate = success.mean()
+        print("Success Rate:", success_rate)
 
     # close all envs
     eval_env.close()

@@ -75,7 +75,10 @@ class ExtraObservationWrapper(Wrapper):
     def obj_pose(self):
         """Get the center of mass (COM) pose."""
         # self.obj.pose.transform(self.obj.cmass_local_pose)
-        return self.env.obj_pose
+        try:
+            return self.env.obj.pose
+        except:
+            return self.env.source_obj_pose
 
     def get_tcp(self):
         """tool-center point, usually the midpoint between the gripper fingers"""
@@ -199,7 +202,7 @@ class FoundationModelWrapper(Wrapper):
         return obs, reward, success, truncated, info
 
     def compute_reward(self, action, reward):
-        reward + (1e-4 * np.linalg.norm(self.unscale(action)))
+        reward - (1e-4 * np.linalg.norm(self.unscale(action)))
         return reward
 
     def observation(self, observation):
