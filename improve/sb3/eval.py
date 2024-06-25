@@ -1,5 +1,5 @@
-import os.path as osp
 import os
+import os.path as osp
 import warnings
 from pprint import pprint
 
@@ -14,8 +14,7 @@ import simpler_env as simpler
 import stable_baselines3 as sb3
 import wandb
 from improve.log.wandb import WandbLogger
-from improve.sb3 import util
-from improve.sb3 import custom 
+from improve.sb3 import custom, util
 from improve.wrapper import dict_util as du
 from improve.wrapper.force_seed import ForceSeedWrapper
 from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
@@ -41,6 +40,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
                                               VecMonitor)
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
+from tqdm import tqdm
 from wandb.integration.sb3 import WandbCallback
 
 
@@ -295,8 +295,7 @@ def main(cfg):
         paths = sorted(paths, key=lambda x: int(x.split("_")[-2]))
         paths = [osp.join(log_dir, p) for p in paths]
 
-
-    for p in paths:
+    for p in tqdm(paths):
         # Load the saved model
         model = model.load(p)
 
@@ -305,7 +304,7 @@ def main(cfg):
             model,
             eval_env,
             logger if cfg.job.wandb.use else model.logger,
-            step = int(p.split("_")[-2]),
+            step=int(p.split("_")[-2]),
             deterministic=True,
             render=True,
             return_episode_rewards=True,

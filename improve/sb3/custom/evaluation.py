@@ -154,6 +154,9 @@ def evaluate_policy(
         logger.record("stats/actions/yaw", wandb.Histogram(actions[:, 5]))
         logger.record("stats/actions/gripper", wandb.Histogram(actions[:, 6]))
 
+        norms = np.linalg.norm(actions, axis=-1)
+        logger.record("stats/action_norm", wandb.Histogram(norms))
+
         logger.dump(step)
 
     mean_reward = np.mean(episode_rewards)
