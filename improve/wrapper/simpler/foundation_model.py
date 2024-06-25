@@ -153,7 +153,7 @@ class FoundationModelWrapper(Wrapper):
             )
 
         elif "octo" in self.policy:
-            from improve.simpler_mod.octo import OctoInference
+            from simpler_env.policies.octo.octo_model import OctoInference
 
             self.model = OctoInference(
                 model_type=self.ckpt, policy_setup=policy_setup, init_rng=0
