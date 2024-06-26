@@ -1,1 +1,1 @@
-from .foundation_model import ExtraObservationWrapper, FoundationModelWrapper
+from .foundation_model import ExtraObservationWrapper, FoundationModelWrapper, ActionSpaceWrapper

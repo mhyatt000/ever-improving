@@ -77,7 +77,11 @@ class RTXRescaleWrapper(gym.Wrapper):
         super().__init__(env)
 
     def step(self, action):
+
+        # ActionSpaceWrapper ... shape might be less than 7
+        action = np.concatenate([action, np.zeros(7 - len(action))])
         action = preprocess_action(action)
+
         ob, rew, terminated, truncated, info = super().step(action)
         return ob, rew, terminated, truncated, info
 

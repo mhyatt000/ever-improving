@@ -102,10 +102,9 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
                 policy=cfg.env.foundation.name,
                 ckpt=cfg.env.foundation.ckpt,
                 residual_scale=cfg.env.residual_scale,
-                action_mask_dims=cfg.env.action_mask_dims,
             )
 
-        env = ActionSpaceWrapper(env, dims=cfg.env.action_mask_dims)
+        env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
 
         env = ExtraObservationWrapper(env)
 

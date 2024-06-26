@@ -96,7 +96,7 @@ class ExtraObservationWrapper(Wrapper):
         return image
 
 
-class ActionSpaceWrapper(ActionWrapper):
+class ActionSpaceWrapper(Wrapper):
     """Masks the action space.
     rather than masking dimensions, this wrapper changes the visible action space
     it pads the action space with zeros to match the original action space
@@ -119,12 +119,14 @@ class ActionSpaceWrapper(ActionWrapper):
     def action(self, action):
         extra = np.zeros(len(self.dims))
         # must keep the same shape expected by simpler
-        action = np.concatenate([action, extra])
+        action = np.concatenate([action[:self.new[0]], extra])
         return action
 
     def step(self, action):
         action = self.action(action)
         return self.env.step(action)
+
+
 
 class FoundationModelWrapper(Wrapper):
     """
