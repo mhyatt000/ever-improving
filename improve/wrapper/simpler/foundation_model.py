@@ -96,6 +96,36 @@ class ExtraObservationWrapper(Wrapper):
         return image
 
 
+class ActionSpaceWrapper(ActionWrapper):
+    """Masks the action space.
+    rather than masking dimensions, this wrapper changes the visible action space
+    it pads the action space with zeros to match the original action space
+
+    helps with model training
+    """
+
+    def __init__(self, env, dims):
+        super().__init__(env)
+
+        self.dims = dims
+
+        self.old = env.action_space.shape
+        low, high = env.action_space.low[0], env.action_space.high[0]
+        self.new = (env.action_space.shape[0] - len(dims),)
+
+        self.action_space = Box(low=low, high=high, shape=self.new, dtype=np.float32)
+
+
+    def action(self, action):
+        extra = np.zeros(len(self.dims))
+        # must keep the same shape expected by simpler
+        action = np.concatenate([action, extra])
+        return action
+
+    def step(self, action):
+        action = self.action(action)
+        return self.env.step(action)
+
 class FoundationModelWrapper(Wrapper):
     """
     uses model (Octo or RTX) to predict initial action
@@ -106,10 +136,9 @@ class FoundationModelWrapper(Wrapper):
     :param policy: policy name
     :param ckpt: checkpoint path
     :param residual_scale: residual policy weight
-    :param action_mask_dims: RPL dimensions to mask in the action space
     """
 
-    def __init__(self, env, task, policy, ckpt, residual_scale=1.0, action_mask_dims=None):
+    def __init__( self, env, task, policy, ckpt, residual_scale=1.0):
         super().__init__(env)
 
         if policy in ["octo-base", "octo-small"]:
@@ -120,7 +149,6 @@ class FoundationModelWrapper(Wrapper):
         self.policy = policy
         self.ckpt = ckpt
         self.residual_scale = 1.0
-        self.action_mask_dims = [] if action_mask_dims is None else action_mask_dims
 
         # TODO add option for w_fm and w_rp
         # where w_fm is the weight for the foundation model
@@ -189,14 +217,13 @@ class FoundationModelWrapper(Wrapper):
 
     def step(self, action):
 
-        for m in self.action_mask_dims:
-            action[m] = 0
-
         total_action = self.model_action + (action * self.residual_scale)
 
         obs, reward, success, truncated, info = self.env.step(total_action)
         # dont compute this
+        # print('WARNING: using RPL action penalty')
         # reward = self.compute_reward(action, reward)
+
         obs = self.observation(obs)
         self.image = self.get_image(obs)
         return obs, reward, success, truncated, info

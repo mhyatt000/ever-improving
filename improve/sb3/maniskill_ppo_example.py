@@ -19,7 +19,8 @@ from improve.wrapper import dict_util as du
 from improve.wrapper.force_seed import ForceSeedWrapper
 from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
 from improve.wrapper.sb3.successinfo import SuccessInfoWrapper
-from improve.wrapper.simpler import (ExtraObservationWrapper,
+from improve.wrapper.simpler import (ActionSpaceWrapper,
+                                     ExtraObservationWrapper,
                                      FoundationModelWrapper)
 from improve.wrapper.simpler.misc import (DownscaleImgWrapper,
                                           FilterKeysWrapper,
@@ -103,6 +104,8 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
                 residual_scale=cfg.env.residual_scale,
                 action_mask_dims=cfg.env.action_mask_dims,
             )
+
+        env = ActionSpaceWrapper(env, dims=cfg.env.action_mask_dims)
 
         env = ExtraObservationWrapper(env)
 
