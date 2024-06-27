@@ -5,7 +5,7 @@ import os.path as osp
 
 import improve
 from pprint import pprint
-import improve.config.resolver
+import improve.hydra.resolver
 
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
 def main(cfg: OmegaConf) -> None:

@@ -15,7 +15,6 @@ from omegaconf import OmegaConf
 from omegaconf import OmegaConf as OC
 
 import improve
-import improve.config.resolver
 import improve.wrapper.dict_util as du
 
 class GoalEnvWrapper(ObservationWrapper, RewardWrapper, ActionWrapper, Wrapper):

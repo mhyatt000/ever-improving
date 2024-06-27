@@ -12,8 +12,7 @@ import gymnasium as gym
 from improve.wrapper.probe import ProbeEnv
 import hydra
 import improve
-import improve.config.prepare
-import improve.config.resolver
+import improve.hydra.resolver
 import mediapy as media
 import numpy as np
 import torch

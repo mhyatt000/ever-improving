@@ -115,17 +115,15 @@ class ActionSpaceWrapper(Wrapper):
 
         self.action_space = Box(low=low, high=high, shape=self.new, dtype=np.float32)
 
-
     def action(self, action):
         extra = np.zeros(len(self.dims))
         # must keep the same shape expected by simpler
-        action = np.concatenate([action[:self.new[0]], extra])
+        action = np.concatenate([action[: self.new[0]], extra])
         return action
 
     def step(self, action):
         action = self.action(action)
         return self.env.step(action)
-
 
 
 class FoundationModelWrapper(Wrapper):
@@ -140,7 +138,7 @@ class FoundationModelWrapper(Wrapper):
     :param residual_scale: residual policy weight
     """
 
-    def __init__( self, env, task, policy, ckpt, residual_scale=1.0):
+    def __init__(self, env, task, policy, ckpt, residual_scale=1.0):
         super().__init__(env)
 
         if policy in ["octo-base", "octo-small"]:
@@ -220,6 +218,12 @@ class FoundationModelWrapper(Wrapper):
     def step(self, action):
 
         total_action = self.model_action + (action * self.residual_scale)
+        """
+        if action[6] != 0:  # if we are using gripper actions
+            total_action[6] = self.model_action[6] * action[6]
+            print('we are using gripper actions')
+            print(total_action[6], self.model_action[6], action[6])
+        """
 
         obs, reward, success, truncated, info = self.env.step(total_action)
         # dont compute this
@@ -228,6 +232,12 @@ class FoundationModelWrapper(Wrapper):
 
         obs = self.observation(obs)
         self.image = self.get_image(obs)
+        info["agent_partial-action"] = {
+            k: v
+            for k, v in zip(
+                ["x", "y", "z", "y", "p", "r", "g"], self.unscale(self.model_action)
+            )
+        }
         return obs, reward, success, truncated, info
 
     def compute_reward(self, action, reward):

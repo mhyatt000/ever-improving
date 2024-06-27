@@ -299,10 +299,13 @@ class PPO(OnPolicyAlgorithm):
         self.logger.record("stats/actions/x", wandb.Histogram(actions[:, 0]))
         self.logger.record("stats/actions/y", wandb.Histogram(actions[:, 1]))
         self.logger.record("stats/actions/z", wandb.Histogram(actions[:, 2]))
-        self.logger.record("stats/actions/roll", wandb.Histogram(actions[:, 3]))
-        self.logger.record("stats/actions/pitch", wandb.Histogram(actions[:, 4]))
-        self.logger.record("stats/actions/yaw", wandb.Histogram(actions[:, 5]))
-        self.logger.record("stats/actions/gripper", wandb.Histogram(actions[:, 6]))
+
+        if len(actions[0]) > 3:
+            self.logger.record("stats/actions/roll", wandb.Histogram(actions[:, 3]))
+            self.logger.record("stats/actions/pitch", wandb.Histogram(actions[:, 4]))
+            self.logger.record("stats/actions/yaw", wandb.Histogram(actions[:, 5]))
+        if len(actions[0]) > 6:
+            self.logger.record("stats/actions/gripper", wandb.Histogram(actions[:, 6]))
 
         norms = np.linalg.norm(actions, axis=-1)
         self.logger.record("stats/action_norm", wandb.Histogram(norms))

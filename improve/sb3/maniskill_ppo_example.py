@@ -5,8 +5,7 @@ from pprint import pprint
 import gymnasium as gym
 import hydra
 import improve
-import improve.config.prepare
-import improve.config.resolver
+import improve.hydra.resolver
 import mani_skill2.envs
 import numpy as np
 import simpler_env as simpler
@@ -14,7 +13,7 @@ import stable_baselines3 as sb3
 import wandb
 from improve.log.wandb import WandbLogger
 from improve.sb3 import util
-from improve.sb3.custom import PPO
+from improve.sb3.custom import PPO, SAC
 from improve.wrapper import dict_util as du
 from improve.wrapper.force_seed import ForceSeedWrapper
 from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
@@ -32,7 +31,7 @@ from improve.wrapper.simpler.rescale import RTXRescaleWrapper
 from improve.wrapper.wandb.vec import WandbVecMonitor
 from mani_skill2.utils.wrappers import RecordEpisode
 from omegaconf import OmegaConf as OC
-from stable_baselines3 import A2C, SAC
+from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import (CallbackList,
                                                 CheckpointCallback,
                                                 EvalCallback)
@@ -104,7 +103,8 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
                 residual_scale=cfg.env.residual_scale,
             )
 
-        env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
+        if cfg.env.action_mask_dims:
+            env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
 
         env = ExtraObservationWrapper(env)
 
@@ -267,7 +267,6 @@ def main(cfg):
 
     if cfg.algo.name == "sac":
         del algo_kwargs["use_original_space"]
-        del algo_kwargs["warmup_zero_action"]
 
     if cfg.algo.name == "ppo":
         algo_kwargs.update(

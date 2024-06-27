@@ -56,7 +56,7 @@ def preprocess_action(action: np.ndarray) -> np.ndarray:
         "rotation_delta": action[3:6],
         "gripper": action[-1],
     }
-    action["gripper"] = preprocess_gripper(action["gripper"])
+    # action["gripper"] = preprocess_gripper(action["gripper"])
     action = _unnormalize_action_widowx_bridge(action)
     action = np.concatenate(
         [
