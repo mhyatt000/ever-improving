@@ -17,7 +17,7 @@ log_dir: ${callback.log_path}
 sweep_id: "jun27_sac_fullcontrol"
 
 train:
-  n_steps: ${r_toint:3e5} # 100k
+  n_steps: ${r_toint:1e5} # 100k
   use_zero_init: True # cant zero without foundation model
 
 algo:
@@ -29,6 +29,7 @@ algo:
   learning_rate: ${r_tofloat:3e-4}
   ent_coef: auto_0.0001
   target_entropy: -7.0 # from SAC applications
+
 
 env:
   goal:
@@ -46,8 +47,3 @@ hydra:
   sweep:
     dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.override_dirname}
-
-  mode: MULTIRUN # needed or else -m flag
-  sweeper:
-    params:
-      env.residual_scale: 1

@@ -3,7 +3,6 @@ from __future__ import annotations
 from pprint import pprint
 
 import gymnasium as gym
-import improve.wrapper.dict_util as du
 import numpy as np
 from gymnasium import logger, spaces
 from gymnasium.core import (ActionWrapper, Env, ObservationWrapper,
@@ -12,8 +11,11 @@ from gymnasium.spaces.box import Box
 from gymnasium.spaces.dict import Dict
 from gymnasium.spaces.space import Space
 from mani_skill2_real2sim.utils.sapien_utils import get_entity_by_name
+from scipy.spatial.transform import Rotation as R
 from simpler_env.utils.env.observation_utils import \
     get_image_from_maniskill2_obs_dict
+
+import improve.wrapper.dict_util as du
 
 
 class ExtraObservationWrapper(Wrapper):
@@ -150,6 +152,10 @@ class FoundationModelWrapper(Wrapper):
         self.ckpt = ckpt
         self.residual_scale = 1.0
 
+        translation = np.linalg.norm([0.05, 0.05, 0.05])
+        axis, angle = self.rpy_to_axis_angle(*[0.25, 0.25, 0.25])
+        self.max = {"translation": translation, "rotation": angle}
+
         # TODO add option for w_fm and w_rp
         # where w_fm is the weight for the foundation model
         # and w_rp is the weight for the residual policy
@@ -218,12 +224,18 @@ class FoundationModelWrapper(Wrapper):
     def step(self, action):
 
         total_action = self.model_action + (action * self.residual_scale)
-        """
-        if action[6] != 0:  # if we are using gripper actions
-            total_action[6] = self.model_action[6] * action[6]
-            print('we are using gripper actions')
-            print(total_action[6], self.model_action[6], action[6])
-        """
+        translation = np.linalg.norm(total_action[:3])
+        axis, rotation = self.rpy_to_axis_angle(*total_action[3:6])
+
+        # dont go out of bounds
+        if abs(translation) > self.max["translation"]:
+            print('OOB translation', total_action[:3])
+            total_action[:3] = total_action[:3] * (self.max["translation"] / translation)
+            print(total_action[:3])
+        if abs(rotation) > self.max["rotation"]:
+            print('OOB rotation', total_action[3:6])
+            total_action[3:6] = self.axis_angle_to_rpy(axis, self.max["rotation"])
+            print(total_action[3:6])
 
         obs, reward, success, truncated, info = self.env.step(total_action)
         # dont compute this
@@ -259,6 +271,26 @@ class FoundationModelWrapper(Wrapper):
         observation["agent_partial-action"] = self.unscale(action)
 
         return observation
+
+    @staticmethod
+    def rpy_to_axis_angle(roll, pitch, yaw):
+
+        rotation = R.from_euler("xyz", [roll, pitch, yaw], degrees=False)
+        axis_angle = rotation.as_rotvec()
+
+        # The angle is the magnitude of the rotation vector
+        angle = np.linalg.norm(axis_angle)
+
+        # The axis is the normalized rotation vector
+        # This should be [0, 0, 0] if there is no rotation
+        axis = axis_angle / angle if angle != 0 else axis_angle
+
+        return axis, angle
+
+    def axis_angle_to_rpy(self, axis, angle):
+        rotation = R.from_rotvec(axis * angle)
+        rpy = rotation.as_euler("xyz", degrees=False)
+        return rpy
 
     def maybe_advance(self):
         """advance the environment to the next subtask"""

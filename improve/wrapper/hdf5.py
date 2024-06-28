@@ -11,9 +11,8 @@ import gymnasium as gym
 import h5py
 import hydra
 import improve
-import improve.config.resolver
+import improve.hydra.resolver
 import improve.wrapper.dict_util as du
-import improve.wrapper.residualrl as rrl
 import numpy as np
 from gymnasium.core import Wrapper
 from omegaconf import OmegaConf
@@ -23,15 +22,31 @@ from tqdm import tqdm
 HOME = os.path.expanduser("~")
 DATA_DIR = os.path.join(HOME, "datasets", "simpler")
 
+"""
+    self.store(obs, reward, terminated, truncated, action, info)
+  File "/home/zero-shot/mhyatt000/ever-improving/improve/wrapper/hdf5.py", line 98, in store
+    info_group.create_dataset(key, data=np.array(value))
+  File "/home/zero-shot/miniconda3/envs/improve/lib/python3.11/site-packages/h5py/_hl/group.py", line 183, in create_dataset
+    dsid = dataset.make_new_dset(group, shape, dtype, data, name, **kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zero-shot/miniconda3/envs/improve/lib/python3.11/site-packages/h5py/_hl/dataset.py", line 86, in make_new_dset
+    tid = h5t.py_create(dtype, logical=1)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/h5t.pyx", line 1663, in h5py.h5t.py_create
+  File "h5py/h5t.pyx", line 1687, in h5py.h5t.py_create
+  File "h5py/h5t.pyx", line 1747, in h5py.h5t.py_create
+TypeError: Object dtype dtype('O') has no native HDF5 equivalent
+"""
+
 
 class HDF5LoggerWrapper(Wrapper):
 
-    def __init__(self, env, rootdir=DATA_DIR, id=None, cfg=None):
+    def __init__(self, env, task, rootdir=DATA_DIR, id=None, cfg=None):
         super(HDF5LoggerWrapper, self).__init__(env)
 
         now = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         self.rootdir = rootdir
-        self.fname = osp.join(self.rootdir, f"dataset_{now}.h5")
+        self.fname = osp.join(self.rootdir, f"dataset_{now}_{task}.h5")
         self.file = None
         self.dataset_info_group = None
         self.episode_group = None
@@ -62,55 +77,40 @@ class HDF5LoggerWrapper(Wrapper):
         self.counter = 0
         return obs, info
 
-    def store(
-        self,
-        obs,
-        reward,
-        terminated,
-        truncated,
-        action,
-        info,
-        task="widowx_put_eggplant_in_basket",
-    ):
+    def create_datasets_from_dict(self, group, data_dict):
+        for key, value in data_dict.items():
+            if isinstance(value, (dict, collections.OrderedDict)):
+                value = du.todict(value)
+                subgroup = group.create_group(key)
+                self.create_datasets_from_dict(subgroup, value)
+            else:
+                group.create_dataset(key, data=np.array(value))
+
+    def store(self, obs, reward, terminated, truncated, action, info):
+
+        assert self.task is not None, "task must be set before storing data"
 
         step = {
             "observation": self.obs,
+            # "next_observation": obs,
             "reward": reward,
             "terminated": terminated,
             "truncated": truncated,
             "action": action,
+            "info": du.todict(info),
         }
         # we want to store the observation that conditioned the action
         self.obs = obs
 
         step_dataset = self.step_group.create_group(f"step_{self.counter}")
 
-        for key, value in step.items():
-            if key == "observation" and isinstance(value, dict):
-                # Create a subgroup for the observation dictionary
-                obs_group = step_dataset.create_group(key)
-                for obs_key, obs_value in value.items():
-                    obs_group.create_dataset(obs_key, data=np.array(obs_value))
-            else:
-                step_dataset.create_dataset(key, data=np.array(value))
-
-        # Store the info dictionary as a subgroup
-        info_group = step_dataset.create_group("info")
-        for key, value in info.items():
-            if isinstance(value, collections.OrderedDict):
-                # Create a subgroup for the OrderedDict
-                od_group = info_group.create_group(key)
-                for k, s in value.items():
-                    od_group.create_dataset(k, data=np.array(s))
-            else:
-                info_group.create_dataset(key, data=np.array(value))
-
+        self.create_datasets_from_dict(step_dataset, step)
         self.counter += 1
 
         # add dataset information for that episode
         if terminated or truncated:
             episode_info = {
-                "task": task,
+                "task": self.task,
                 "n_steps": self.counter,
                 "success": reward > 0.0,
             }
@@ -130,7 +130,7 @@ class HDF5LoggerWrapper(Wrapper):
         self.file.close()
         self.env.close()
 
-    def wait_for_break():
+    def wait_for_break(self):
         desc = "press exit to break the loop"
         try:
             for _ in tqdm(range(30), desc=desc, leave=False):
@@ -145,17 +145,20 @@ class HDF5LoggerWrapper(Wrapper):
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
 def main(cfg):
 
-    env = rrl.make(cfg.env)
+    from improve.env import make_env
 
-    obs,info = env.reset()
+    env = make_env(cfg)()
+    env = HDF5LoggerWrapper(env, task=cfg.env.foundation.task)
+
+    """
+    obs, info = env.reset()
     print(info)
+    env.close()
     quit()
+    """
 
-    env = HDF5LoggerWrapper(env)
-
-    for i in tqdm(
-        range(int(1e3)), desc="collecting data... do not disturb", leave=False
-    ):
+    desc = "collecting data... do not disturb"
+    for i in tqdm(range(int(1e2)), desc=desc, leave=False):
         obs = env.reset()
         done = False
         while not done:

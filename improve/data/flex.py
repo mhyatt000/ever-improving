@@ -8,7 +8,7 @@ from pprint import pprint
 import h5py
 import hydra
 import improve
-import improve.config.resolver
+import improve.hydra.resolver
 import improve.wrapper.dict_util as du
 import numpy as np
 import torch
@@ -23,12 +23,12 @@ DATA_DIR = os.path.join(HOME, "datasets", "simpler")
 
 class HDF5Dataset(Dataset):
 
-    def __init__(self, root_dir=DATA_DIR, n_steps=1):
+    def __init__(self, names=['dataset.h5'], root_dir=DATA_DIR, n_steps=1):
         super(HDF5Dataset, self).__init__()
 
         self.root_dir = root_dir
 
-        self.fnames = [osp.join(root_dir, "dataset.h5")]
+        self.fnames = [osp.join(root_dir, n) for n in names]
         self.n_steps = n_steps
 
         # shuffle the dataset using seq length
@@ -66,8 +66,10 @@ class HDF5Dataset(Dataset):
             else:
                 return HDF5Dataset.to_tensor(data)
 
-        if isinstance(h, (int, float, bool)):
+        if isinstance(h, (int, float)):
             return torch.tensor(h)
+        if isinstance(h, (bool, np.bool_)):
+            return torch.tensor(bool(h))
         if isinstance(h, (np.ndarray, np.generic)):
             return torch.tensor(h)
         if isinstance(h, bytes):
@@ -205,12 +207,16 @@ def main():
     # n_success = 0
     # n = 0
 
+    name = 'dataset_2024-06-27_165838_google_robot_pick_horizontal_coke_can.h5'
+    names = [name]
+
     # D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
-    D = HDF5Dataset(DATA_DIR, n_steps=10)
+    D = HDF5Dataset(names, DATA_DIR, n_steps=10)
     loader = Dataloader(D, batch_size=64, num_workers=4, shuffle=True)
 
     batch = next(iter(loader))
-    print(batch['info']['will_succeed'].view(-1))
+    # print(batch['info']['will_succeed'].view(-1))
+    print(batch['info']['will_succeed'][:, 0].sum())
     print(batch['info']['will_succeed'].shape)
     quit()
 
