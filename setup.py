@@ -8,9 +8,7 @@ setup(
     author_email="mhyatt000@gmail.com",
     description="A collection of tools for RL self-improvement",
     packages=find_packages(),
-    install_requires=[
-        "simpler_env",
-    ],
+    install_requires=[ ],
     # entry_points={
     # 'console_scripts': [
     # 'your-command=yourpackage:main_function',

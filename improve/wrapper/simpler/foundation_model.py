@@ -140,7 +140,7 @@ class FoundationModelWrapper(Wrapper):
     :param residual_scale: residual policy weight
     """
 
-    def __init__(self, env, task, policy, ckpt, residual_scale=1.0):
+    def __init__(self, env, task, policy, ckpt, residual_scale=1.0, strategy="clip"):
         super().__init__(env)
 
         if policy in ["octo-base", "octo-small"]:
@@ -151,10 +151,21 @@ class FoundationModelWrapper(Wrapper):
         self.policy = policy
         self.ckpt = ckpt
         self.residual_scale = 1.0
+        self.strategy = strategy
 
         translation = np.linalg.norm([0.05, 0.05, 0.05])
         axis, angle = self.rpy_to_axis_angle(*[0.25, 0.25, 0.25])
         self.max = {"translation": translation, "rotation": angle}
+
+        self.bounds = [
+            (0.05, -0.05),
+            (0.05, -0.05),
+            (0.05, -0.05),
+            (0.25, -0.25),
+            (0.25, -0.25),
+            (0.25, -0.25),
+            (1, -1),
+        ]
 
         # TODO add option for w_fm and w_rp
         # where w_fm is the weight for the foundation model
@@ -170,6 +181,11 @@ class FoundationModelWrapper(Wrapper):
         self.observation_space["simpler-img"] = Box(
             low=0, high=255, shape=image.shape, dtype=np.uint8
         )
+
+        print(f'{type(self).__name__} initialized')
+        print(f'iniitialized {self.policy} model')
+        print(f'residual scale: {self.residual_scale}')
+        print(f'strategy: {self.strategy}')
 
     def build_model(self):
         """Builds the model."""
@@ -221,22 +237,49 @@ class FoundationModelWrapper(Wrapper):
         image = get_image_from_maniskill2_obs_dict(self.env, obs)
         return image
 
+    def compute_final_action(self, action):
+
+        # actions are added together using the rp_scale
+        # if the action is out of bounds, it is transformed to be in bounds
+        if self.strategy == "clip":
+            total_action = self.model_action + (action * self.residual_scale)
+            translation = np.linalg.norm(total_action[:3])
+            axis, rotation = self.rpy_to_axis_angle(*total_action[3:6])
+
+            # dont go out of bounds
+            if abs(translation) > self.max["translation"]:
+                print("OOB translation", total_action[:3])
+                total_action[:3] = total_action[:3] * (
+                    self.max["translation"] / translation
+                )
+                print(total_action[:3])
+            if abs(rotation) > self.max["rotation"]:
+                print("OOB rotation", total_action[3:6])
+                total_action[3:6] = self.axis_angle_to_rpy(axis, self.max["rotation"])
+                print(total_action[3:6])
+
+        # residual actions transformed to the remaining action space after FM
+        # added together without rp_scale
+        if self.strategy == "dynamic":
+            bounds = [
+                (high - a, low - a)
+                for (high, low), a in zip(self.bounds, self.model_action)
+            ]
+
+            def f(x, b):
+                return asymmetric_transform(
+                    x,
+                    low=-1,
+                    high=1,
+                    post_scaling_max=b[0],
+                    post_scaling_min=b[1],
+                )
+
+            action = np.array([f(a, b) for a, b in zip(action, bounds)])
+
     def step(self, action):
 
-        total_action = self.model_action + (action * self.residual_scale)
-        translation = np.linalg.norm(total_action[:3])
-        axis, rotation = self.rpy_to_axis_angle(*total_action[3:6])
-
-        # dont go out of bounds
-        if abs(translation) > self.max["translation"]:
-            print('OOB translation', total_action[:3])
-            total_action[:3] = total_action[:3] * (self.max["translation"] / translation)
-            print(total_action[:3])
-        if abs(rotation) > self.max["rotation"]:
-            print('OOB rotation', total_action[3:6])
-            total_action[3:6] = self.axis_angle_to_rpy(axis, self.max["rotation"])
-            print(total_action[3:6])
-
+        total_action = self.compute_final_action(action)
         obs, reward, success, truncated, info = self.env.step(total_action)
         # dont compute this
         # print('WARNING: using RPL action penalty')
@@ -395,3 +438,25 @@ def _unnormalize_rtx_for_observation(
         post_scaling_min=-1.4,
     )
     return action
+
+
+def asymmetric_transform(
+    actions: np.ndarray,
+    low: float,
+    high: float,
+    safety_margin: float = 0.0,
+    post_scaling_max: float = 1.0,
+    post_scaling_min: float = -1.0,
+) -> np.ndarray:
+    """Modified rescale function ensuring 0 maps to 0."""
+
+    # dont divide by zero
+    pos_scale = post_scaling_max / max(high, 1e-8)
+    neg_scale = post_scaling_min / min(low, -1e-8)
+
+    resc_actions = np.where(actions >= 0, actions * pos_scale, actions * neg_scale)
+    return np.clip(
+        resc_actions,
+        post_scaling_min + safety_margin,
+        post_scaling_max - safety_margin,
+    )

@@ -47,6 +47,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
                 policy=cfg.env.foundation.name,
                 ckpt=cfg.env.foundation.ckpt,
                 residual_scale=cfg.env.residual_scale,
+                strategy=cfg.env.scale_strategy,
             )
 
         if cfg.env.action_mask_dims:
@@ -71,12 +72,14 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         if cfg.env.downscale != 1:
             env = DownscaleImgWrapper(env, downscale=cfg.env.downscale)
 
+        # NOTE: replaced by ActionSpaceWrapper since it is more general
         # must be closer to simpler than rescale
         # this way it overrides the rescale
-        if cfg.env.no_quarternion:
-            env = NoRotationWrapper(env)
+        # if cfg.env.no_quarternion:
+        # env = NoRotationWrapper(env)
 
-        env = RTXRescaleWrapper(env)
+        if cfg.env.scale_strategy == 'clip':
+            env = RTXRescaleWrapper(env)
 
         if cfg.env.reach:
             env = ReachTaskWrapper(

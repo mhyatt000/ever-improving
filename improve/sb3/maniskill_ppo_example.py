@@ -31,6 +31,10 @@ from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from wandb.integration.sb3 import WandbCallback
 
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="gym")
+warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
+
 # Defines a continuous, infinite horizon, task where terminated is always False
 # unless a timelimit is reached.
 class ContinuousTaskWrapper(gym.Wrapper):
@@ -72,7 +76,6 @@ def main(cfg):
             monitor_gym=True,
             name=cfg.job.wandb.name,
             group=cfg.job.wandb.group,
-            tags=[t for t in cfg.job.wandb.tags],
             config=OC.to_container(cfg, resolve=True),
         )
         wandb.config.update({"name": run.name})
