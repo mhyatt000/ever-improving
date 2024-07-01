@@ -3,7 +3,6 @@ import random
 
 import gymnasium as gym
 import numpy as np
-import simpler_env as simpler
 from gymnasium import spaces
 from mani_skill2_real2sim.utils.sapien_utils import get_entity_by_name
 

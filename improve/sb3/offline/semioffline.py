@@ -6,21 +6,18 @@ import numpy as np
 import torch as th
 from gymnasium import spaces
 from improve.config.algo import PACCN
-from stable_baselines3.common.base_class import BaseAlgorithm
-from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
+# from stable_baselines3.common.base_class import BaseAlgorithm
+# from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.policies import ActorCriticPolicy
+# from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.type_aliases import (GymEnv, MaybeCallback,
                                                    Schedule)
 from stable_baselines3.common.utils import obs_as_tensor, safe_mean
-from stable_baselines3.common.vec_env import VecEnv
 
-SelfSemiOfflineAlgorithm = TypeVar(
-    "SelfSemiOfflineAlgorithm", bound="SemiOfflineAlgorithm"
-)
+# from stable_baselines3.common.vec_env import VecEnv
 
 
-class SemiOfflineAlgorithm(BaseAlgorithm):
+class SemiOfflineTrainer:
 
     def __init__(
         self,
@@ -31,20 +28,6 @@ class SemiOfflineAlgorithm(BaseAlgorithm):
         loggercn,  # logger config node
         env: Optional[GymEnv] = None,  # environment
     ):
-
-        super(SemiOfflineAlgorithm, self).__init__(
-            policy="MultiInputPolicy",
-            env=env,
-            verbose=algocn.verbose,
-            device=algocn.device,
-            support_multi_env=True,
-            stats_window_size=loggercn.stats_window_size,
-            learning_rate=optimcn.learning_rate,
-            tensorboard_log=loggercn.tensorboard_log,
-            seed=traincn.seed,
-            # use_sde: bool = False,
-            # sde_sample_freq: int = -1,
-        )
 
         self.algocn = algocn
         self.modelcn = modelcn
@@ -87,15 +70,17 @@ class SemiOfflineAlgorithm(BaseAlgorithm):
 
     def collect_rollouts(self):
 
+        raise NotImplementedError
+
         self.policy.set_training_mode(False)
 
         n_steps = 0
 
         # Sample new weights for the state dependent exploration
         if self.use_sde:
-            self.policy.reset_noise(env.num_envs)
+            self.policy.reset_noise(self.env.num_envs)
 
-        callback.on_rollout_start()
+        self.callback.on_rollout_start()
 
         while n_steps < n_rollout_steps:
             with th.no_grad():
@@ -106,13 +91,13 @@ class SemiOfflineAlgorithm(BaseAlgorithm):
             # Rescale and perform action
             clipped_actions = actions
             clipped_actions = self.preprocess_actions(clipped_actions)
-            new_obs, rewards, dones, infos = env.step(clipped_actions)
+            new_obs, rewards, dones, infos = self.env.step(clipped_actions)
 
-            self.num_timesteps += env.num_envs
+            self.num_timesteps += self.env.num_envs
 
             # Give access to local variables
-            callback.update_locals(locals())
-            if not callback.on_step():
+            self.callback.update_locals(locals())
+            if not self.callback.on_step():
                 return False
 
             self._update_info_buffer(infos, dones)
@@ -197,16 +182,15 @@ class SemiOfflineAlgorithm(BaseAlgorithm):
             self.logger.record(key, value)
 
     def learn(
-        self: SelfSemiOfflineAlgorithm,
+        self,
         total_timesteps: int,
         callback: MaybeCallback = None,
         log_interval: int = 1,
         tb_log_name: str = "SemiOfflineAlgorithm",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
-    ) -> SelfSemiOfflineAlgorithm:
+    ):
         iteration = 0
-
 
         """
         do n times
@@ -214,7 +198,7 @@ class SemiOfflineAlgorithm(BaseAlgorithm):
         collect more rollouts
         """
 
-        # self._setup_learn() 
+        # self._setup_learn()
         # callback.on_training_start(locals(), globals())
         # self.train()
         # callback.on_training_end()
@@ -229,16 +213,19 @@ class SemiOfflineAlgorithm(BaseAlgorithm):
         )
 
         callback.on_training_start(locals(), globals())
+        self.train()
 
-        assert self.env is not None
+        if self.env is not None:
+            while self.num_timesteps < collect_steps:
+                continue_training = self.collect_rollouts(
+                    self.env,
+                    callback,
+                    self.rollout_buffer,
+                    n_rollout_steps=self.n_steps,
+                )
 
-        while self.num_timesteps < total_timesteps:
-            continue_training = self.collect_rollouts(
-                self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps
-            )
-
-            if not continue_training:
-                break
+                if not continue_training:
+                    break
 
             iteration += 1
             self._update_current_progress_remaining(self.num_timesteps, total_timesteps)
@@ -248,11 +235,7 @@ class SemiOfflineAlgorithm(BaseAlgorithm):
                 assert self.ep_info_buffer is not None
                 self._dump_logs(iteration)
 
-            self.train()
-
         callback.on_training_end()
-
-        return self
 
     def _get_torch_save_params(self) -> Tuple[List[str], List[str]]:
         state_dicts = ["policy", "policy.optimizer"]

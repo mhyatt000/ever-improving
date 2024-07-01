@@ -2,7 +2,6 @@ import functools
 import os
 import os.path as osp
 import random
-from multiprocessing import Lock
 from pprint import pprint
 
 import h5py
@@ -16,6 +15,8 @@ from improve.wrapper.dict_util import apply_both
 from omegaconf import OmegaConf as OC
 from torch.utils.data import DataLoader as Dataloader
 from torch.utils.data import Dataset, IterableDataset
+
+from improve.util.timer import Timer, timer
 
 HOME = os.path.expanduser("~")
 DATA_DIR = os.path.join(HOME, "datasets", "simpler")
@@ -108,6 +109,10 @@ class HDF5Dataset(Dataset):
                     trajectory,
                 )
                 trajectory['info']['will_succeed'] = will_succeed.repeat(self.n_steps, 1)
+                trajectory = du.apply(trajectory, lambda x: x.float())
+
+                if self.n_steps == 1:
+                    trajectory = du.apply(trajectory, lambda x: x.squeeze(0))
                 return trajectory 
 
 
@@ -211,8 +216,16 @@ def main():
     names = [name]
 
     # D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
-    D = HDF5Dataset(names, DATA_DIR, n_steps=10)
-    loader = Dataloader(D, batch_size=64, num_workers=4, shuffle=True)
+    D = HDF5Dataset(names, DATA_DIR, n_steps=1)
+    loader = Dataloader(D, batch_size=128, num_workers=4, shuffle=True)
+
+    for batch in loader:
+        shape = batch['info']['will_succeed'].shape
+        bs = shape[0]
+        print(bs)
+        if bs != 128:
+            break
+    quit()
 
     batch = next(iter(loader))
     # print(batch['info']['will_succeed'].view(-1))

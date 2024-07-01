@@ -1,4 +1,5 @@
 import os.path as osp
+
 from improve.env import make_env
 import warnings
 from pprint import pprint
@@ -14,7 +15,7 @@ import stable_baselines3 as sb3
 import wandb
 from improve.log.wandb import WandbLogger
 from improve.sb3 import util
-from improve.sb3.custom import PPO, SAC
+from improve.sb3.custom import PPO, SAC, TQC
 from improve.wrapper import dict_util as du
 from improve.wrapper.wandb.vec import WandbVecMonitor
 from omegaconf import OmegaConf as OC
@@ -183,6 +184,7 @@ def main(cfg):
         "ppo": PPO,
         "a2c": A2C,
         "sac": SAC,
+        "tqc": TQC,
     }[cfg.algo.name]
     model = algo(
         "MultiInputPolicy",

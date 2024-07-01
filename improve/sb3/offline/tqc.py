@@ -1,44 +1,30 @@
-"""
-custom SAC implementation
-- with adjustments
-"""
-
-from typing import (Any, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar,
-                    Union)
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
+                    TypeVar, Union)
 
 import numpy as np
 import torch as th
-import wandb
 from gymnasium import spaces
 from improve.sb3.custom.chef import CHEF
+from sb3_contrib.common.utils import quantile_huber_loss
+from sb3_contrib.tqc.policies import (Actor, CnnPolicy, Critic, MlpPolicy,
+                                      MultiInputPolicy, TQCPolicy)
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.noise import ActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
-from stable_baselines3.common.policies import BasePolicy, ContinuousCritic
-from stable_baselines3.common.type_aliases import (GymEnv, MaybeCallback,
-                                                   Schedule)
+from stable_baselines3.common.policies import BasePolicy
+from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
 from stable_baselines3.common.utils import (get_parameters_by_name,
                                             polyak_update)
-from stable_baselines3.sac.policies import (Actor, CnnPolicy, MlpPolicy,
-                                            MultiInputPolicy, SACPolicy)
-from torch.nn import functional as F
 
-SelfSAC = TypeVar("SelfSAC", bound="SAC")
+SelfTQC = TypeVar("SelfTQC", bound="TQC")
 
 
-class SAC(CHEF):
+class TQC(CHEF):
     """
-    Soft Actor-Critic (SAC)
-    Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor,
-    This implementation borrows code from original implementation (https://github.com/haarnoja/sac)
-    from OpenAI Spinning Up (https://github.com/openai/spinningup), from the softlearning repo
-    (https://github.com/rail-berkeley/softlearning/)
-    and from Stable Baselines (https://github.com/hill-a/stable-baselines)
-    Paper: https://arxiv.org/abs/1801.01290
-    Introduction to SAC: https://spinningup.openai.com/en/latest/algorithms/sac.html
 
-    Note: we use double q target and not value target as discussed
-    in https://github.com/hill-a/stable-baselines/issues/270
+    Controlling Overestimation Bias with Truncated Mixture of Continuous Distributional Quantile Critics.
+    Paper: https://arxiv.org/abs/2005.04269
+    This implementation uses SB3 SAC implementation as base.
 
     :param policy: The policy model to use (MlpPolicy, CnnPolicy, ...)
     :param env: The environment to learn from (if registered in Gym, can be str)
@@ -52,9 +38,7 @@ class SAC(CHEF):
     :param gamma: the discount factor
     :param train_freq: Update the model every ``train_freq`` steps. Alternatively pass a tuple of frequency and unit
         like ``(5, "step")`` or ``(2, "episode")``.
-    :param gradient_steps: How many gradient steps to do after each rollout (see ``train_freq``)
-        Set to ``-1`` means to do as many gradient steps as steps done in the environment
-        during the rollout.
+    :param gradient_steps: How many gradient update after each step
     :param action_noise: the action noise type (None by default), this can help
         for hard exploration problem. Cf common.noise for the different action noise type.
     :param replay_buffer_class: Replay buffer class to use (for instance ``HerReplayBuffer``).
@@ -69,6 +53,7 @@ class SAC(CHEF):
     :param target_update_interval: update the target network every ``target_network_update_freq``
         gradient steps.
     :param target_entropy: target entropy when learning ``ent_coef`` (``ent_coef = 'auto'``)
+    :param top_quantiles_to_drop_per_net: Number of quantiles to drop per network
     :param use_sde: Whether to use generalized State Dependent Exploration (gSDE)
         instead of action noise exploration (default: False)
     :param sde_sample_freq: Sample a new noise matrix every n steps when using gSDE
@@ -79,8 +64,7 @@ class SAC(CHEF):
         the reported success rate, mean episode length, and mean reward over
     :param tensorboard_log: the log location for tensorboard (if None, no logging)
     :param policy_kwargs: additional arguments to be passed to the policy on creation
-    :param verbose: Verbosity level: 0 for no output, 1 for info messages (such as device or wrappers used), 2 for
-        debug messages
+    :param verbose: the verbosity level: 0 no output, 1 info, 2 debug
     :param seed: Seed for the pseudo random generators
     :param device: Device (cpu, cuda, ...) on which the code should be run.
         Setting it to auto, the code will be run on the GPU if possible.
@@ -92,17 +76,17 @@ class SAC(CHEF):
         "CnnPolicy": CnnPolicy,
         "MultiInputPolicy": MultiInputPolicy,
     }
-    policy: SACPolicy
+    policy: TQCPolicy
     actor: Actor
-    critic: ContinuousCritic
-    critic_target: ContinuousCritic
+    critic: Critic
+    critic_target: Critic
 
     def __init__(
         self,
-        policy: Union[str, Type[SACPolicy]],
+        policy: Union[str, Type[TQCPolicy]],
         env: Union[GymEnv, str],
-        learning_rate: Union[float, Schedule] = 3e-4,
-        buffer_size: int = 1_000_000,  # 1e6
+        learning_rate: Union[float, Callable] = 3e-4,
+        buffer_size: int = 1000000,  # 1e6
         learning_starts: int = 100,
         batch_size: int = 256,
         tau: float = 0.005,
@@ -116,6 +100,7 @@ class SAC(CHEF):
         ent_coef: Union[str, float] = "auto",
         target_update_interval: int = 1,
         target_entropy: Union[str, float] = "auto",
+        top_quantiles_to_drop_per_net: int = 2,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
         use_sde_at_warmup: bool = False,
@@ -141,7 +126,7 @@ class SAC(CHEF):
             gamma,
             train_freq,
             gradient_steps,
-            action_noise,
+            action_noise=action_noise,
             replay_buffer_class=replay_buffer_class,
             replay_buffer_kwargs=replay_buffer_kwargs,
             policy_kwargs=policy_kwargs,
@@ -168,6 +153,7 @@ class SAC(CHEF):
         self.ent_coef = ent_coef
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer: Optional[th.optim.Adam] = None
+        self.top_quantiles_to_drop_per_net = top_quantiles_to_drop_per_net
 
         if _init_setup_model:
             self._setup_model()
@@ -180,10 +166,11 @@ class SAC(CHEF):
         self.batch_norm_stats_target = get_parameters_by_name(
             self.critic_target, ["running_"]
         )
+
         # Target entropy is used when learning the entropy coefficient
         if self.target_entropy == "auto":
             # automatically set target entropy if needed
-            self.target_entropy = float(-np.prod(self.env.action_space.shape).astype(np.float32))  # type: ignore
+            self.target_entropy = -np.prod(self.env.action_space.shape).astype(np.float32)  # type: ignore
         else:
             # Force conversion
             # this will also throw an error for unexpected string
@@ -273,33 +260,40 @@ class SAC(CHEF):
                 next_actions, next_log_prob = self.actor.action_log_prob(
                     replay_data.next_observations
                 )
-                # Compute the next Q values: min over all critics targets
-                next_q_values = th.cat(
-                    self.critic_target(replay_data.next_observations, next_actions),
-                    dim=1,
+                # Compute and cut quantiles at the next state
+                # batch x nets x quantiles
+                next_quantiles = self.critic_target(
+                    replay_data.next_observations, next_actions
                 )
-                next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
-                # add entropy term
-                next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+
+                # Sort and drop top k quantiles to control overestimation.
+                n_target_quantiles = (
+                    self.critic.quantiles_total
+                    - self.top_quantiles_to_drop_per_net * self.critic.n_critics
+                )
+                next_quantiles, _ = th.sort(next_quantiles.reshape(batch_size, -1))
+                next_quantiles = next_quantiles[:, :n_target_quantiles]
+
                 # td error + entropy term
-
-                target_q_values = (
-                    replay_data.rewards
-                    + (1 - replay_data.dones) * self.gamma * next_q_values
+                target_quantiles = next_quantiles - ent_coef * next_log_prob.reshape(
+                    -1, 1
                 )
+                target_quantiles = (
+                    replay_data.rewards
+                    + (1 - replay_data.dones) * self.gamma * target_quantiles
+                )
+                # Make target_quantiles broadcastable to (batch_size, n_critics, n_target_quantiles).
+                target_quantiles.unsqueeze_(dim=1)
 
-            # Get current Q-values estimates for each critic network
-            # using action from the replay buffer
-            current_q_values = self.critic(
+            # Get current Quantile estimates using action from the replay buffer
+            current_quantiles = self.critic(
                 replay_data.observations, replay_data.actions
             )
-
-            # Compute critic loss
-            critic_loss = 0.5 * sum(
-                F.mse_loss(current_q, target_q_values) for current_q in current_q_values
+            # Compute critic loss, not summing over the quantile dimension as in the paper.
+            critic_loss = quantile_huber_loss(
+                current_quantiles, target_quantiles, sum_over_quantiles=False
             )
-            assert isinstance(critic_loss, th.Tensor)  # for type checker
-            critic_losses.append(critic_loss.item())  # type: ignore[union-attr]
+            critic_losses.append(critic_loss.item())
 
             # Optimize the critic
             self.critic.optimizer.zero_grad()
@@ -307,13 +301,12 @@ class SAC(CHEF):
             self.critic.optimizer.step()
 
             # Compute actor loss
-            # Alternative: actor_loss = th.mean(log_prob - qf1_pi)
-            # Min over all critic networks
-            q_values_pi = th.cat(
-                self.critic(replay_data.observations, actions_pi), dim=1
+            qf_pi = (
+                self.critic(replay_data.observations, actions_pi)
+                .mean(dim=2)
+                .mean(dim=1, keepdim=True)
             )
-            min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
-            actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
+            actor_loss = (ent_coef * log_prob - qf_pi).mean()
             actor_losses.append(actor_loss.item())
 
             # Optimize the actor
@@ -326,31 +319,10 @@ class SAC(CHEF):
                 polyak_update(
                     self.critic.parameters(), self.critic_target.parameters(), self.tau
                 )
-                # Copy running stats, see GH issue #996
+                # Copy running stats, see https://github.com/DLR-RM/stable-baselines3/issues/996
                 polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
 
         self._n_updates += gradient_steps
-
-        # custom
-        values = q_values_pi.cpu().detach().numpy()
-        self.logger.record("stats/values_mean", np.mean(values))
-        self.logger.record("stats/values_std", np.std(values))
-        self.logger.record("stats/values_hist", wandb.Histogram(values))
-
-        actions = actions_pi.cpu().detach().numpy()
-        self.logger.record("stats/actions/x", wandb.Histogram(actions[:, 0]))
-        self.logger.record("stats/actions/y", wandb.Histogram(actions[:, 1]))
-        self.logger.record("stats/actions/z", wandb.Histogram(actions[:, 2]))
-
-        if len(actions[0]) > 3:
-            self.logger.record("stats/actions/roll", wandb.Histogram(actions[:, 3]))
-            self.logger.record("stats/actions/pitch", wandb.Histogram(actions[:, 4]))
-            self.logger.record("stats/actions/yaw", wandb.Histogram(actions[:, 5]))
-        if len(actions[0]) > 6:
-            self.logger.record("stats/actions/gripper", wandb.Histogram(actions[:, 6]))
-
-        norms = np.linalg.norm(actions, axis=-1)
-        self.logger.record("stats/action_norm", wandb.Histogram(norms))
 
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         self.logger.record("train/ent_coef", np.mean(ent_coefs))
@@ -360,14 +332,14 @@ class SAC(CHEF):
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
     def learn(
-        self: SelfSAC,
+        self: SelfTQC,
         total_timesteps: int,
         callback: MaybeCallback = None,
         log_interval: int = 4,
-        tb_log_name: str = "SAC",
+        tb_log_name: str = "TQC",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
-    ) -> SelfSAC:
+    ) -> SelfTQC:
         return super().learn(
             total_timesteps=total_timesteps,
             callback=callback,
@@ -378,6 +350,7 @@ class SAC(CHEF):
         )
 
     def _excluded_save_params(self) -> List[str]:
+        # Exclude aliases
         return super()._excluded_save_params() + [
             "actor",
             "critic",

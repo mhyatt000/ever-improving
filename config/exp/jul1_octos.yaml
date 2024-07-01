@@ -1,0 +1,56 @@
+# @package _global_
+
+# help with sweepers
+# https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
+# https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
+
+defaults:
+# - /launcher: base
+  - override /algo: sac
+  - override /buffer: base # no HER for now!
+  - override /env/foundation: octo-small
+  - override /env/obs_mode: oracle
+
+  - _self_
+
+log_dir: ${callback.log_path}
+sweep_id: "jul1_octos"
+
+train:
+  n_steps: ${r_toint:3e5} # 100k
+  use_zero_init: True # cant zero without foundation model
+
+algo:
+  buffer_size: ${r_toint:1e6}
+  warmup_zero_action: True # gaussian
+  batch_size: 512
+  learning_starts: ${r_toint:1e4}
+
+  learning_rate: ${r_tofloat:3e-4}
+  ent_coef: auto_0.0001
+  target_entropy: -7.0 # from SAC applications
+
+env:
+  goal:
+    use: False
+  use_original_space: False # ppo doesnt support this rn
+
+  n_envs: 1
+  action_mask_dims: 
+    - -1
+    - -2
+    - -3
+    - -4
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+  mode: MULTIRUN # needed or else -m flag
+  sweeper:
+    params:
+      env.residual_scale: 1
+      env.foundation.task: widowx_put_eggplant_in_basket,widowx_spoon_on_towel,widowx_carrot_on_plate

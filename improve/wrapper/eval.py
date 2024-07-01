@@ -9,7 +9,7 @@ from typing import Any
 import gymnasium as gym
 import hydra
 import improve
-import improve.config.resolver
+import improve.hydra.resolver
 import improve.wrapper.dict_util as du
 import mediapy
 import numpy as np

@@ -1,3 +1,11 @@
+defaults:
+  - job: base
+  - callback: base
+  - _self_
+
+algo:
+  name: 'pac'
+
 exp:
   wandb: true
 
@@ -85,8 +93,8 @@ model_other:
 
 data:
   bs_per_gpu: 32
-  workers_per_gpu: 7
-  prefetch_factor: 2
+  workers_per_gpu: 24
+  prefetch_factor: 4
   preprocess:
     rgb_static_pad: 10
     rgb_gripper_pad: 4
