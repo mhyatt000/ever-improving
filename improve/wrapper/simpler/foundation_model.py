@@ -182,10 +182,10 @@ class FoundationModelWrapper(Wrapper):
             low=0, high=255, shape=image.shape, dtype=np.uint8
         )
 
-        print(f'{type(self).__name__} initialized')
-        print(f'iniitialized {self.policy} model')
-        print(f'residual scale: {self.residual_scale}')
-        print(f'strategy: {self.strategy}')
+        print(f"{type(self).__name__} initialized")
+        print(f"iniitialized {self.policy} model")
+        print(f"residual scale: {self.residual_scale}")
+        print(f"strategy: {self.strategy}")
 
     def build_model(self):
         """Builds the model."""
@@ -276,6 +276,7 @@ class FoundationModelWrapper(Wrapper):
                 )
 
             action = np.array([f(a, b) for a, b in zip(action, bounds)])
+            return action + self.model_action
 
     def step(self, action):
 
