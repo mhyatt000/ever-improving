@@ -1,4 +1,5 @@
 import functools
+from tqdm import tqdm
 import os
 import os.path as osp
 import random
@@ -24,7 +25,7 @@ DATA_DIR = os.path.join(HOME, "datasets", "simpler")
 
 class HDF5Dataset(Dataset):
 
-    def __init__(self, names=['dataset.h5'], root_dir=DATA_DIR, n_steps=1):
+    def __init__(self, names=["dataset.h5"], root_dir=DATA_DIR, n_steps=1):
         super(HDF5Dataset, self).__init__()
 
         self.root_dir = root_dir
@@ -36,25 +37,28 @@ class HDF5Dataset(Dataset):
         seq_len = n_steps
 
         idxs = []
-        for fname in self.fnames:
-            with h5py.File(fname, "r", libver="latest", swmr=True) as f:
-                # go through each episode (skip the first info section)
-                for episode in f["dataset_info"].keys():
-                    episode_len = f["dataset_info"][episode]["n_steps"][()]
-                    n, rem = divmod(episode_len, seq_len)
+        # for fname in self.fnames:
+        # just use concat dataset for multiple files
+        fname = self.fnames[0]
+        # added rdcc cache
+        self.f =  h5py.File(fname, "r", libver="latest", swmr=True, rdcc_nbytes=1024**2) 
+            # go through each episode (skip the first info section)
+        for episode in self.f["dataset_info"].keys():
+            episode_len = self.f["dataset_info"][episode]["n_steps"][()]
+            n, rem = divmod(episode_len, seq_len)
 
-                    # add last seq with reward to idxs
-                    if n > 0 and rem > 0:
-                        idxs.append((episode, (-seq_len, episode_len)))
+            # add last seq with reward to idxs
+            if n > 0 and rem > 0:
+                idxs.append((episode, (-seq_len, episode_len)))
 
-                    # add remaining windows to idxs
-                    offset = random.randint(0, rem)
-                    idxs += [
-                        (episode, (i, i + seq_len))
-                        for i in range(0, episode_len - rem, seq_len)
-                    ]
-                    for i in range(n):
-                        idxs.append((episode, (offset + i, offset + i + seq_len)))
+            # add remaining windows to idxs
+            offset = random.randint(0, rem)
+            idxs += [
+                (episode, (i, i + seq_len))
+                for i in range(0, episode_len - rem, seq_len)
+            ]
+            for i in range(n):
+                idxs.append((episode, (offset + i, offset + i + seq_len)))
 
         self.idxs = idxs
 
@@ -90,30 +94,37 @@ class HDF5Dataset(Dataset):
         return len(self.idxs)
 
     def __getitem__(self, idx):
-        for fname in self.fnames:
-            with h5py.File(fname, "r", libver="latest", swmr=True) as f:
-                episode, (start, end) = self.idxs[idx]
-                steps = list(f[episode]["steps"].keys())
-                steps.sort(key=lambda x: int(x.split("_")[1]))
 
-                will_succeed = HDF5Dataset.extract(f["dataset_info"][episode])['success']
+        # return { "observation": { "thing1": torch.rand(1, 10, 7), "thing2": torch.rand(1, 10, 7), }, "reward": torch.rand(1, 10), 'terminated': (torch.rand(1, 10) > 0.5).float(), "info": {"will_succeed": torch.rand(1, 10, 1)}, }
 
-                trajectory = []
-                for key in steps[start:end]:
-                    step = f[episode]["steps"][key]
-                    trajectory.append(HDF5Dataset.extract(step))
+        #  for fname in self.fnames:
+        # with h5py.File(fname, "r", libver="latest", swmr=True) as self.f:
+        episode, (start, end) = self.idxs[idx]
+        steps = list(self.f[episode]["steps"].keys())
+        steps.sort(key=lambda x: int(x.split("_")[1]))
 
-                trajectory = [du.apply(x, lambda x: x.unsqueeze(0)) for x in trajectory]
-                trajectory =  functools.reduce(
-                    lambda a, b: apply_both(a, b, lambda x, y: torch.cat([x, y])),
-                    trajectory,
-                )
-                trajectory['info']['will_succeed'] = will_succeed.repeat(self.n_steps, 1)
-                trajectory = du.apply(trajectory, lambda x: x.float())
+        will_succeed = HDF5Dataset.extract(self.f["dataset_info"][episode])[
+            "success"
+        ]
 
-                if self.n_steps == 1:
-                    trajectory = du.apply(trajectory, lambda x: x.squeeze(0))
-                return trajectory 
+        trajectory = []
+        for key in steps[start:end]:
+            step = self.f[episode]["steps"][key]
+            trajectory.append(HDF5Dataset.extract(step))
+
+        trajectory = [du.apply(x, lambda x: x.unsqueeze(0)) for x in trajectory]
+        trajectory = functools.reduce(
+            lambda a, b: apply_both(a, b, lambda x, y: torch.cat([x, y])),
+            trajectory,
+        )
+        trajectory["info"]["will_succeed"] = will_succeed.repeat(
+            self.n_steps, 1
+        )
+        trajectory = du.apply(trajectory, lambda x: x.float())
+
+        if self.n_steps == 1:
+            trajectory = du.apply(trajectory, lambda x: x.squeeze(0))
+        return trajectory
 
 
 class HDF5IterDataset(IterableDataset):
@@ -212,25 +223,20 @@ def main():
     # n_success = 0
     # n = 0
 
-    name = 'dataset_2024-06-27_165838_google_robot_pick_horizontal_coke_can.h5'
+    name = "dataset_2024-06-27_165838_google_robot_pick_horizontal_coke_can.h5"
     names = [name]
 
     # D = HDF5IterDataset(DATA_DIR, loop=False, n_steps=10)
-    D = HDF5Dataset(names, DATA_DIR, n_steps=1)
+    D = HDF5Dataset(names, DATA_DIR, n_steps=10)
     loader = Dataloader(D, batch_size=128, num_workers=4, shuffle=True)
 
-    for batch in loader:
-        shape = batch['info']['will_succeed'].shape
-        bs = shape[0]
-        print(bs)
-        if bs != 128:
-            break
+    batch = next(iter(loader))
+    print(batch["reward"].shape)
     quit()
 
-    batch = next(iter(loader))
     # print(batch['info']['will_succeed'].view(-1))
-    print(batch['info']['will_succeed'][:, 0].sum())
-    print(batch['info']['will_succeed'].shape)
+    print(batch["info"]["will_succeed"][:, 0].sum())
+    print(batch["info"]["will_succeed"].shape)
     quit()
 
     print(len(D))

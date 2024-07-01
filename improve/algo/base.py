@@ -4,7 +4,8 @@ import os.path as osp
 
 import clip
 import numpy as np
-import simpler_env as simpler
+
+# import simpler_env as simpler
 import torch
 from omegaconf import OmegaConf as OC
 from torch.utils.tensorboard import SummaryWriter
@@ -20,15 +21,16 @@ from improve.wrapper import dict_util as du
 class Algo:
     """Base Training Algorithm"""
 
-    def __init__(self, acc, model, loader, optimizer, scheduler, cfg):
+    def __init__(self, fabric, model, loader, optimizer, scheduler, cfg):
 
-        self.acc = acc
-        self.device = self.acc.device
+        self.fabric = fabric
+        self.device = self.fabric.device
         self.loader = loader
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.cfg = cfg
+        self.dir = cfg.callback.log_path
 
         self.preprocessor = PreProcess(cn=cfg.data.preprocess, device=self.device)
         self.writer = SummaryWriter(cfg.paths.save_path + "logs")
@@ -36,25 +38,26 @@ class Algo:
         self.tokenizer = clip.tokenize
         self.nstep = 0
 
+        self.state = {
+            "model": self.model,
+            "optimizer": self.optimizer,
+            "scheduler": self.scheduler,
+            "nstep": self.nstep,
+        }
+
     def log(self, d, step):
-        if not self.cfg.exp.wandb:
-            return
         """Log dictionary d to wandb"""
         d = du.apply(d, lambda x: x.cpu().detach() if x is torch.Tensor else x)
         d = du.flatten(d, delim="/")
-        wandb.log(d, step=step)
+        self.fabric.log_dict(d, step=step)
+
 
     def save(self):
-        self.acc.wait_for_everyone()
-        model = self.acc.unwrap_model(self.model)
-
-        state_dict = {k: v.cpu() for k, v in model.state_dict().items()}
-        self.acc.save(
-            {"state_dict": state_dict},
-            osp.join(improve.WEIGHTS, f"GR1_{self.step}.pth"),
-        )
+        fname = osp.join(self.dir, "checkpoint.ckpt")
+        self.fabric.save(fname, self.state)
 
     def load(self):
+        raise NotImplementedError
         path = osp.join(improve.WEIGHTS, self.cfg.paths.ckpt)
         self.model.load_state_dict(torch.load(path)["state_dict"], strict=False)
         self.model = self.acc.prepare(self.model, device_placement=[True])[0]
@@ -65,6 +68,32 @@ class Algo:
     def transform_batch(self, batch):
         return batch
 
+    def maybe_backward(self, loss):
+        if True:
+            self.fabric.backward(loss)
+            self.fabric.clip_gradients(self.model, self.optimizer, max_norm=2.0)
+
+            self.optimizer.step()
+            self.scheduler.step()
+
+        else:  # accumulate gradient ... not ready yet
+
+            raise NotImplementedError
+            # Accumulate gradient 8 batches at a time
+            acc_every = self.cfg.training.gradient_accumulation_steps
+            acc = self.nstep % acc_every != 0
+
+            with self.fabric.no_backward_sync(self.model, enabled=acc):
+                output = self.model(input)
+                loss = loss
+
+                self.fabric.backward(loss)
+
+            if not acc:
+                # Step the optimizer after accumulation phase is over
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
     def step(self, batch):
 
         self.model.train()
@@ -73,10 +102,9 @@ class Algo:
         batch = self.transform_batch(batch)
         batch = self.model(batch)
         loss = self.loss(batch)
+        self.maybe_backward(loss["total"])
 
-        self.acc.backward(loss["total"])
-        self.optimizer.step()
-        self.scheduler.step()
+        # housekeeping
         self.log({"loss": loss}, self.nstep)
 
         lr = self.optimizer.param_groups[0]["lr"]
@@ -190,8 +218,7 @@ class Algo:
 
         # self.rollout()
         for batch in tqdm(self.loader, total=len(self.loader), desc="epoch"):
-            with self.acc.accumulate(self.model):
-                self.step(batch)
+            self.step(batch)
         self.save()
 
     def run(self):

@@ -18,7 +18,7 @@ training:
   num_sequences: 1000
   ep_len: 120 # was 360
   print_steps: 100
-  lr_max: 0.0001
+  lr_max: 0.0003
   weight_decay: 0.0001
   arm_loss_ratio: 1 # 100
   num_warmup_steps: 1000
@@ -92,9 +92,9 @@ model_other:
 
 
 data:
-  bs_per_gpu: 32
-  workers_per_gpu: 24
-  prefetch_factor: 4
+  bs_per_gpu: 128
+  workers_per_gpu: 8
+  prefetch_factor: 2
   preprocess:
     rgb_static_pad: 10
     rgb_gripper_pad: 4

@@ -17,6 +17,8 @@ goal:
   cls: ${r_typeof:improve.wrapper.GoalEnvWrapper}
 
 residual_scale: 1
+scale_strategy: 'dynamic'
+
 action_mask_dims: null
 use_original_space: ${algo.use_original_space}
 # should add foundation_key: agent_partial-action ?
