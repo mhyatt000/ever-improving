@@ -17,7 +17,7 @@ log_dir: ${callback.log_path}
 sweep_id: "jul1_octos"
 
 train:
-  n_steps: ${r_toint:3e5} # 100k
+  n_steps: ${r_toint:1e6} # 1M
   use_zero_init: True # cant zero without foundation model
 
 algo:
