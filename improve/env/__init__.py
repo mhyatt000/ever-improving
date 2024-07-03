@@ -15,11 +15,12 @@ from improve.wrapper.simpler.reach_task import ReachTaskWrapper
 from improve.wrapper.simpler.rescale import RTXRescaleWrapper
 from mani_skill2.utils.wrappers import RecordEpisode
 
+from .action_rescale import ActionRescaler
 
 def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
     def _init() -> gym.Env:
         # NOTE: Import envs here so that they are registered with gym in subprocesses
-        import mani_skill2.envs
+        # import mani_skill2.envs
 
         extra = {}
 
@@ -40,18 +41,20 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
             **extra,
         )
 
-        if cfg.env.foundation.name:
-            env = FoundationModelWrapper(
-                env,
-                task=cfg.env.foundation.task,
-                policy=cfg.env.foundation.name,
-                ckpt=cfg.env.foundation.ckpt,
-                residual_scale=cfg.env.residual_scale,
-                strategy=cfg.env.scale_strategy,
-            )
+        if cfg.env.fm_loc == 'env':
 
-        if cfg.env.action_mask_dims:
-            env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
+            if cfg.env.foundation.name:
+                env = FoundationModelWrapper(
+                    env,
+                    task=cfg.env.foundation.task,
+                    policy=cfg.env.foundation.name,
+                    ckpt=cfg.env.foundation.ckpt,
+                    residual_scale=cfg.env.residual_scale,
+                    strategy=cfg.env.scale_strategy,
+                )
+
+            if cfg.env.action_mask_dims:
+                env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
 
         env = ExtraObservationWrapper(env)
 
@@ -78,8 +81,9 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # if cfg.env.no_quarternion:
         # env = NoRotationWrapper(env)
 
-        if cfg.env.scale_strategy == 'clip':
-            env = RTXRescaleWrapper(env)
+        if cfg.env.fm_loc == 'env': # otherwise rescale is done in the algo
+            if cfg.env.scale_strategy == 'clip':
+                env = RTXRescaleWrapper(env)
 
         if cfg.env.reach:
             env = ReachTaskWrapper(

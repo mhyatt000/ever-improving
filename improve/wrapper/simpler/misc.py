@@ -47,7 +47,7 @@ class FilterKeysWrapper(gym.Wrapper):
         return self.observation(obs), info
 
     def observation(self, observation):
-        observation = {k: observation[k] for k in self.keys}
+        observation = {k: observation[k] for k in observation if k in self.keys}
         return observation
 
     def step(self, action):

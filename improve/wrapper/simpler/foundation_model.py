@@ -99,7 +99,7 @@ class ExtraObservationWrapper(Wrapper):
 
 
 class ActionSpaceWrapper(Wrapper):
-    """Masks the action space.
+    """modifies the action space.
     rather than masking dimensions, this wrapper changes the visible action space
     it pads the action space with zeros to match the original action space
 
@@ -151,6 +151,8 @@ class FoundationModelWrapper(Wrapper):
         self.policy = policy
         self.ckpt = ckpt
         self.residual_scale = 1.0
+
+        assert strategy in ["dynamic", "clip", None]
         self.strategy = strategy
 
         translation = np.linalg.norm([0.05, 0.05, 0.05])
@@ -277,6 +279,10 @@ class FoundationModelWrapper(Wrapper):
 
             action = np.array([f(a, b) for a, b in zip(action, bounds)])
             return action + self.model_action
+
+        if self.strategy is None:
+            total_action = self.model_action + (action * self.residual_scale)
+            return total_action
 
     def step(self, action):
 

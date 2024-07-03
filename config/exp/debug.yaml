@@ -8,7 +8,7 @@ defaults:
 # - /launcher: base
   - override /algo: ppo
   - override /buffer: base # no HER for now!
-  - override /env/foundation: dont
+  - override /env/foundation: rtx
 
   - _self_
 
@@ -30,8 +30,6 @@ algo:
 env:
   goal: 
     use: False
-  seed:
-    force: True # only one environment starting point for now
   use_original_space: False # ppo doesnt support this rn
 
   n_envs: 1

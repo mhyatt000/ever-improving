@@ -1,23 +1,13 @@
 import os.path as osp
-
-from improve.env import make_env
 import warnings
 from pprint import pprint
 
 import gymnasium as gym
-import hydra
-import improve
-import improve.hydra.resolver
 import mani_skill2.envs
 import numpy as np
 import simpler_env as simpler
 import stable_baselines3 as sb3
 import wandb
-from improve.log.wandb import WandbLogger
-from improve.sb3 import util
-from improve.sb3.custom import PPO, SAC, TQC
-from improve.wrapper import dict_util as du
-from improve.wrapper.wandb.vec import WandbVecMonitor
 from omegaconf import OmegaConf as OC
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import (CallbackList,
@@ -30,10 +20,20 @@ from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from wandb.integration.sb3 import WandbCallback
 
+import hydra
+import improve
+import improve.hydra.resolver
+from improve.env import make_env
+from improve.log.wandb import WandbLogger
+from improve.sb3 import util
+from improve.sb3.custom import PPO, SAC, TQC
+from improve.sb3.custom.rp_sac import RP_SAC
+from improve.wrapper import dict_util as du
+from improve.wrapper.wandb.vec import WandbVecMonitor
 
-import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="gym")
 warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
+
 
 # Defines a continuous, infinite horizon, task where terminated is always False
 # unless a timelimit is reached.
@@ -60,7 +60,6 @@ parser.add_argument(
     "--model-path", type=str, help="path to sb3 model for evaluation"
 )
 """
-
 
 
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
@@ -107,7 +106,7 @@ def main(cfg):
     else:
         record_dir = osp.join(log_dir, "videos")
 
-    if cfg.env.foundation.name is None:
+    if cfg.env.foundation.name is None or cfg.env.fm_loc == "central":
         eval_env = SubprocVecEnv(
             [make_env(cfg, record_dir=record_dir) for _ in range(1)]
         )
@@ -132,7 +131,8 @@ def main(cfg):
             env.seed(cfg.job.seed)
             env.reset()
 
-    if cfg.env.foundation.name:  # using foundation model ... only one env allowed
+    # using foundation model ... only one env allowed
+    if cfg.env.foundation.name and cfg.env.fm_loc == "env":
         print(cfg.env.foundation.name)
         env = DummyVecEnv(
             [
@@ -186,7 +186,7 @@ def main(cfg):
     algo = {
         "ppo": PPO,
         "a2c": A2C,
-        "sac": SAC,
+        "sac": RP_SAC if cfg.env.fm_loc == "central" else SAC,
         "tqc": TQC,
     }[cfg.algo.name]
     model = algo(

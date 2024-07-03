@@ -571,11 +571,6 @@ class CHEF(BaseAlgorithm):
             # Select action randomly or according to policy
             actions, buffer_actions = self._sample_action(learning_starts, action_noise, env.num_envs)
 
-            if self.use_original_space:
-                # hard-coded for now
-                actions = actions + self._last_obs['agent_partial-action']
-                buffer_actions = buffer_actions + self._last_obs['agent_partial-action']
-
             # Rescale and perform action
             new_obs, rewards, dones, infos = env.step(actions)
 

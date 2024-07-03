@@ -34,3 +34,5 @@ max_episode_steps: 60
 n_envs: 16
 no_quarternion: False
 reach: False # use reach task?
+
+fm_loc: 'env'
