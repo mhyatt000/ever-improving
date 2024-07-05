@@ -24,7 +24,7 @@ algo:
   buffer_size: ${r_toint:1e6}
   warmup_zero_action: True           # gaussian
   batch_size: 64 #                   # for debug
-  learning_starts: ${r_toint:1e3}    # for debug
+  learning_starts: ${r_toint:1e4}    # for debug
 
   learning_rate: ${r_tofloat:3e-4}
   ent_coef: auto_0.0001
@@ -35,7 +35,8 @@ env:
     use: False
   use_original_space: False         # ppo doesnt support this rn
 
-  n_envs: 2
+  downscale: 1
+  n_envs: 16
   action_mask_dims: 
     - -1
     - -2

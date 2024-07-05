@@ -10,10 +10,10 @@ class FoundationModel_CN:
     task: str
 
     noact: list = default([-1, -2, -3, -4])  # no action dimensions
-    strategy: str = "dynamic"  # residual scaling strategy
+    strategy: str = None # "dynamic"  # residual scaling strategy
     residual_scale: float = 1.0  # residual scaling factor
 
-    n_envs: int = 2 # number of parallel environments
+    batch_size: int = 16 # number of parallel environments
 
     def __post_init__(self):
         self.policy = self.name

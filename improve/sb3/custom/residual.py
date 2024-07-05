@@ -10,6 +10,10 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 import numpy as np
 import torch as th
 from gymnasium import spaces
+from improve.config import FoundationModel_CN, OctoS_CN
+from improve.env import ActionRescaler
+from improve.fm import build_foundation_model
+from improve.sb3.custom import CHEF
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.buffers import DictReplayBuffer, ReplayBuffer
 from stable_baselines3.common.callbacks import BaseCallback
@@ -25,14 +29,9 @@ from stable_baselines3.common.utils import safe_mean, should_collect_more_steps
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 
-from improve.config import FoundationModel_CN, OctoS_CN
-from improve.env import ActionRescaler
-from improve.fm import build_foundation_model
-from improve.sb3.custom import CHEF
-
 
 @dataclass
-class AlgoCN:
+class Algo_CN:
     learning_rate: Union[float, Schedule]
     buffer_size: int = 1_000_000  # 1e6
     learning_starts: int = 100
@@ -68,16 +67,17 @@ class OffPolicyResidual(CHEF):
         self,
         policy: Union[str, Type[BasePolicy]],
         env: Union[GymEnv, str],
-        algocn: Union[AlgoCN, dict],  # algo config node
+        algocn: Union[Algo_CN, dict],  # algo config node
         fmcn: FoundationModel_CN = OctoS_CN(),
     ):
 
-        self.algocn = AlgoCN(**algocn) if type(algocn) == dict else algocn
+        self.algocn = Algo_CN(**algocn) if type(algocn) == dict else algocn
         super().__init__(policy, env, **asdict(self.algocn))
 
+        instructions = self.env.env_method("get_language_instruction")
+        print(f"Instructions: {instructions}")
         self.fmcn = fmcn
         self.fm = build_foundation_model(self.fmcn)
-        instructions = self.env.env_method("get_language_instruction")
         self.fm.reset(instructions)
 
         self.rescaler = ActionRescaler(
@@ -168,20 +168,30 @@ class OffPolicyResidual(CHEF):
             new_obs, rewards, dones, infos = env.step(actions)
 
             # add the partial action to the observation
-            instructions = self.env.env_method("get_language_instruction")
-            print("instructions")
-            print(instructions)
-
             image = new_obs["simpler-img"]
             # need to untranspose... not transpose again BCHW -> BHWC
             image = np.transpose(image, (0, 2, 3, 1))
 
-            print("simpler img shape", image.shape)
-            raw, self.fm_act = self.fm.step(image, instructions)
+            raw, self.fm_act = self.fm.step(image)
             self.fm_act = self.rescaler.dict2act(self.fm_act)
-            new_obs["agent_partial-action"] = self.fm_act
 
-            print(self.fm_act)
+            new_obs["agent_partial-action"] = self.fm_act
+            # need to add this retroactively since the env doesn't know about it
+            if self._vec_normalize_env is not None:
+                self._vec_normalize_env.old_obs["agent_partial-action"] = self.fm_act
+            # else: self._last_original_obs, new_obs_ = self._last_obs, new_obs
+
+            for i, done in enumerate(dones):
+                if done and infos[i].get("terminal_observation") is not None:
+                    infos[i]["terminal_observation"]["agent_partial-action"] = (
+                        self.fm_act[i]
+                    )
+                    if 'simple-img' in infos[i]["terminal_observation"]:
+                        del infos[i]["terminal_observation"]["simple-img"]
+                    infos[i]["terminal_observation"]["simpler-img"] 
+
+            self.img = new_obs["simpler-img"]
+            del new_obs["simpler-img"]
 
             self.num_timesteps += env.num_envs
             num_collected_steps += 1
@@ -202,13 +212,10 @@ class OffPolicyResidual(CHEF):
             from improve.wrapper import dict_util as du
 
             # print(f"actions: {du.apply(actions, lambda x: type(x))}")
-            print(f"new_obs: {du.apply(new_obs, lambda x: type(x))}")
-
-            print(f"new_obs: {du.apply(new_obs, lambda x: x.shape)}")
-            print(f"last_obs: {du.apply(self._last_obs, lambda x: x.shape)}")
-            print(f"buffer_actions: {buffer_actions}")
-            quit()
-
+            # print(f"new_obs: {du.apply(new_obs, lambda x: type(x))}")
+            # print(f"new_obs: {du.apply(new_obs, lambda x: x.shape)}")
+            # print(f"last_obs: {du.apply(self._last_obs, lambda x: x.shape)}")
+            # print(f"buffer_actions: {buffer_actions}")
             # Store data in replay buffer (normalized action and unnormalized observation)
             self._store_transition(replay_buffer, buffer_actions, new_obs, rewards, dones, infos)  # type: ignore[arg-type]
 
@@ -277,5 +284,8 @@ class OffPolicyResidual(CHEF):
         if reset_num_timesteps or self._last_obs is None:
             self.fm_act = np.zeros((self.env.num_envs, 7), dtype=np.float32)
             self._last_obs["agent_partial-action"] = self.fm_act
+
+            self.img = self._last_obs["simpler-img"]
+            del self._last_obs["simpler-img"]
 
         return things

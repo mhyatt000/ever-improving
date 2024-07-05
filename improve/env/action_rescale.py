@@ -13,7 +13,7 @@ class ActionRescaler:
         self.strategy = strategy
         self.residual_scale = residual_scale
 
-        assert strategy == "dynamic"  # only dynamic is debugged for central FM
+        assert strategy == None # "dynamic"  # only dynamic is debugged for central FM
 
         if strategy == "clip":
             translation = np.linalg.norm([0.05, 0.05, 0.05])
@@ -82,19 +82,21 @@ class ActionRescaler:
             action = np.array([f(a, b) for a, b in zip(action, bounds)])
             return action + model_action
 
+        if self.strategy is None:
+            return action + model_action
+
     def scale_action(self, action):
-        return self.dict2act(_scale_for_obs(self.act2dict(action)))
+        return self.dict2act(_scale_action(self.act2dict(action)))
 
     def unscale_for_obs(self, action):
         return self.dict2act(_unscale_for_obs(self.act2dict(action)))
 
     def dict2act(self, action: dict[str, np.ndarray]) -> np.ndarray:
-        print(action)
         return np.concatenate(
             [
                 action["world_vector"],
                 action["rot_axangle"],
-                np.array([action["gripper"]]),
+                action["gripper"],
             ],
             axis=-1,
         )
@@ -105,6 +107,26 @@ class ActionRescaler:
             "rot_axangle": action[:, 3:6],
             "gripper": action[:, -1],
         }
+
+
+
+def _scale_action(action: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    action["world_vector"] = _rescale_action_with_bound(
+        action["world_vector"],
+        low=1.75,
+        high=-1.75,
+        post_scaling_max=-0.05,
+        post_scaling_min=0.05,
+    )
+    action["rot_axangle"] = _rescale_action_with_bound(
+        action["rot_axangle"],
+        low=1.4,
+        high=-1.4,
+        post_scaling_max=-0.25,
+        post_scaling_min=0.25,
+    )
+    return action
+
 
 
 def _unscale_for_obs(action: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
@@ -164,3 +186,13 @@ def asymmetric_transform(
         post_scaling_min + safety_margin,
         post_scaling_max - safety_margin,
     )
+
+
+def main():
+
+    rescaler = ActionRescaler('dynamic', 1)
+
+    fm_action = np.array([0.1, -0.1, 0, 0.1, -0.1, 0, 1])
+
+if __name__ == "__main__":
+    main()

@@ -1,15 +1,17 @@
+from collections import deque
 from typing import List, Optional
 
 import jax
 import numpy as np
 from octo.model.octo_model import OctoModel
+from octo.utils.train_utils import freeze_weights, merge_params
 from simpler_env.policies.octo.octo_model import OctoInference
+from simpler_env.utils.action.action_ensemble import ActionEnsembler
 from transforms3d.euler import euler2axangle
 
 import improve
 from improve.wrapper import dict_util as du
 
-from octo.utils.train_utils import ( freeze_weights, merge_params)
 
 class BatchedOctoInference(OctoInference):
     def __init__(self, batch_size: int, **kwargs):
@@ -19,12 +21,12 @@ class BatchedOctoInference(OctoInference):
         print(type(self))
         print(f"batch_size: {batch_size}")
 
-        example_batch = du.apply(
-            self.model.example_batch, lambda x: np.concatenate([x] * batch_size)
-        )
-
-        # print(du.apply(example_batch, lambda x: x.shape))
-        # return
+        if batch_size > 1:
+            example_batch = du.apply(
+                self.model.example_batch, lambda x: np.concatenate([x] * batch_size)
+            )
+        else:
+            example_batch = self.model.example_batch
 
         new = OctoModel.from_config(
             self.model.config,
@@ -33,12 +35,23 @@ class BatchedOctoInference(OctoInference):
             verbose=True,
             # dataset_statistics=dataset.dataset_statistics,
         )
+
         merged_params = merge_params(new.params, self.model.params)
         new = new.replace(params=merged_params)
         del self.model
         self.model = new
 
+        if self.action_ensemble:
+            self.action_ensembler = BatchedActionEnsembler(
+                self.pred_action_horizon, self.action_ensemble_temp, self.batch_size
+            )
+        else:
+            self.action_ensembler = None
+
     def reset(self, descs: List[str]) -> None:
+        self.reset_all(descs)
+
+    def reset_all(self, descs: List[str]) -> None:
         if self.automatic_task_creation:
             self.task = self.model.create_tasks(texts=descs)
         else:
@@ -50,11 +63,23 @@ class BatchedOctoInference(OctoInference):
             self.action_ensembler.reset()
         self.num_image_history = 0
 
-        self.sticky_action_is_on = False
-        self.gripper_action_repeat = 0
-        self.sticky_gripper_action = 0.0
+        self.sticky_action_is_on = np.full((self.batch_size,), False)
+        self.gripper_action_repeat = np.full((self.batch_size,), 0)
+        self.sticky_gripper_action = np.full((self.batch_size,), 0.0)
+        # parent removed this ...
         # self.gripper_is_closed = False
-        self.previous_gripper_action = None
+        self.previous_gripper_action = np.full((8,), np.nan)
+
+    def _obtain_image_history_and_mask(self) -> tuple[np.ndarray, np.ndarray]:
+        ax = 1 # 0 if self.batch_size == 1 else 1
+        images = np.stack(self.image_history, axis=ax)
+        horizon = len(self.image_history)
+        # note: this should be of float type, not a bool type
+        pad_mask = np.ones(horizon, dtype=np.float64)
+        pad_mask[: horizon - min(horizon, self.num_image_history)] = 0
+        # pad_mask = np.ones(self.horizon, dtype=np.float64) # note: this should be of float type, not a bool type
+        # pad_mask[:self.horizon - self.num_image_history] = 0
+        return images, pad_mask
 
     def step(
         self, image: np.ndarray, descs: Optional[str] = None, *args, **kwargs
@@ -79,13 +104,9 @@ class BatchedOctoInference(OctoInference):
         assert image.dtype == np.uint8
         image = self._resize_image(image)
         self._add_image_to_history(image)
-        # images, pad_mask = self._obtain_image_history_and_mask()
-        images = image.reshape(image.shape[0], 1, *image.shape[1:])
-        pad_mask = np.ones((image.shape[0], 1), dtype=np.float64)
-        # images, pad_mask = images[None], pad_mask[None]
+        images, pad_mask = self._obtain_image_history_and_mask()
 
-        print(images.shape)
-        print(pad_mask.shape)
+        pad_mask = np.repeat(pad_mask[None, :], self.batch_size, axis=0)
 
         # we need use a different rng key for each model forward step; this has a large impact on model performance
         self.rng, key = jax.random.split(self.rng)  # each shape [2,]
@@ -106,18 +127,12 @@ class BatchedOctoInference(OctoInference):
             }
             norm_raw_actions = self.model.lc_ws2(input_observation)[:, :, :7]
 
-        # norm_raw_actions = norm_raw_actions[0]  # remove batch, becoming (action_pred_horizon, action_dim)
-        # assert norm_raw_actions.shape == (self.pred_action_horizon, 7)
+        assert norm_raw_actions.shape == (self.batch_size, self.pred_action_horizon, 7)
 
         if self.action_ensemble:
-            ensembled_actions = [
-                self.action_ensembler.ensemble_action(norm_raw_actions[i])[None]
-                for i in range(norm_raw_actions.shape[0])
-            ]
-            norm_raw_actions = np.concatenate(ensembled_actions, axis=0)
+            norm_raw_actions = self.action_ensembler.ensemble_action(norm_raw_actions)
 
         raw_actions = norm_raw_actions * self.action_std[None] + self.action_mean[None]
-
         raw_action = {
             "world_vector": np.array(raw_actions[:, :3]),
             "rotation_delta": np.array(raw_actions[:, 3:6]),
@@ -133,14 +148,14 @@ class BatchedOctoInference(OctoInference):
             raw_action["rotation_delta"], dtype=np.float64
         )
 
-        rot_axangles = []
+        axangles = []
         for rotation_delta in action_rotation_delta:
             roll, pitch, yaw = rotation_delta
-            action_rotation_ax, action_rotation_angle = euler2axangle(roll, pitch, yaw)
-            action_rotation_axangle = action_rotation_ax * action_rotation_angle
-            rot_axangles.append(action_rotation_axangle[None])
+            ax, angle = euler2axangle(roll, pitch, yaw)
+            axangle = ax * angle
+            axangles.append(axangle[None])
 
-        action["rot_axangle"] = np.concatenate(rot_axangles, axis=0) * self.action_scale
+        action["rot_axangle"] = np.concatenate(axangles, axis=0) * self.action_scale
 
         if self.policy_setup == "google_robot":
             current_gripper_action = raw_action["open_gripper"]
@@ -165,39 +180,67 @@ class BatchedOctoInference(OctoInference):
 
             # action['gripper'] = np.array([relative_gripper_action])
 
+            # wow. what a mess when vectorized
             # alternative implementation
-            if self.previous_gripper_action is None:
-                relative_gripper_action = np.array([0])
-            else:
-                relative_gripper_action = (
-                    self.previous_gripper_action - current_gripper_action
-                )  # google robot 1 = close; -1 = open
+            relative_gripper_action = np.where(
+                np.isnan(self.previous_gripper_action),
+                np.zeros_like(self.previous_gripper_action),
+                self.previous_gripper_action - current_gripper_action,
+            )
             self.previous_gripper_action = current_gripper_action
 
-            if (
-                np.abs(relative_gripper_action) > 0.5
-                and self.sticky_action_is_on is False
-            ):
-                self.sticky_action_is_on = True
-                self.sticky_gripper_action = relative_gripper_action
+            to_stick = np.logical_and(
+                np.abs(relative_gripper_action) > 0.5,
+                (self.sticky_action_is_on is False),
+            )
+            self.sticky_action_is_on = np.where(
+                to_stick, True, self.sticky_action_is_on
+            )
+            self.sticky_gripper_action = np.where(
+                to_stick, relative_gripper_action, self.sticky_gripper_action
+            )
 
-            if self.sticky_action_is_on:
-                self.gripper_action_repeat += 1
-                relative_gripper_action = self.sticky_gripper_action
+            self.gripper_action_repeat += self.sticky_action_is_on.astype(int)
+            relative_gripper_action = np.where(
+                self.sticky_action_is_on,
+                self.sticky_gripper_action,
+                relative_gripper_action,
+            )
 
-            if self.gripper_action_repeat == self.sticky_gripper_num_repeat:
-                self.sticky_action_is_on = False
-                self.gripper_action_repeat = 0
-                self.sticky_gripper_action = 0.0
+            reset = self.gripper_action_repeat == self.sticky_gripper_num_repeat
+            self.sticky_action_is_on = np.where(reset, False, self.sticky_action_is_on)
+            self.gripper_action_repeat = np.where(reset, 0, self.gripper_action_repeat)
+            self.sticky_gripper_action = np.where(
+                reset, 0.0, self.sticky_gripper_action
+            )
 
             action["gripper"] = relative_gripper_action
 
         elif self.policy_setup == "widowx_bridge":
-            action["gripper"] = (
-                2.0 * (raw_action["open_gripper"] > 0.5) - 1.0
-            )  # binarize gripper action to 1 (open) and -1 (close)
+            # binarize gripper action to 1 (open) and -1 (close)
+            action["gripper"] = 2.0 * (raw_action["open_gripper"] > 0.5) - 1.0
             # self.gripper_is_closed = (action['gripper'] < 0.0)
 
         action["terminate_episode"] = np.array([0.0] * self.batch_size)
 
         return raw_action, action
+
+
+class BatchedActionEnsembler(ActionEnsembler):
+    def __init__(self, pred_action_horizon, action_ensemble_temp=0.0, batch_size=1):
+        self.ensemblers = [
+            ActionEnsembler(pred_action_horizon, action_ensemble_temp)
+            for _ in range(batch_size)
+        ]
+
+    def reset(self):
+        for ensembler in self.ensemblers:
+            ensembler.reset()
+
+    def ensemble_action(self, cur_action):
+        return np.stack(
+            [
+                ensembler.ensemble_action(cur_action[i])
+                for i, ensembler in enumerate(self.ensemblers)
+            ]
+        )
