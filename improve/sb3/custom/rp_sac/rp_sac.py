@@ -10,8 +10,6 @@ import numpy as np
 import torch as th
 import wandb
 from gymnasium import spaces
-from improve.sb3.custom.chef import CHEF
-from improve.sb3.custom.residual import OffPolicyResidual
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.noise import ActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
@@ -20,9 +18,12 @@ from stable_baselines3.common.type_aliases import (GymEnv, MaybeCallback,
                                                    Schedule)
 from stable_baselines3.common.utils import (get_parameters_by_name,
                                             polyak_update)
-from stable_baselines3.sac.policies import (Actor, CnnPolicy, MlpPolicy,
-                                            MultiInputPolicy, SACPolicy)
 from torch.nn import functional as F
+
+from improve.sb3.custom.chef import CHEF
+from improve.sb3.custom.residual import OffPolicyResidual
+from improve.sb3.custom.rp_sac.policies import (Actor, CnnPolicy, MlpPolicy,
+                                                MultiInputPolicy, SACPolicy)
 
 SelfRP_SAC = TypeVar("SelfRP_SAC", bound="RP_SAC")
 
@@ -317,7 +318,13 @@ class RP_SAC(OffPolicyResidual):
             )
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
             actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
+
             actor_losses.append(actor_loss.item())
+
+            # encourage nonaction for RP
+            norms = th.linalg.vector_norm(actions_pi, dim=-1).mean()
+            noaction_loss = 10 * norms
+            actor_loss += noaction_loss
 
             # Optimize the actor
             self.actor.optimizer.zero_grad()
@@ -358,6 +365,7 @@ class RP_SAC(OffPolicyResidual):
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         self.logger.record("train/ent_coef", np.mean(ent_coefs))
         self.logger.record("train/actor_loss", np.mean(actor_losses))
+        self.logger.record("train/noaction_loss", np.mean(noaction_loss.item()))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))

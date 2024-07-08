@@ -23,7 +23,7 @@ train:
 algo:
   buffer_size: ${r_toint:1e6}
   warmup_zero_action: True           # gaussian
-  batch_size: 64 #                   # for debug
+  batch_size: 512 #                   # for debug
   learning_starts: ${r_toint:1e4}    # for debug
 
   learning_rate: ${r_tofloat:3e-4}
@@ -36,7 +36,7 @@ env:
   use_original_space: False         # ppo doesnt support this rn
 
   downscale: 1
-  n_envs: 16
+  n_envs: 8
   action_mask_dims: 
     - -1
     - -2

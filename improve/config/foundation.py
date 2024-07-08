@@ -13,7 +13,7 @@ class FoundationModel_CN:
     strategy: str = None # "dynamic"  # residual scaling strategy
     residual_scale: float = 1.0  # residual scaling factor
 
-    batch_size: int = 16 # number of parallel environments
+    batch_size: int = 8 # number of parallel environments
 
     def __post_init__(self):
         self.policy = self.name

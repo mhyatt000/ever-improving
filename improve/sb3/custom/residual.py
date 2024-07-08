@@ -10,10 +10,6 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 import numpy as np
 import torch as th
 from gymnasium import spaces
-from improve.config import FoundationModel_CN, OctoS_CN
-from improve.env import ActionRescaler
-from improve.fm import build_foundation_model
-from improve.sb3.custom import CHEF
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.buffers import DictReplayBuffer, ReplayBuffer
 from stable_baselines3.common.callbacks import BaseCallback
@@ -28,6 +24,11 @@ from stable_baselines3.common.type_aliases import (GymEnv, MaybeCallback,
 from stable_baselines3.common.utils import safe_mean, should_collect_more_steps
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
+
+from improve.config import FoundationModel_CN, OctoS_CN
+from improve.env import ActionRescaler
+from improve.fm import build_foundation_model
+from improve.sb3.custom import CHEF
 
 
 @dataclass
@@ -72,6 +73,9 @@ class OffPolicyResidual(CHEF):
     ):
 
         self.algocn = Algo_CN(**algocn) if type(algocn) == dict else algocn
+        for k, v in asdict(self.algocn).items():
+            setattr(self, k, v)
+
         super().__init__(policy, env, **asdict(self.algocn))
 
         instructions = self.env.env_method("get_language_instruction")
@@ -96,6 +100,48 @@ class OffPolicyResidual(CHEF):
         self.action_space = spaces.Box(
             low=-1, high=1, shape=(act_shape,), dtype=np.float32
         )
+
+    def _setup_model(self) -> None:
+        self._setup_lr_schedule()
+        self.set_random_seed(self.seed)
+
+        if self.replay_buffer_class is None:
+            if isinstance(self.observation_space, spaces.Dict):
+                self.replay_buffer_class = DictReplayBuffer
+            else:
+                self.replay_buffer_class = ReplayBuffer
+
+        if self.replay_buffer is None:
+            # Make a local copy as we should not pickle
+            # the environment when using HerReplayBuffer
+            replay_buffer_kwargs = self.replay_buffer_kwargs.copy()
+            if issubclass(self.replay_buffer_class, HerReplayBuffer):
+                assert (
+                    self.env is not None
+                ), "You must pass an environment when using `HerReplayBuffer`"
+                replay_buffer_kwargs["env"] = self.env
+            self.replay_buffer = self.replay_buffer_class(
+                self.buffer_size,
+                self.observation_space,
+                self.action_space,
+                device=self.device,
+                n_envs=self.n_envs,
+                optimize_memory_usage=self.optimize_memory_usage,
+                **replay_buffer_kwargs,
+            )
+
+        self.policy = self.policy_class(
+            self.observation_space,
+            self.action_space,
+            self.lr_schedule,
+            self.fm,
+            self.rescaler,
+            **self.policy_kwargs,
+        )
+        self.policy = self.policy.to(self.device)
+
+        # Convert train freq parameter to TrainFreq object
+        self._convert_train_freq()
 
     def collect_rollouts(
         self,
@@ -186,9 +232,9 @@ class OffPolicyResidual(CHEF):
                     infos[i]["terminal_observation"]["agent_partial-action"] = (
                         self.fm_act[i]
                     )
-                    if 'simple-img' in infos[i]["terminal_observation"]:
+                    if "simple-img" in infos[i]["terminal_observation"]:
                         del infos[i]["terminal_observation"]["simple-img"]
-                    infos[i]["terminal_observation"]["simpler-img"] 
+                    infos[i]["terminal_observation"]["simpler-img"]
 
             self.img = new_obs["simpler-img"]
             del new_obs["simpler-img"]

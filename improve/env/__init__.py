@@ -103,7 +103,8 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # env = ContinuousTaskWrapper(env)
 
         if record_dir is not None:
-            env = RecordEpisode(env, record_dir, info_on_video=True)
+            print(f'TODO RECORD: {record_dir}')
+            # env = RecordEpisode(env, record_dir, info_on_video=True)
 
         return env
 
