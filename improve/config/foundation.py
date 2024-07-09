@@ -1,6 +1,14 @@
 from dataclasses import dataclass
+from enum import Enum
+from typing import Optional, Union
 
 from improve.util.config import default
+
+
+class Strategy(Enum):
+    CLIP = "clip"
+    DYNAMIC = "dynamic"
+    NONE = None
 
 
 @dataclass
@@ -10,10 +18,10 @@ class FoundationModel_CN:
     task: str
 
     noact: list = default([-1, -2, -3, -4])  # no action dimensions
-    strategy: str = None # "dynamic"  # residual scaling strategy
+    strategy: Strategy = "clip" # residual scaling strategy
     residual_scale: float = 1.0  # residual scaling factor
 
-    batch_size: int = 8 # number of parallel environments
+    batch_size: int = 8  # number of parallel environments
 
     def __post_init__(self):
         self.policy = self.name

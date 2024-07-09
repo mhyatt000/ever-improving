@@ -39,6 +39,21 @@ def concat(arr):
 
     return merge(arr, _concat_helper)
 
+def stack(arr):
+    """Stack a list of Dicts on 0 dim."""
+
+    def _stack_helper(x, y):
+        assert isinstance(x, np.ndarray) and isinstance(y, np.ndarray)
+
+        if len(x.shape) == len(y.shape):
+            return np.stack([x, y])
+        if len(x.shape) > len(y.shape):
+            return np.concatenate([x, [y]])
+        if len(x.shape) < len(y.shape):
+            return np.concatenate([[x], y])
+
+    return merge(arr, _stack_helper)
+
 
 def merge(arr, func):
     """Merge a list of Dicts using func
@@ -55,9 +70,9 @@ def apply(d, func):
 
     if isinstance(d, Dict):
         return Dict({k: apply(v, func) for k, v in d.spaces.items()})
-    elif isinstance(d, dict):
+    elif isinstance(d, (OrderedDict, dict)):
         return {k: apply(v, func) for k, v in d.items()}
-    elif isinstance(d, list):
+    elif isinstance(d, (tuple, list)):
         return [apply(item, func) for item in d]
     else:
         return func(d)

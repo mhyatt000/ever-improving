@@ -13,11 +13,9 @@ class ActionRescaler:
         self.strategy = strategy
         self.residual_scale = residual_scale
 
-        assert strategy == None # "dynamic"  # only dynamic is debugged for central FM
-
         if strategy == "clip":
             translation = np.linalg.norm([0.05, 0.05, 0.05])
-            axis, angle = self.rpy_to_axis_angle(*[0.25, 0.25, 0.25])
+            axis, angle = rpy_to_axis_angle(*[0.25, 0.25, 0.25])
             self.max = {"translation": translation, "rotation": angle}
 
         if strategy == "dynamic":
@@ -45,21 +43,25 @@ class ActionRescaler:
         # actions are added together using the rp_scale
         # if the action is out of bounds, it is transformed to be in bounds
         if self.strategy == "clip":
-            total_action = model_action + (action * self.residual_scale)
-            translation = np.linalg.norm(total_action[:3])
-            axis, rotation = self.rpy_to_axis_angle(*total_action[3:6])
+            action = self.scale_action(action)  # to RTX space
 
-            # dont go out of bounds
-            if abs(translation) > self.max["translation"]:
-                print("OOB translation", total_action[:3])
-                total_action[:3] = total_action[:3] * (
-                    self.max["translation"] / translation
-                )
-                print(total_action[:3])
-            if abs(rotation) > self.max["rotation"]:
-                print("OOB rotation", total_action[3:6])
-                total_action[3:6] = self.axis_angle_to_rpy(axis, self.max["rotation"])
-                print(total_action[3:6])
+            total_action = model_action + (action * self.residual_scale)
+
+            # vectorized now
+            translation = np.linalg.norm(total_action[:, :3], axis=-1)
+            results = np.array([rpy_to_axis_angle(*a[3:6]) for a in total_action])
+            axis, rotation = zip(*results)
+
+            for i in range(len(total_action)):
+                if abs(translation[i]) > self.max["translation"]:
+                    total_action[i, :3] = total_action[i, :3] * (
+                        self.max["translation"] / translation[i]
+                    )
+
+                if abs(rotation[i]) > self.max["rotation"]:
+                    total_action[i, 3:6] = axis_angle_to_rpy(
+                        axis[i], self.max["rotation"]
+                    )
 
             return total_action
 
@@ -83,6 +85,7 @@ class ActionRescaler:
             return action + model_action
 
         if self.strategy is None:
+            action = self.scale_action(action)  # to RTX space
             return action + model_action
 
     def scale_action(self, action):
@@ -102,31 +105,37 @@ class ActionRescaler:
         )
 
     def act2dict(self, action: np.ndarray) -> dict[str, np.ndarray]:
-        return {
-            "world_vector": action[:, :3],
-            "rot_axangle": action[:, 3:6],
-            "gripper": action[:, -1],
-        }
-
+        try:
+            return {
+                "world_vector": action[:, :3],
+                "rot_axangle": action[:, 3:6],
+                "gripper": np.expand_dims(action[:, -1], axis=-1),
+            }
+        except:
+            return {
+                "world_vector": action[:, :3],
+                "rot_axangle": action[:, 3:6],
+                "gripper": action[:, -1],
+            }
 
 
 def _scale_action(action: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     action["world_vector"] = _rescale_action_with_bound(
         action["world_vector"],
-        low=1.75,
-        high=-1.75,
-        post_scaling_max=-0.05,
-        post_scaling_min=0.05,
+        low=-1.75,
+        high=1.75,
+        post_scaling_min=-0.05,
+        post_scaling_max=0.05,
     )
+
     action["rot_axangle"] = _rescale_action_with_bound(
         action["rot_axangle"],
-        low=1.4,
-        high=-1.4,
-        post_scaling_max=-0.25,
-        post_scaling_min=0.25,
+        low=-1.4,
+        high=1.4,
+        post_scaling_min=-0.25,
+        post_scaling_max=0.25,
     )
     return action
-
 
 
 def _unscale_for_obs(action: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
@@ -134,15 +143,15 @@ def _unscale_for_obs(action: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         action["world_vector"],
         low=-0.05,
         high=0.05,
-        post_scaling_max=1.75,
         post_scaling_min=-1.75,
+        post_scaling_max=1.75,
     )
     action["rot_axangle"] = _rescale_action_with_bound(
         action["rot_axangle"],
         low=-0.25,
         high=0.25,
-        post_scaling_max=1.4,
         post_scaling_min=-1.4,
+        post_scaling_max=1.4,
     )
     return action
 
@@ -159,11 +168,15 @@ def _rescale_action_with_bound(
     resc_actions = (actions - low) / (high - low) * (
         post_scaling_max - post_scaling_min
     ) + post_scaling_min
+
+    """ do not use this 
+    """
     return np.clip(
         resc_actions,
         post_scaling_min + safety_margin,
         post_scaling_max - safety_margin,
     )
+    return resc_actions
 
 
 def asymmetric_transform(
@@ -188,11 +201,36 @@ def asymmetric_transform(
     )
 
 
+def rpy_to_axis_angle(roll, pitch, yaw):
+
+    rotation = R.from_euler("xyz", [roll, pitch, yaw], degrees=False)
+    axis_angle = rotation.as_rotvec()
+
+    # The angle is the magnitude of the rotation vector
+    angle = np.linalg.norm(axis_angle)
+
+    # The axis is the normalized rotation vector
+    # This should be [0, 0, 0] if there is no rotation
+    axis = axis_angle / angle if angle != 0 else axis_angle
+
+    return axis, angle
+
+
+def axis_angle_to_rpy(axis, angle):
+    rotation = R.from_rotvec(axis * angle)
+    rpy = rotation.as_euler("xyz", degrees=False)
+    return rpy
+
+
 def main():
 
-    rescaler = ActionRescaler('dynamic', 1)
+    rescaler = ActionRescaler("dynamic", 1)
 
-    fm_action = np.array([0.1, -0.1, 0, 0.1, -0.1, 0, 1])
+    fm_action = np.array([[0.1, -0.1, 0, 0.1, -0.1, 0, 1]])
+    fm_action = np.zeros((1, 7))
+
+    print(rescaler.scale_action(fm_action))
+
 
 if __name__ == "__main__":
     main()

@@ -17,7 +17,7 @@ goal:
   cls: ${r_typeof:improve.wrapper.GoalEnvWrapper}
 
 residual_scale: 1
-scale_strategy: 'dynamic'
+scale_strategy: 'clip'
 
 action_mask_dims: null
 use_original_space: ${algo.use_original_space}

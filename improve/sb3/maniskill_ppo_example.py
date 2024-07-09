@@ -16,7 +16,7 @@ from stable_baselines3.common.callbacks import (CallbackList,
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
-                                              VecMonitor)
+                                              VecMonitor, VecVideoRecorder)
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from wandb.integration.sb3 import WandbCallback
 
@@ -28,6 +28,7 @@ from improve.log.wandb import WandbLogger
 from improve.sb3 import util
 from improve.sb3.custom import PPO, RP_SAC, SAC, TQC
 from improve.wrapper import dict_util as du
+from improve.wrapper.wandb.record import VecRecord
 from improve.wrapper.wandb.vec import WandbVecMonitor
 
 warnings.filterwarnings("ignore", category=UserWarning, module="gym")
@@ -81,7 +82,20 @@ def make_envs(
         eval_env.seed(cfg.job.seed)
         eval_env.reset()
 
-        return eval_env, eval_env
+        return (
+            VecRecord(
+                eval_env,
+                osp.join(log_dir, "train"),
+                use_wandb=False,
+            ),
+            VecRecord(
+                eval_env,
+                osp.join(log_dir, "eval"),
+                use_wandb=True,
+            ),
+        )
+
+        # return eval_env, VecVideoRecorder(eval_env, record_dir, record_video_trigger=lambda x: True)
 
         if eval_only:
             env = eval_env
@@ -223,7 +237,7 @@ def main(cfg):
     if cfg.job.wandb.use:
         model.set_logger(logger)
 
-    n_eval = 1 if (cfg.env.seed.force and cfg.env.seed.seeds is None) else 10
+    n_eval = 10
 
     if eval_only:
         model_path = cfg.job.name
@@ -252,10 +266,10 @@ def main(cfg):
             callback_after_eval=post_eval,
             best_model_save_path=log_dir,
             log_path=log_dir,
-            eval_freq=2 * rollout_steps // num_envs,
+            eval_freq=rollout_steps // num_envs,
             deterministic=True,
             render=True,
-            n_eval_episodes=n_eval,
+            n_eval_episodes=max(num_envs, 5),
         )
 
         checkpoint_callback = CheckpointCallback(
