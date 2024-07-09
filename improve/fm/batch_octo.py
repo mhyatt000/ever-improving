@@ -14,12 +14,14 @@ from transforms3d.euler import euler2axangle
 import improve
 from improve.wrapper import dict_util as du
 
+"""
 # create a 1D mesh with a single axis named "batch"
 mesh = Mesh(jax.devices(), axis_names="batch")
 # Our batches will be data-parallel sharded -- each device will get a slice of the batch
 dp_sharding = NamedSharding(mesh, PartitionSpec("batch"))
 # Our model will be replicated across devices (we are only doing data parallelism, not model parallelism)
 replicated_sharding = NamedSharding(mesh, PartitionSpec())
+"""
 
 
 class BatchedOctoInference(OctoInference):
@@ -57,12 +59,15 @@ class BatchedOctoInference(OctoInference):
         else:
             self.action_ensembler = None
 
+        """
         self.fwd = jax.jit(
             fun=self._fwd,
             in_shardings=[replicated_sharding, dp_sharding],
             out_shardings=(replicated_sharding, replicated_sharding),
             donate_argnums=0,
         )
+        """
+        self.fwd = self._fwd
 
     def reset(self, descs: List[str]) -> None:
         self.reset_all(descs)
