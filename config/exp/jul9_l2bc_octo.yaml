@@ -9,7 +9,7 @@ defaults:
   - override /algo: sac
   - override /buffer: base # no HER for now!
   - override /env/foundation: octo-small
-  - override /env/obs_mode: oracle
+  - override /env/obs_mode: oracle-central
 
   - _self_
 
@@ -36,6 +36,7 @@ env:
 
   fm_loc: 'central'
 
+  downscale: 1
   n_envs: 8
   action_mask_dims: 
     - -1

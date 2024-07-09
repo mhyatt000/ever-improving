@@ -93,7 +93,31 @@ class BatchedOctoInference(OctoInference):
     @partial(
         jax.jit,
         in_shardings=[replicated_sharding, dp_sharding],
+        out_shardings=(replicated_sharding, replicated_sharding),
+        donate_argnums=0,
     )
+    def _fwd(self, model, images, pad_mask, task, automatic_task_creation, rng, key):
+        """ only for DDP speedup"""
+
+        if automatic_task_creation:
+            input_observation = {"image_primary": images, "pad_mask": pad_mask}
+            norm_raw_actions = model.sample_actions(
+                input_observation, task, rng=key
+            )
+
+        else:
+            input_observation = {"image_primary": images, "timestep_pad_mask": pad_mask}
+            input_observation = {
+                "observations": input_observation,
+                "tasks": {"language_instruction": task},
+                "rng": np.concatenate([rng, key]),
+            }
+            norm_raw_actions = model.lc_ws2(input_observation)[:, :, :7]
+
+        return norm_raw_actions
+
+
+
     def step(
         self, image: np.ndarray, descs: Optional[str] = None, *args, **kwargs
     ) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
@@ -125,20 +149,15 @@ class BatchedOctoInference(OctoInference):
         self.rng, key = jax.random.split(self.rng)  # each shape [2,]
         # print("octo local rng", self.rng, key)
 
-        if self.automatic_task_creation:
-            input_observation = {"image_primary": images, "pad_mask": pad_mask}
-            norm_raw_actions = self.model.sample_actions(
-                input_observation, self.task, rng=key
-            )
-
-        else:
-            input_observation = {"image_primary": images, "timestep_pad_mask": pad_mask}
-            input_observation = {
-                "observations": input_observation,
-                "tasks": {"language_instruction": self.task},
-                "rng": np.concatenate([self.rng, key]),
-            }
-            norm_raw_actions = self.model.lc_ws2(input_observation)[:, :, :7]
+        norm_raw_actions = self._fwd(
+            self.model,
+            images,
+            pad_mask,
+            self.task,
+            self.automatic_task_creation,
+            self.rng,
+            key,
+        )
 
         assert norm_raw_actions.shape == (self.batch_size, self.pred_action_horizon, 7)
 
