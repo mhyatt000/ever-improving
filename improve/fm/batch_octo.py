@@ -90,8 +90,7 @@ class BatchedOctoInference(OctoInference):
         # pad_mask[:self.horizon - self.num_image_history] = 0
         return images, pad_mask
 
-    @partial(
-        jax.jit,
+    @jax.jit(
         in_shardings=[replicated_sharding, dp_sharding],
         out_shardings=(replicated_sharding, replicated_sharding),
         donate_argnums=0,
