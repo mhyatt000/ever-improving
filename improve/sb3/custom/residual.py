@@ -1,4 +1,5 @@
 import io
+import copy
 import pathlib
 import sys
 import time
@@ -88,6 +89,7 @@ class OffPolicyResidual(CHEF):
             strategy=self.fmcn.strategy, residual_scale=self.fmcn.residual_scale
         )
 
+        self.observation_space = copy.deepcopy(self.observation_space)
         self.observation_space["agent_partial-action"] = spaces.Box(
             low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
         )

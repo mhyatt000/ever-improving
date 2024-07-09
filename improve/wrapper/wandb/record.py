@@ -140,7 +140,7 @@ class VecRecord(VecEnvWrapper):
         """
 
         info = None
-        return obs, info
+        return obs
 
     def step_async(self, actions: np.ndarray):
         # episodes[-1].append(actions)
@@ -487,7 +487,10 @@ def main(cfg):
 
     env = VecRecord(env, output_dir=".", use_wandb=False)
     env.seed(cfg.job.seed)
-    env.reset()
+    things = env.reset()
+
+    print(type(things[0]), type(things[1]))
+    quit()
 
     for _ in range(1000):
         actions = np.array([env.action_space.sample() for _ in range(num_envs)])

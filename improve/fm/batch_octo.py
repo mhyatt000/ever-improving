@@ -1,8 +1,10 @@
 from collections import deque
+from functools import partial
 from typing import List, Optional
 
 import jax
 import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec
 from octo.model.octo_model import OctoModel
 from octo.utils.train_utils import freeze_weights, merge_params
 from simpler_env.policies.octo.octo_model import OctoInference
@@ -11,6 +13,13 @@ from transforms3d.euler import euler2axangle
 
 import improve
 from improve.wrapper import dict_util as du
+
+# create a 1D mesh with a single axis named "batch"
+mesh = Mesh(jax.devices(), axis_names="batch")
+# Our batches will be data-parallel sharded -- each device will get a slice of the batch
+dp_sharding = NamedSharding(mesh, PartitionSpec("batch"))
+# Our model will be replicated across devices (we are only doing data parallelism, not model parallelism)
+replicated_sharding = NamedSharding(mesh, PartitionSpec())
 
 
 class BatchedOctoInference(OctoInference):
@@ -71,7 +80,7 @@ class BatchedOctoInference(OctoInference):
         self.previous_gripper_action = np.full((8,), np.nan)
 
     def _obtain_image_history_and_mask(self) -> tuple[np.ndarray, np.ndarray]:
-        ax = 1 # 0 if self.batch_size == 1 else 1
+        ax = 1  # 0 if self.batch_size == 1 else 1
         images = np.stack(self.image_history, axis=ax)
         horizon = len(self.image_history)
         # note: this should be of float type, not a bool type
@@ -81,6 +90,10 @@ class BatchedOctoInference(OctoInference):
         # pad_mask[:self.horizon - self.num_image_history] = 0
         return images, pad_mask
 
+    @partial(
+        jax.jit,
+        in_shardings=[replicated_sharding, dp_sharding],
+    )
     def step(
         self, image: np.ndarray, descs: Optional[str] = None, *args, **kwargs
     ) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
