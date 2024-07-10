@@ -83,11 +83,9 @@ def make_envs(
         eval_env.reset()
 
         return (
-            VecRecord(
-                eval_env,
-                osp.join(log_dir, "train"),
-                use_wandb=False,
-            ),
+            # big slow down
+            # VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=False,),
+            eval_env,
             VecRecord(
                 eval_env,
                 osp.join(log_dir, "eval"),
@@ -199,6 +197,7 @@ def main(cfg):
     del algo_kwargs["name"]
     del algo_kwargs["policy_kwargs"]
 
+    # NOTE is this needed? already added in cn.Algo
     policy_kwargs.update(
         {"optimizer_kwargs": {"betas": (0.999, 0.999), "weight_decay": 1e-4}}
     )
@@ -223,14 +222,22 @@ def main(cfg):
         "ppo": PPO,
         "a2c": A2C,
         "sac": RP_SAC if cfg.env.fm_loc == "central" else SAC,
+        "rp_sac": RP_SAC,
         "tqc": TQC,
     }[cfg.algo.name]
-    model = algo(
-        "MultiInputPolicy",
-        env,
-        **algo_kwargs,
-        policy_kwargs=policy_kwargs,
-    )
+
+    from improve import cn
+
+    if cfg.algo.name == 'rp_sac':
+        algo_kwargs = OC.to_container(cfg.algo, resolve=True)
+        model = algo( "MultiInputPolicy", env, cn.RP_SAC(**algo_kwargs)) # TODO add fmcn
+    else:
+        model = algo(
+            "MultiInputPolicy",
+            env,
+            **algo_kwargs,
+            policy_kwargs=policy_kwargs,
+        )
 
     print(model.policy)
 

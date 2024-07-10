@@ -1,5 +1,0 @@
-# by default use no kwargs for buffer
-name: null
-cls: null
-args: null
-size: ${r_toint:1e3}

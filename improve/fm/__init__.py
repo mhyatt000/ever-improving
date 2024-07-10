@@ -1,8 +1,8 @@
-from improve.config import FoundationModel_CN, OctoS_CN
+from improve import cn
 from improve.fm.batch_octo import BatchedOctoInference
 
 
-def build_foundation_model(fmcn: FoundationModel_CN):
+def build_foundation_model(fmcn: cn.FoundationModel):
     """Builds the model."""
 
     # build policy
@@ -37,7 +37,7 @@ def build_foundation_model(fmcn: FoundationModel_CN):
 def main():
     batch_size = 1
     model = build_foundation_model(
-        OctoS_CN(
+        cn.OctoS(
             batch_size=batch_size,
         )
     )

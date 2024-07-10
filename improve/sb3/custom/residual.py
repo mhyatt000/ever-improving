@@ -1,5 +1,5 @@
-import io
 import copy
+import io
 import pathlib
 import sys
 import time
@@ -26,41 +26,10 @@ from stable_baselines3.common.utils import safe_mean, should_collect_more_steps
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 
-from improve.config import FoundationModel_CN, OctoS_CN
+from improve import cn
 from improve.env import ActionRescaler
 from improve.fm import build_foundation_model
 from improve.sb3.custom import CHEF
-
-
-@dataclass
-class Algo_CN:
-    learning_rate: Union[float, Schedule]
-    buffer_size: int = 1_000_000  # 1e6
-    learning_starts: int = 100
-    batch_size: int = 256
-    tau: float = 0.005
-    gamma: float = 0.99
-    train_freq: Union[int, Tuple[int, str]] = (1, "step")
-    gradient_steps: int = 1
-    action_noise: Optional[ActionNoise] = None
-    replay_buffer_class: Optional[Type[ReplayBuffer]] = None
-    replay_buffer_kwargs: Optional[Dict[str, Any]] = None
-    optimize_memory_usage: bool = False
-    policy_kwargs: Optional[Dict[str, Any]] = None
-    stats_window_size: int = 100
-    tensorboard_log: Optional[str] = None
-    verbose: int = 0
-    device: Union[th.device, str] = "auto"
-    support_multi_env: bool = False
-    monitor_wrapper: bool = True
-    seed: Optional[int] = None
-    use_sde: bool = False
-    sde_sample_freq: int = -1
-    use_sde_at_warmup: bool = False
-    sde_support: bool = True
-    supported_action_spaces: Optional[Tuple[Type[spaces.Space], ...]] = None
-    use_original_space: bool = True
-    warmup_zero_action: bool = True
 
 
 class OffPolicyResidual(CHEF):
@@ -69,15 +38,49 @@ class OffPolicyResidual(CHEF):
         self,
         policy: Union[str, Type[BasePolicy]],
         env: Union[GymEnv, str],
-        algocn: Union[Algo_CN, dict],  # algo config node
-        fmcn: FoundationModel_CN = OctoS_CN(),
+        algocn: cn.Algo,  # algo config node
+        fmcn: cn.FoundationModel = cn.OctoS(),  # foundation model config node
     ):
 
-        self.algocn = Algo_CN(**algocn) if type(algocn) == dict else algocn
+        self.algocn = algocn
         for k, v in asdict(self.algocn).items():
             setattr(self, k, v)
 
-        super().__init__(policy, env, **asdict(self.algocn))
+        kwargs = deepcopy(asdict(self.algocn))
+        kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k
+            in [
+                "buffer_size",
+                "learning_starts",
+                "batch_size",
+                "tau",
+                "gamma",
+                "train_freq",
+                "gradient_steps",
+                "action_noise",
+                "replay_buffer_class",
+                "replay_buffer_kwargs",
+                "optimize_memory_usage",
+                "policy_kwargs",
+                "stats_window_size",
+                "tensorboard_log",
+                "verbose",
+                "device",
+                "support_multi_env",
+                "monitor_wrapper",
+                "seed",
+                "use_sde",
+                "sde_sample_freq",
+                "use_sde_at_warmup",
+                "sde_support",
+                "supported_action_spaces",
+                "use_original_space",
+                "warmup_zero_action",
+            ]
+        }
+        super().__init__(policy, env, self.algocn.learning_rate, **kwargs)
 
         instructions = self.env.env_method("get_language_instruction")
         print(f"Instructions: {instructions}")

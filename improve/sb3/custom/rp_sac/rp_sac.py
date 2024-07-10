@@ -20,6 +20,7 @@ from stable_baselines3.common.utils import (get_parameters_by_name,
                                             polyak_update)
 from torch.nn import functional as F
 
+from improve import cn
 from improve.sb3.custom.chef import CHEF
 from improve.sb3.custom.residual import OffPolicyResidual
 from improve.sb3.custom.rp_sac.policies import (Actor, CnnPolicy, MlpPolicy,
@@ -57,78 +58,16 @@ class RP_SAC(OffPolicyResidual):
         self,
         policy: Union[str, Type[SACPolicy]],
         env: Union[GymEnv, str],
-        learning_rate: Union[float, Schedule] = 3e-4,
-        buffer_size: int = 1_000_000,  # 1e6
-        learning_starts: int = 100,
-        batch_size: int = 256,
-        tau: float = 0.005,
-        gamma: float = 0.99,
-        train_freq: Union[int, Tuple[int, str]] = 1,
-        gradient_steps: int = 1,
-        action_noise: Optional[ActionNoise] = None,
-        replay_buffer_class: Optional[Type[ReplayBuffer]] = None,
-        replay_buffer_kwargs: Optional[Dict[str, Any]] = None,
-        optimize_memory_usage: bool = False,
-        ent_coef: Union[str, float] = "auto",
-        target_update_interval: int = 1,
-        target_entropy: Union[str, float] = "auto",
-        use_sde: bool = False,
-        sde_sample_freq: int = -1,
-        use_sde_at_warmup: bool = False,
-        stats_window_size: int = 100,
-        tensorboard_log: Optional[str] = None,
-        policy_kwargs: Optional[Dict[str, Any]] = None,
-        verbose: int = 0,
-        seed: Optional[int] = None,
-        device: Union[th.device, str] = "auto",
-        _init_setup_model: bool = True,
-        #
-        use_original_space=False,  # use original action space?
-        warmup_zero_action=False,  # zero action or gaussian noise before learning starts
+        algocn: cn.RP_SAC,
     ):
-        super().__init__(
-            policy,
-            env,
-            dict(
-                learning_rate=learning_rate,
-                buffer_size=buffer_size,
-                learning_starts=learning_starts,
-                batch_size=batch_size,
-                tau=tau,
-                gamma=gamma,
-                train_freq=train_freq,
-                gradient_steps=gradient_steps,
-                action_noise=action_noise,
-                replay_buffer_class=replay_buffer_class,
-                replay_buffer_kwargs=replay_buffer_kwargs,
-                policy_kwargs=policy_kwargs,
-                stats_window_size=stats_window_size,
-                tensorboard_log=tensorboard_log,
-                verbose=verbose,
-                device=device,
-                seed=seed,
-                use_sde=use_sde,
-                sde_sample_freq=sde_sample_freq,
-                use_sde_at_warmup=use_sde_at_warmup,
-                optimize_memory_usage=optimize_memory_usage,
-                supported_action_spaces=(spaces.Box,),
-                support_multi_env=True,
-                #
-                use_original_space=use_original_space,
-                warmup_zero_action=warmup_zero_action,
-            ),
-        )
+        super().__init__(policy, env, algocn)
 
-        self.target_entropy = target_entropy
         self.log_ent_coef = None  # type: Optional[th.Tensor]
         # Entropy coefficient / Entropy temperature
         # Inverse of the reward scale
-        self.ent_coef = ent_coef
-        self.target_update_interval = target_update_interval
         self.ent_coef_optimizer: Optional[th.optim.Adam] = None
 
-        if _init_setup_model:
-            self._setup_model()
+        self._setup_model()
 
     def _setup_model(self) -> None:
         super()._setup_model()
@@ -277,7 +216,7 @@ class RP_SAC(OffPolicyResidual):
 
             # encourage nonaction for RP
             norms = th.linalg.vector_norm(actions_pi, dim=-1).mean()
-            noaction_loss = 10 * norms
+            noaction_loss = self.l2_weight * norms
             actor_loss += noaction_loss
 
             # Optimize the actor

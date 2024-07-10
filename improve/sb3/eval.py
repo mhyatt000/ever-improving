@@ -6,8 +6,7 @@ from pprint import pprint
 import gymnasium as gym
 import hydra
 import improve
-import improve.config.prepare
-import improve.config.resolver
+import improve.hydra.resolver
 import mani_skill2.envs
 import numpy as np
 import simpler_env as simpler

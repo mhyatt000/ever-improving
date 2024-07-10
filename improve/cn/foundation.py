@@ -12,7 +12,7 @@ class Strategy(Enum):
 
 
 @dataclass
-class FoundationModel_CN:
+class FoundationModel:
     name: str
     ckpt: str
     task: str
@@ -31,17 +31,17 @@ class FoundationModel_CN:
 
 
 @dataclass
-class OctoS_CN(FoundationModel_CN):
+class OctoS(FoundationModel):
     name: str = "octo-small"
     ckpt: None = None
     task: str = "widowx_put_eggplant_in_basket"
 
 
-class OctoB_CN(FoundationModel_CN):
+class OctoB(FoundationModel):
     name: str = "octo-base"
     ckpt: None = None
     task: str = "widowx_put_eggplant_in_basket"
 
 
-class RTX_CN(FoundationModel_CN):
+class RTX(FoundationModel):
     pass

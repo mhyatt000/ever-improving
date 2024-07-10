@@ -16,6 +16,7 @@ def main(cfg: OmegaConf) -> None:
     # pprint(cfg)
     print('\n\n\n')
 
+    print(cfg['algo'])
 
 if __name__ == "__main__":
     main()

@@ -9,7 +9,7 @@ from pprint import pprint
 
 import hydra
 import improve
-from improve.config import resolver
+from improve.hydra import resolver
 from omegaconf import OmegaConf as OC
 
 

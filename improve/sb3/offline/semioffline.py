@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 import numpy as np
 import torch as th
 from gymnasium import spaces
-from improve.config.algo import PACCN
+from improve import cn 
 # from stable_baselines3.common.base_class import BaseAlgorithm
 # from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
@@ -21,7 +21,7 @@ class SemiOfflineTrainer:
 
     def __init__(
         self,
-        algocn: PACCN,  # algorithm config node
+        algocn: cn.PAC,  # algorithm config node
         modelcn,  # model
         optimcn,  # optimizer config node
         traincn,  # training config node

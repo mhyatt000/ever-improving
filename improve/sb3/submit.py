@@ -5,8 +5,7 @@ import time
 
 import hydra
 import improve
-import improve.config.prepare
-import improve.config.resolver
+import improve.hydra.resolver
 
 import submitit
 
