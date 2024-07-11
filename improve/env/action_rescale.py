@@ -5,20 +5,21 @@ functions for rescaling the action space
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+from improve import cn
+
 
 class ActionRescaler:
 
-    def __init__(self, strategy, residual_scale):
-        assert strategy in ["dynamic", "clip", None]
-        self.strategy = strategy
+    def __init__(self, strategy: cn.Strategy, residual_scale):
+        self.strategy = strategy.value
         self.residual_scale = residual_scale
 
-        if strategy == "clip":
+        if self.strategy == "clip":
             translation = np.linalg.norm([0.05, 0.05, 0.05])
             axis, angle = rpy_to_axis_angle(*[0.25, 0.25, 0.25])
             self.max = {"translation": translation, "rotation": angle}
 
-        if strategy == "dynamic":
+        if self.strategy == "dynamic":
             self.bounds = [
                 (0.05, -0.05),
                 (0.05, -0.05),

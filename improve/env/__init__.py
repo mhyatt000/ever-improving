@@ -1,3 +1,5 @@
+import os.path as osp
+
 import gymnasium as gym
 import simpler_env as simpler
 from improve.wrapper.force_seed import ForceSeedWrapper
@@ -13,9 +15,28 @@ from improve.wrapper.simpler.misc import (DownscaleImgWrapper,
 from improve.wrapper.simpler.no_rotation import NoRotationWrapper
 from improve.wrapper.simpler.reach_task import ReachTaskWrapper
 from improve.wrapper.simpler.rescale import RTXRescaleWrapper
+from improve.wrapper.wandb.record import VecRecord
+from improve.wrapper.wandb.vec import WandbVecMonitor
 from mani_skill2.utils.wrappers import RecordEpisode
+from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
+                                              VecMonitor, VecVideoRecorder)
 
 from .action_rescale import ActionRescaler
+
+# Defines a continuous, infinite horizon, task where terminated is always False
+# unless a timelimit is reached.
+class ContinuousTaskWrapper(gym.Wrapper):
+    def __init__(self, env) -> None:
+        super().__init__(env)
+
+    def reset(self, *args, **kwargs):
+        return super().reset(*args, **kwargs)
+
+    def step(self, action):
+        ob, rew, terminated, truncated, info = super().step(action)
+        return ob, rew, False, truncated, info
+
+
 
 def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
     def _init() -> gym.Env:
@@ -41,7 +62,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
             **extra,
         )
 
-        if cfg.env.fm_loc == 'env':
+        if cfg.env.fm_loc == "env":
 
             if cfg.env.foundation.name:
                 env = FoundationModelWrapper(
@@ -81,8 +102,8 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # if cfg.env.no_quarternion:
         # env = NoRotationWrapper(env)
 
-        if cfg.env.fm_loc == 'env': # otherwise rescale is done in the algo
-            if cfg.env.scale_strategy == 'clip':
+        if cfg.env.fm_loc == "env":  # otherwise rescale is done in the algo
+            if cfg.env.scale_strategy == "clip":
                 env = RTXRescaleWrapper(env)
 
         if cfg.env.reach:
@@ -103,7 +124,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # env = ContinuousTaskWrapper(env)
 
         if record_dir is not None:
-            print(f'TODO RECORD: {record_dir}')
+            print(f"TODO RECORD: {record_dir}")
             # env = RecordEpisode(env, record_dir, info_on_video=True)
 
         return env
@@ -112,3 +133,76 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
     # env = WandbInfoStatWrapper(env, logger)
 
     return _init
+
+
+def make_envs( cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None):
+
+    suffix = "eval" if eval_only else "train"
+    record_dir = osp.join(log_dir, f"videos/{suffix}")
+
+    if cfg.env.foundation.name is None or cfg.env.fm_loc == "central":
+        eval_env = SubprocVecEnv(
+            [make_env(cfg, record_dir=record_dir) for _ in range(num_envs)]
+        )
+        eval_env = VecMonitor(eval_env)  # attach this so SB3 can log reward metrics
+        eval_env.seed(cfg.job.seed)
+        eval_env.reset()
+
+        return (
+            # big slow down
+            # VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=False,),
+            eval_env,
+            VecRecord(
+                eval_env,
+                osp.join(log_dir, "eval"),
+                use_wandb=True,
+            ),
+        )
+
+        # return eval_env, VecVideoRecorder(eval_env, record_dir, record_video_trigger=lambda x: True)
+
+        if eval_only:
+            env = eval_env
+        else:
+            # Create vectorized environments for training
+            env = SubprocVecEnv(
+                [
+                    make_env(cfg, max_episode_steps=max_episode_steps)
+                    for _ in range(num_envs)
+                ]
+            )
+            env = VecMonitor(env)
+            # if cfg.job.wandb.use:
+                # env = WandbVecMonitor(env, logger)
+
+            env.seed(cfg.job.seed)
+            env.reset()
+        return env, eval_env
+
+    # using foundation model ... only one env allowed
+    if cfg.env.foundation.name and cfg.env.fm_loc == "env":
+        num = 1 if cfg.env.fm_loc == "env" else num_envs
+        print(cfg.env.foundation.name)
+        env = SubprocVecEnv(
+            [
+                make_env(
+                    cfg,
+                    record_dir=record_dir,
+                    max_episode_steps=max_episode_steps,
+                )
+                for _ in range(num)
+            ]
+        )
+        print("made dummy vec env")
+
+        env = VecMonitor(env)
+        # if cfg.job.wandb.use:
+            # env = WandbVecMonitor(env, logger)
+
+        print("wrapped env")
+
+        env.seed(cfg.job.seed)
+        env.reset()
+        eval_env = env
+
+        return env, eval_env
