@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Union
 
+from improve import names
 from improve.util.config import default, store
 
 
@@ -19,7 +20,7 @@ class FoundationModel:
     task: str = None
 
     noact: list = default([-1, -2, -3, -4])  # no action dimensions
-    strategy: Strategy = Strategy.CLIP # residual scaling strategy
+    strategy: Strategy = Strategy.CLIP  # residual scaling strategy
     residual_scale: float = 1.0  # residual scaling factor
 
     batch_size: int = 8  # number of parallel environments
@@ -80,13 +81,14 @@ class RTX(FoundationModel):
 
     model: RT1Model = default(RT1Model())
     # checkpoint_path: str = "rt_1_x_jax/b321733791_75882326_000900000"
-    ckpt: str = "/home/zero-shot/rt_1_x_jax/b321733791_75882326_000900000"
+    ckpt: str = osp.join(names.WEIGHTS, "rt_1_x_jax/b321733791_75882326_000900000")
     seqlen: int = 15
     batch_size: int = 2
 
     cached: bool = True
 
     # def __post_init__(self): self.checkpoint_path = osp.join(improve.WEIGHTS, self.checkpoint_path)
-    def __post_init__(self): 
+    def __post_init__(self):
         super().__post_init__()
-        self.model = RT1Model(**self.model)
+        if isinstance(self.model, dict):
+            self.model = RT1Model(**self.model)
