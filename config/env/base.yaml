@@ -12,7 +12,7 @@ device: null
 obs_keys: ${env.obs_mode.obs_keys}
 
 goal:
-  use: True
+  use: False
   key: simpler-img
   cls: ${r_typeof:improve.wrapper.GoalEnvWrapper}
 

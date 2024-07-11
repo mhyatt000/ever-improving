@@ -6,7 +6,7 @@
 
 defaults:
 # - /launcher: base
-  - override /algo: sac
+  - override /algo: rp_sac
   - override /buffer: base # no HER for now!
   - override /env/foundation: rtx
   - override /env/obs_mode: oracle-central
@@ -22,12 +22,11 @@ train:
 
 algo:
   buffer_size: ${r_toint:1e6}
-  warmup_zero_action: True           # gaussian
-  batch_size: 512 #                   # for debug
-  learning_starts: ${r_toint:1e4}    # for debug
+  warmup_zero_action: True           # zero or (False=gaussian)
+  batch_size: 512 #                  
+  learning_starts: ${r_toint:1e4}   
 
   learning_rate: ${r_tofloat:3e-4}
-  ent_coef: auto_0.0001
   target_entropy: -7.0               # from SAC applications
 
 env:
@@ -60,3 +59,10 @@ hydra:
     params:
       env.residual_scale: 1
         # env.foundation.task: can
+
+      env.foundation.task: 
+        google_robot_move_near,
+        google_robot_open_drawer,
+        google_robot_close_drawer,
+        google_robot_place_apple_in_closed_top_drawer,
+        google_robot_pick_coke_can

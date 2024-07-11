@@ -14,7 +14,7 @@ defaults:
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "debug_rtx"
+sweep_id: "embed_all_rtx"
 
 train:
   n_steps: ${r_toint:1e6}            # 1M
@@ -43,10 +43,11 @@ env:
     - -4
 
   fm_loc: 'central'
-  n_envs: 8
+  
+  n_envs: 2
   foundation:
-    batch_size: 8
-    cached: True
+    batch_size: 2
+    cached: False
 
 hydra:
   run:
@@ -58,5 +59,4 @@ hydra:
   mode: MULTIRUN # needed or else -m flag
   sweeper:
     params:
-      env.residual_scale: 1
-        # env.foundation.task: can
+      env.foundation.task: google_robot_pick_coke_can,google_robot_move_near,google_robot_open_drawer,google_robot_close_drawer,google_robot_place_apple_in_closed_top_drawer,widowx_spoon_on_towel,widowx_carrot_on_plate,widowx_stack_cube,widowx_put_eggplant_in_basket
