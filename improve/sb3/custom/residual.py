@@ -39,7 +39,7 @@ class OffPolicyResidual(CHEF):
         policy: Union[str, Type[BasePolicy]],
         env: Union[GymEnv, str],
         algocn: cn.Algo,  # algo config node
-        fmcn: cn.FoundationModel = cn.OctoS(),  # foundation model config node
+        fmcn: cn.FoundationModel,  # foundation model config node
     ):
 
         self.algocn = algocn

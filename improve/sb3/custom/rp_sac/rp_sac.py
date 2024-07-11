@@ -59,8 +59,9 @@ class RP_SAC(OffPolicyResidual):
         policy: Union[str, Type[SACPolicy]],
         env: Union[GymEnv, str],
         algocn: cn.RP_SAC,
+        fmcn: cn.FoundationModel,
     ):
-        super().__init__(policy, env, algocn)
+        super().__init__(policy, env, algocn, fmcn)
 
         self.log_ent_coef = None  # type: Optional[th.Tensor]
         # Entropy coefficient / Entropy temperature

@@ -15,131 +15,20 @@ from stable_baselines3.common.callbacks import (CallbackList,
                                                 EvalCallback)
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
-                                              VecMonitor, VecVideoRecorder)
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from wandb.integration.sb3 import WandbCallback
 
 import hydra
 import improve
 import improve.hydra.resolver
-from improve.env import make_env
+from improve.env import make_env, make_envs
 from improve.log.wandb import WandbLogger
 from improve.sb3 import util
 from improve.sb3.custom import PPO, RP_SAC, SAC, TQC
 from improve.wrapper import dict_util as du
-from improve.wrapper.wandb.record import VecRecord
-from improve.wrapper.wandb.vec import WandbVecMonitor
 
 warnings.filterwarnings("ignore", category=UserWarning, module="gym")
 warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
-
-
-# Defines a continuous, infinite horizon, task where terminated is always False
-# unless a timelimit is reached.
-class ContinuousTaskWrapper(gym.Wrapper):
-    def __init__(self, env) -> None:
-        super().__init__(env)
-
-    def reset(self, *args, **kwargs):
-        return super().reset(*args, **kwargs)
-
-    def step(self, action):
-        ob, rew, terminated, truncated, info = super().step(action)
-        return ob, rew, False, truncated, info
-
-
-"""
-parser.add_argument(
-    "--log-dir",
-    type=str,
-    default="logs",
-    help="path for where logs, checkpoints, and videos are saved",
-)
-parser.add_argument(
-    "--model-path", type=str, help="path to sb3 model for evaluation"
-)
-"""
-
-
-def make_envs(
-    cfg,
-    log_dir,
-    eval_only=False,
-    num_envs=1,
-    max_episode_steps=None,
-    logger=None,
-):
-
-    suffix = "eval" if eval_only else "train"
-    record_dir = osp.join(log_dir, f"videos/{suffix}")
-
-    if cfg.env.foundation.name is None or cfg.env.fm_loc == "central":
-        eval_env = SubprocVecEnv(
-            [make_env(cfg, record_dir=record_dir) for _ in range(num_envs)]
-        )
-        eval_env = VecMonitor(eval_env)  # attach this so SB3 can log reward metrics
-        eval_env.seed(cfg.job.seed)
-        eval_env.reset()
-
-        return (
-            # big slow down
-            # VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=False,),
-            eval_env,
-            VecRecord(
-                eval_env,
-                osp.join(log_dir, "eval"),
-                use_wandb=True,
-            ),
-        )
-
-        # return eval_env, VecVideoRecorder(eval_env, record_dir, record_video_trigger=lambda x: True)
-
-        if eval_only:
-            env = eval_env
-        else:
-            # Create vectorized environments for training
-            env = SubprocVecEnv(
-                [
-                    make_env(cfg, max_episode_steps=max_episode_steps)
-                    for _ in range(num_envs)
-                ]
-            )
-            env = VecMonitor(env)
-            if cfg.job.wandb.use:
-                env = WandbVecMonitor(env, logger)
-
-            env.seed(cfg.job.seed)
-            env.reset()
-        return env, eval_env
-
-    # using foundation model ... only one env allowed
-    if cfg.env.foundation.name and cfg.env.fm_loc == "env":
-        num = 1 if cfg.env.fm_loc == "env" else num_envs
-        print(cfg.env.foundation.name)
-        env = SubprocVecEnv(
-            [
-                make_env(
-                    cfg,
-                    record_dir=record_dir,
-                    max_episode_steps=max_episode_steps,
-                )
-                for _ in range(num)
-            ]
-        )
-        print("made dummy vec env")
-
-        env = VecMonitor(env)
-        if cfg.job.wandb.use:
-            env = WandbVecMonitor(env, logger)
-
-        print("wrapped env")
-
-        env.seed(cfg.job.seed)
-        env.reset()
-        eval_env = env
-
-        return env, eval_env
 
 
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
@@ -161,7 +50,6 @@ def main(cfg):
 
     pprint(OC.to_container(cfg, resolve=True))  # keep after wandb so it logs
 
-    # args = parse_args()
     num_envs = cfg.env.n_envs
     max_episode_steps = cfg.env.max_episode_steps
     log_dir = osp.join(cfg.callback.log_path, wandb.run.name)
@@ -188,7 +76,6 @@ def main(cfg):
         eval_only=eval_only,
         num_envs=num_envs,
         max_episode_steps=max_episode_steps,
-        logger=logger,
     )
     print(env)
 
@@ -228,9 +115,16 @@ def main(cfg):
 
     from improve import cn
 
-    if cfg.algo.name == 'rp_sac':
+    if cfg.algo.name == "rp_sac":
         algo_kwargs = OC.to_container(cfg.algo, resolve=True)
-        model = algo( "MultiInputPolicy", env, cn.RP_SAC(**algo_kwargs)) # TODO add fmcn
+        algocn = cn.RP_SAC(**algo_kwargs)
+
+        if cfg.env.foundation.name == "octo-small":
+            fmcn = cn.OctoS(**OC.to_container(cfg.env.foundation, resolve=True))
+        elif cfg.env.foundation.name == "rtx":
+            fmcn = cn.RTX(**OC.to_container(cfg.env.foundation, resolve=True))
+
+        model = algo("MultiInputPolicy", env, algocn, fmcn)
     else:
         model = algo(
             "MultiInputPolicy",

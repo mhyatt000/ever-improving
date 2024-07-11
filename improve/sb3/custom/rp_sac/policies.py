@@ -597,7 +597,7 @@ class MultiInputPolicy(SACPolicy):
             )
 
         if deterministic:
-            print(observation.keys())
+            # print(observation.keys())
             img = observation['simpler-img']
             raw, fm_act = self.fm.step(img)
             fm_act = self.rescaler.dict2act(fm_act)
