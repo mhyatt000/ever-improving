@@ -71,6 +71,8 @@ class BatchedOctoInference(OctoInference):
 
     def reset(self, descs: List[str]) -> None:
         self.reset_all(descs)
+        # use cached embeds
+        # del self.model.tokenizer
 
     def reset_all(self, descs: List[str]) -> None:
         if self.automatic_task_creation:
