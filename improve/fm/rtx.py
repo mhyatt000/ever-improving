@@ -108,9 +108,6 @@ class RT1Policy:
             # but need it if using T5
             tf.config.experimental.set_visible_devices([], "GPU")
 
-            assert task
-            self.embeds = np.array(load_task_embedding(task))
-            assert self.embeds is not None
         else:
             self.llm = hub.load(
                 "https://tfhub.dev/google/universal-sentence-encoder-large/5"
@@ -170,12 +167,23 @@ class RT1Policy:
 
         if not self.cached:
             assert instructions is not None
-            embeds = self.llm([instructions[0]]).numpy()
-            store_task_embedding(embeds, task=self.task)
+            self.embeds = []
+            for instr in set(instructions): # only the unique ones
 
-            print(embeds)
+                embeds = self.llm([instr]).numpy()
+                self.embeds.append(embeds)
+                store_task_embedding(embeds, instruction=instr)
+
+                print(embeds.shape)
+
             print("not cached!")
-            self.embeds = embeds
+            self.embeds = np.array(self.embeds)
+            print(self.embeds.shape)
+
+        else:
+            print("cached!")
+            self.embeds = np.array([load_task_embedding(instr) for instr in instructions])
+            print(self.embeds.shape)
 
         self.embeds = np.expand_dims(self.embeds, 1)
         self.embeds = np.repeat(self.embeds, self.seqlen, axis=1)

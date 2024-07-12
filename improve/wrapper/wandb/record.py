@@ -45,6 +45,15 @@ def isimg(o):
     return False
 
 
+def try_ex(func, *args, **kwargs):
+    """could be a decorator one day"""
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        print(e)
+        return None
+
+
 class VecRecord(VecEnvWrapper):
 
     def __init__(self, venv: VecEnv, output_dir, use_wandb=True):
@@ -216,7 +225,7 @@ class VecRecord(VecEnvWrapper):
 
     def flush(self, i):
 
-        print(f'flushing {i}')
+        print(f"flushing {i}")
 
         ep = self.episodes[i]
 
@@ -279,7 +288,7 @@ class VecRecord(VecEnvWrapper):
 
     def close(self) -> None:
         for i in range(self.num_envs):
-            self.flush(i)
+            try_ex(self.flush(i))
         self.shard.close()
 
         return super().close()

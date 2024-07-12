@@ -2,17 +2,17 @@ from collections import deque
 from functools import partial
 from typing import List, Optional
 
+import improve
 import jax
 import numpy as np
+import tensorflow as tf
+from improve.wrapper import dict_util as du
 from jax.sharding import Mesh, NamedSharding, PartitionSpec
 from octo.model.octo_model import OctoModel
 from octo.utils.train_utils import freeze_weights, merge_params
 from simpler_env.policies.octo.octo_model import OctoInference
 from simpler_env.utils.action.action_ensemble import ActionEnsembler
 from transforms3d.euler import euler2axangle
-
-import improve
-from improve.wrapper import dict_util as du
 
 """
 # create a 1D mesh with a single axis named "batch"
@@ -25,7 +25,12 @@ replicated_sharding = NamedSharding(mesh, PartitionSpec())
 
 
 class BatchedOctoInference(OctoInference):
-    def __init__(self, batch_size: int, **kwargs):
+    def __init__(
+        self,
+        batch_size: int = 8,
+        cached: bool = False,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.batch_size = batch_size
@@ -58,6 +63,11 @@ class BatchedOctoInference(OctoInference):
             )
         else:
             self.action_ensembler = None
+
+        self.cached = cached
+        if self.cached:
+            del self.model.tokenizer
+            tf.config.experimental.set_visible_devices([], "GPU")
 
         """
         self.fwd = jax.jit(

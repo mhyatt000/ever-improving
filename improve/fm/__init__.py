@@ -31,6 +31,7 @@ def build_foundation_model(fmcn: cn.FoundationModel):
             batch_size=fmcn.batch_size,
             model_type=fmcn.ckpt,
             policy_setup=fmcn.policy_setup,
+            cached=fmcn.cached,
         )
         # model = OctoInference(model_type=fmcn.ckpt, policy_setup=policy_setup)
 
@@ -40,12 +41,11 @@ def build_foundation_model(fmcn: cn.FoundationModel):
     return model
 
 
-from omegaconf import OmegaConf as OC
-
 import hydra
 import improve
 import improve.hydra.resolver
 from improve import cn
+from omegaconf import OmegaConf as OC
 
 
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
@@ -55,29 +55,36 @@ def main(cfg):
     # print(em)
     # quit()
 
+    # fmcn = cn.OctoS(**OC.to_container(cfg.env.foundation, resolve=True))
+    # model = build_foundation_model(fmcn)
+
+    import numpy as np
+    import simpler_env as simpler
     from improve.env import make_env
 
-    # model = build_foundation_model(fmcn)
-    import numpy as np
-
-    import simpler_env as simpler
+    """
     env = simpler.make(
         cfg.env.foundation.task,
         # cant find simpler-img if you specify the mode
-        render_mode="cameras",
+        # render_mode="cameras",
         # max_episode_steps=max_episode_steps,
         renderer_kwargs={
             "offscreen_only": True,
             "device": "cuda:0",
         },
     )
+    """
 
-
-    # env = make_env(cfg)()
+    env = make_env(cfg)()
 
     env.reset()
     obs, *things = env.step(env.action_space.sample())
-    print(obs.keys())
+
+    from improve.wrapper import dict_util as du
+
+    from pprint import pprint
+
+    print(du.apply(obs, lambda x: type(x)))
     # model.reset([env.get_language_instruction()])
     return
 

@@ -50,6 +50,7 @@ class OctoS(FoundationModel):
     ckpt: Optional[str] = None
     task: str = "widowx_put_eggplant_in_basket"
 
+    cached: bool = False
 
 @store
 @dataclass
