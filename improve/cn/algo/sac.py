@@ -52,7 +52,7 @@ class SAC(OffPolicy):
 class ResidualPolicy(Algo):
     name: str = "residual_policy"
 
-    l2_weight: float = 10.0
+    l2_weight: float = 1.0
 
 
 @store

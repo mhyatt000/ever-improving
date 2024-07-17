@@ -40,7 +40,7 @@ from improve.util.optim import async_step
 from improve.util.transform import PreProcess
 from improve.wrapper import dict_util as du
 
-# from improve.wrapper.eval import EvalWrapper
+from improve.wrapper.eval import EvalWrapper
 
 import lightning as L
 from wandb.integration.lightning.fabric import WandbLogger
