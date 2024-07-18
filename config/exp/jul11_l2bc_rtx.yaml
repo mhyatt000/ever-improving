@@ -41,7 +41,7 @@ env:
     - -3
     - -4
 
-  fm_loc: 'central'
+  fm_loc: CENTRAL
   n_envs: 8
   foundation:
     batch_size: 8
@@ -61,8 +61,8 @@ hydra:
         # env.foundation.task: can
 
       env.foundation.task: 
-        google_robot_move_near,
-        google_robot_open_drawer,
-        google_robot_close_drawer,
-        google_robot_place_apple_in_closed_top_drawer,
         google_robot_pick_coke_can
+        # google_robot_move_near,
+        # google_robot_open_drawer,
+        # google_robot_close_drawer,
+        # google_robot_place_apple_in_closed_top_drawer
