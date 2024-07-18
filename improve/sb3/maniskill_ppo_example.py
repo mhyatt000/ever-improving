@@ -3,11 +3,10 @@ import warnings
 from pprint import pprint
 
 import gymnasium as gym
-import mani_skill2.envs
+# import mani_skill2.envs
 import numpy as np
 import simpler_env as simpler
 import stable_baselines3 as sb3
-import wandb
 from omegaconf import OmegaConf as OC
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import (CallbackList,
@@ -21,10 +20,11 @@ from wandb.integration.sb3 import WandbCallback
 import hydra
 import improve
 import improve.hydra.resolver
+import wandb
 from improve.env import make_env, make_envs
 from improve.log.wandb import WandbLogger
 from improve.sb3 import util
-from improve.sb3.custom import PPO, RP_SAC, SAC, TQC
+from improve.sb3.custom import AWAC, PPO, RP_SAC, SAC, TQC
 from improve.wrapper import dict_util as du
 
 warnings.filterwarnings("ignore", category=UserWarning, module="gym")
@@ -37,7 +37,7 @@ def main(cfg):
     if cfg.job.wandb.use:
         print("Using wandb")
         run = wandb.init(
-            project="residualrl-maniskill2demo",
+            project="awac",
             dir=cfg.callback.log_path,
             job_type="train",
             # sync_tensorboard=True,
@@ -48,7 +48,7 @@ def main(cfg):
         )
         wandb.config.update({"name": run.name})
 
-    pprint(OC.to_container(cfg, resolve=True))  # keep after wandb so it logs
+    print(OC.to_yaml(cfg, resolve=True))  # keep after wandb so it logs
 
     num_envs = cfg.env.n_envs
     max_episode_steps = cfg.env.max_episode_steps
@@ -108,7 +108,8 @@ def main(cfg):
     algo = {
         "ppo": PPO,
         "a2c": A2C,
-        "sac": RP_SAC if cfg.env.fm_loc == "central" else SAC,
+        "sac": RP_SAC if cfg.env.fm_loc.value == "central" else SAC,
+        "awac": AWAC,
         "rp_sac": RP_SAC,
         "tqc": TQC,
     }[cfg.algo.name]
@@ -125,6 +126,11 @@ def main(cfg):
             fmcn = cn.RTX(**OC.to_container(cfg.env.foundation, resolve=True))
 
         model = algo("MultiInputPolicy", env, algocn, fmcn)
+
+    elif cfg.algo.name == "awac":
+        algocn = OC.to_container(cfg.algo, resolve=True)
+        model = AWAC("MultiInputPolicy", env, algocn)
+
     else:
         model = algo(
             "MultiInputPolicy",

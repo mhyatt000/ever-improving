@@ -182,7 +182,9 @@ class RT1Policy:
 
         else:
             print("cached!")
-            self.embeds = np.array([load_task_embedding(instr) for instr in instructions])
+            # self.embeds = np.array([load_task_embedding(instr) for instr in instructions])
+            # this is a mess... because of move near task
+            self.embeds = np.array(load_task_embedding(self.task))
             print(self.embeds.shape)
 
         self.embeds = np.expand_dims(self.embeds, 1)

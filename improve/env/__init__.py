@@ -2,6 +2,10 @@ import os.path as osp
 
 import gymnasium as gym
 import simpler_env as simpler
+# from mani_skill2.utils.wrappers import RecordEpisode
+from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
+                                              VecMonitor, VecVideoRecorder)
+
 from improve.wrapper.force_seed import ForceSeedWrapper
 from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
 from improve.wrapper.sb3.successinfo import SuccessInfoWrapper
@@ -14,14 +18,23 @@ from improve.wrapper.simpler.misc import (DownscaleImgWrapper,
                                           GraspDenseRewardWrapper)
 from improve.wrapper.simpler.no_rotation import NoRotationWrapper
 from improve.wrapper.simpler.reach_task import ReachTaskWrapper
-from improve.wrapper.simpler.rescale import RTXRescaleWrapper
+from improve.wrapper.simpler.rescale import RTXRescaleWrapper, ActionRescaleWrapper
+from improve.wrapper.simpler.source_target import SourceTargetWrapper
 from improve.wrapper.wandb.record import VecRecord
 from improve.wrapper.wandb.vec import WandbVecMonitor
-from mani_skill2.utils.wrappers import RecordEpisode
-from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
-                                              VecMonitor, VecVideoRecorder)
 
 from .action_rescale import ActionRescaler
+
+MULTI_OBJ_ENVS = [
+    "google_robot_move_near_v0",
+    "google_robot_move_near_v1",
+    "google_robot_move_near",
+    "widowx_spoon_on_towel",
+    "widowx_carrot_on_plate",
+    "widowx_stack_cube",
+    # "widowx_put_eggplant_in_basket",
+]
+
 
 # Defines a continuous, infinite horizon, task where terminated is always False
 # unless a timelimit is reached.
@@ -37,7 +50,6 @@ class ContinuousTaskWrapper(gym.Wrapper):
         return ob, rew, False, truncated, info
 
 
-
 def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
     def _init() -> gym.Env:
         # NOTE: Import envs here so that they are registered with gym in subprocesses
@@ -45,8 +57,8 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
 
         extra = {}
 
-        if cfg.env.obs_mode.mode != "rgb":
-            extra["obs_mode"] = cfg.env.obs_mode.mode
+        if cfg.env.obs_mode.mode.value != "rgb":
+            extra["obs_mode"] = cfg.env.obs_mode.mode.value
         if cfg.env.task == "google_robot_pick_horizontal_coke_can":
             extra["success_from_episode_stats"] = False
 
@@ -62,7 +74,10 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
             **extra,
         )
 
-        if cfg.env.fm_loc == "env":
+        if cfg.algo.name == 'awac':
+            env = ActionRescaleWrapper(env)
+
+        if cfg.env.fm_loc.value == "env":
 
             if cfg.env.foundation.name:
                 env = FoundationModelWrapper(
@@ -78,6 +93,10 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
                 env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
 
         env = ExtraObservationWrapper(env)
+
+        if cfg.env.foundation.task in MULTI_OBJ_ENVS:
+            print("using src tgt wrapper")
+            env = SourceTargetWrapper(env)
 
         if cfg.env.seed.force:
             if cfg.env.seed.seeds is not None:
@@ -102,7 +121,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # if cfg.env.no_quarternion:
         # env = NoRotationWrapper(env)
 
-        if cfg.env.fm_loc == "env":  # otherwise rescale is done in the algo
+        if cfg.env.fm_loc.value == "env":  # otherwise rescale is done in the algo
             if cfg.env.scale_strategy == "clip":
                 env = RTXRescaleWrapper(env)
 
@@ -123,9 +142,9 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # if max_episode_steps is not None:
         # env = ContinuousTaskWrapper(env)
 
-        if record_dir is not None:
-            print(f"TODO RECORD: {record_dir}")
-            # env = RecordEpisode(env, record_dir, info_on_video=True)
+        # if record_dir is not None:
+        # print(f"TODO RECORD: {record_dir}")
+        # env = RecordEpisode(env, record_dir, info_on_video=True)
 
         return env
 
@@ -135,12 +154,12 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
     return _init
 
 
-def make_envs( cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None):
+def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
 
     suffix = "eval" if eval_only else "train"
     record_dir = osp.join(log_dir, f"videos/{suffix}")
 
-    if cfg.env.foundation.name is None or cfg.env.fm_loc == "central":
+    if cfg.env.foundation.name is None or cfg.env.fm_loc.value == "central":
         eval_env = SubprocVecEnv(
             [make_env(cfg, record_dir=record_dir) for _ in range(num_envs)]
         )
@@ -150,7 +169,7 @@ def make_envs( cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None
 
         return (
             # big slow down
-            # VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=False,),
+            # VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=True,),
             eval_env,
             VecRecord(
                 eval_env,
@@ -173,15 +192,15 @@ def make_envs( cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None
             )
             env = VecMonitor(env)
             # if cfg.job.wandb.use:
-                # env = WandbVecMonitor(env, logger)
+            # env = WandbVecMonitor(env, logger)
 
             env.seed(cfg.job.seed)
             env.reset()
         return env, eval_env
 
     # using foundation model ... only one env allowed
-    if cfg.env.foundation.name and cfg.env.fm_loc == "env":
-        num = 1 if cfg.env.fm_loc == "env" else num_envs
+    if cfg.env.foundation.name and cfg.env.fm_loc.value == "env":
+        num = 1 if cfg.env.fm_loc.value == "env" else num_envs
         print(cfg.env.foundation.name)
         env = SubprocVecEnv(
             [
@@ -197,7 +216,7 @@ def make_envs( cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None
 
         env = VecMonitor(env)
         # if cfg.job.wandb.use:
-            # env = WandbVecMonitor(env, logger)
+        # env = WandbVecMonitor(env, logger)
 
         print("wrapped env")
 

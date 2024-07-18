@@ -9,16 +9,19 @@ LowDimKeys = [
     "agent_qpos-sin",
     "agent_qpos-cos",
     "agent_qvel",
-    "agent_partial-action",
     "eef-pose",
 ]
 
-OracleKeys = [
-    "obj-wrt-eef",
-]
+RPKeys = ["agent_partial-action"]
+OracleKeys = ["obj-wrt-eef"]
+ImageKeys = ["simpler-img"]
 
-ImageKeys = [
-    "simple-img",
+
+SourceTargetKeys = [
+    "src-pose",
+    "tgt-pose",
+    "src-wrt-eef",
+    "tgt-wrt-eef",
 ]
 
 
@@ -30,35 +33,55 @@ class Mode(Enum):
 @dataclass
 class ObsMode:
     name: str = "base"
-    mode: Mode = "rgb"
+    mode: Mode = Mode.RGB
 
 
 @dataclass
 class Oracle(ObsMode):
     name: str = "oracle"
-    obs_keys: List[str] = default(OracleKeys + LowDimKeys)
+    obs_keys: List[str] = default(OracleKeys + LowDimKeys + RPKeys)
 
 
+@store
 @dataclass
 class OracleCentral(Oracle):
     name: str = "oracle-central"
-    obs_keys: List[str] = default(OracleKeys + LowDimKeys + ImageKeys)
+    obs_keys: List[str] = default(OracleKeys + LowDimKeys + RPKeys + ImageKeys)
 
 
 class LowDim(ObsMode):
     name: str = "lowdim"
-    mode: str = "state_dict"
+    mode: str = Mode.STATE_DICT
     obs_keys: None = None
 
-
+@store
+@dataclass
 class Image(ObsMode):
     name: str = "image"
-    obs_keys: List[str] = default(ImageKeys + LowDimKeys)
+    obs_keys: List[str] = default(ImageKeys)
 
 
 class Hybrid(ObsMode):
     name: str = "hybrid"
-    obs_keys: List[str] = default(ImageKeys + OracleKeys + LowDimKeys)
+    obs_keys: List[str] = default(ImageKeys + OracleKeys + LowDimKeys + RPKeys)
 
     def __init__(self):
         raise NotImplementedError
+
+
+@store
+@dataclass
+class SrcTgt(ObsMode):
+    name: str = "src-tgt"
+    obs_keys: List[str] = default(
+        SourceTargetKeys + LowDimKeys + RPKeys + OracleKeys + ImageKeys
+    )
+
+
+@store
+@dataclass
+class AWAC(ObsMode):
+    name: str = "awac"
+    # no img keys
+    obs_keys: List[str] = default(LowDimKeys + OracleKeys)
+    # obs_keys: List[str] = default(ImageKeys)

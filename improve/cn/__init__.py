@@ -1,23 +1,14 @@
-from improve.util.config import default
 from dataclasses import dataclass
-from typing import Any, List
+from enum import Enum
+from typing import Any, List, Optional, Tuple, Union
+
+from improve.util.config import default, store_as_head
 from omegaconf import MISSING
 
 from .algo import *
 from .buffer import base
 from .buffer.base import Buffer
-from .env.foundation.base import *
-
-defaults = [
-    # Load the config "mysql" from the config group "db"
-    {"db": "mysql"}
-]
-
-
-@dataclass
-class Config:
-    # this is unfortunately verbose due to @dataclass limitations
-    defaults: List[Any] = default(defaults)
-
-    # Hydra will populate this field based on the defaults list
-    db: Any = MISSING
+from .env.base import Env
+from .env.foundation.base import RTX, FoundationModel, OctoB, OctoS, RT1Model, Strategy
+from .env.obs_mode.base import (Hybrid, Image, LowDim, ObsMode, Oracle,
+                                OracleCentral)

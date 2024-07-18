@@ -1,4 +1,5 @@
 import copy
+import functools
 import io
 import os.path as osp
 import time
@@ -10,7 +11,6 @@ from typing import Optional, Tuple
 import gymnasium as gym
 import imageio
 import numpy as np
-import wandb
 import webdataset as wds
 from gymnasium import spaces
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
@@ -18,6 +18,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (VecEnv, VecEnvObs,
                                                            VecEnvStepReturn,
                                                            VecEnvWrapper)
 
+import wandb
 from improve.wrapper import dict_util as du
 
 
@@ -100,7 +101,9 @@ class VecRecord(VecEnvWrapper):
         # sink.write(sample)
 
         self.episodes = [[] for _ in range(self.num_envs)]
+        self.actions = None
         self.renders = None
+        self.last_obs = None
 
         self._elapsed_steps = 0
         self._episode_id = list(range(self.num_envs))
@@ -119,6 +122,8 @@ class VecRecord(VecEnvWrapper):
         obs = du.todict(obs)
         reset_kwargs = copy.deepcopy(kwargs)
 
+        self.last_obs = obs
+
         # Clear cache
         self._elapsed_steps = 0
         # self._episode_id += 1
@@ -126,6 +131,7 @@ class VecRecord(VecEnvWrapper):
         self._episode_info = {}
         self._render_images = []
 
+        self.actions = None
         # state = self.env.get_state()
         self.data = dict(
             # s=state,
@@ -149,9 +155,13 @@ class VecRecord(VecEnvWrapper):
         """
 
         info = None
+        from pprint import pprint
+
+        pprint(obs.keys())
         return obs
 
     def step_async(self, actions: np.ndarray):
+        self.actions = actions
         # episodes[-1].append(actions)
         self.venv.step_async(actions)
 
@@ -166,12 +176,15 @@ class VecRecord(VecEnvWrapper):
         # obs = self.process_obs(obs)
 
         transitions = {
-            "obs": obs,
+            "obs": self.last_obs,
+            "next_obs": obs,
+            "actions": self.actions,
             "rewards": rewards,
             "dones": dones,
             # "infos": infos,
         }
 
+        self.last_obs = obs
         # print(du.apply(infos, lambda x: type(x) ))
 
         transitions = [
@@ -232,20 +245,23 @@ class VecRecord(VecEnvWrapper):
         obs = [x["obs"] for x in ep]
         obs = du.stack(obs)
 
+        # TODO fix this... youre essentially writing 2x the data
+        next_obs = [x["next_obs"] for x in ep]
+        next_obs = du.stack(next_obs)
+
         # print(du.apply(obs, lambda x: type(x)))
         # print(obs[0]['agent_base_pose'])
 
-        frames = self.renders[i]
-        # vid = np2mp4b(frames)
+        frames = self.renders[i][:, :, 512:1024]
+        vid = np2mp4b(frames)
         self.renders[i] = None
 
         # print(len(ep))
         # print(ep[0].keys())
 
-        import functools
-
         rewards = functools.reduce(lambda x, y: x + [float(y["rewards"])], ep, [])
         dones = functools.reduce(lambda x, y: x + [float(y["dones"])], ep, [])
+        actions = functools.reduce(lambda x, y: x + [y["actions"].tolist()], ep, [])
 
         infos = [du.todict(x["info"]) for x in ep]
         infos = du.concat(infos)
@@ -255,34 +271,42 @@ class VecRecord(VecEnvWrapper):
         self.id_counter += 1
         self._episode_id[i] = self.id_counter
 
-        if self.use_wandb:
-            caption = f"ep_id={id} | reward={sum(rewards)} | {'success' if sum(rewards) > 0 else 'failure'}"
-            videos = {
-                f"videos/obs.{k}": wandb.Video(
-                    v.transpose(0, 3, 1, 2),
-                    fps=5,
-                    caption=caption,
-                )
-                for k, v in obs.items()
-                if isimg(v[0])
-            }
-            wandb.log(videos)
-
-        obs = du.apply(obs, lambda x: np2npzb(x) if not isimg(x[0]) else np2mp4b(x))
         obs = {
-            f'obs.{k}.{"mp4" if isinstance(v,bytes) else "npz"}': v
+            f'obs.{k}.{"mp4" if isimg(v[0]) else "npz"}': (
+                np2mp4b(v) if isimg(v[0]) else np2npzb(v)
+            )
             for k, v in obs.items()
+        }
+
+        next_obs = {
+            f'next_obs.{k}.{"mp4" if isimg(v[0]) else "npz"}': (
+                np2mp4b(v) if isimg(v[0]) else np2npzb(v)
+            )
+            for k, v in next_obs.items()
         }
 
         sample = {
             "__key__": f"{id}",
             **obs,
+            **next_obs,
             "rewards.json": rewards,
+            "actions.json": actions,
             "dones.json": dones,
-            # "video.mp4": vid,
+            "video.mp4": vid,
             "infos.json": infos,
         }
         self.shard.write(sample)
+
+        if self.use_wandb:
+            caption = f"ep_id={id} | reward={sum(rewards)} | {'success' if sum(rewards) > 0 else 'failure'}"
+            videos = {
+                f"videos/obs.vid": wandb.Video(
+                    frames.transpose(0, 3, 1, 2),
+                    fps=5,
+                    caption=caption,
+                )
+            }
+            wandb.log(videos)
 
         self.episodes[i] = []
 

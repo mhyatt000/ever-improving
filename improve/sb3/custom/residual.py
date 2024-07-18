@@ -11,6 +11,10 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 import numpy as np
 import torch as th
 from gymnasium import spaces
+from improve import cn
+from improve.env import ActionRescaler
+from improve.fm import build_foundation_model
+from improve.sb3.custom import CHEF
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.buffers import DictReplayBuffer, ReplayBuffer
 from stable_baselines3.common.callbacks import BaseCallback
@@ -25,11 +29,6 @@ from stable_baselines3.common.type_aliases import (GymEnv, MaybeCallback,
 from stable_baselines3.common.utils import safe_mean, should_collect_more_steps
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
-
-from improve import cn
-from improve.env import ActionRescaler
-from improve.fm import build_foundation_model
-from improve.sb3.custom import CHEF
 
 
 class OffPolicyResidual(CHEF):
@@ -47,39 +46,8 @@ class OffPolicyResidual(CHEF):
             setattr(self, k, v)
 
         kwargs = deepcopy(asdict(self.algocn))
-        kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k
-            in [
-                "buffer_size",
-                "learning_starts",
-                "batch_size",
-                "tau",
-                "gamma",
-                "train_freq",
-                "gradient_steps",
-                "action_noise",
-                "replay_buffer_class",
-                "replay_buffer_kwargs",
-                "optimize_memory_usage",
-                "policy_kwargs",
-                "stats_window_size",
-                "tensorboard_log",
-                "verbose",
-                "device",
-                "support_multi_env",
-                "monitor_wrapper",
-                "seed",
-                "use_sde",
-                "sde_sample_freq",
-                "use_sde_at_warmup",
-                "sde_support",
-                "supported_action_spaces",
-                "use_original_space",
-                "warmup_zero_action",
-            ]
-        }
+        keys = "buffer_size, learning_starts, batch_size, tau, gamma, train_freq, gradient_steps, action_noise, replay_buffer_class, replay_buffer_kwargs, optimize_memory_usage, policy_kwargs, stats_window_size, tensorboard_log, verbose, device, support_multi_env, monitor_wrapper, seed, use_sde, sde_sample_freq, use_sde_at_warmup, sde_support, supported_action_spaces, use_original_space, warmup_zero_action"
+        kwargs = {k: v for k, v in kwargs.items() if k in keys.split(", ")}
         super().__init__(policy, env, self.algocn.learning_rate, **kwargs)
 
         instructions = self.env.env_method("get_language_instruction")
@@ -336,6 +304,8 @@ class OffPolicyResidual(CHEF):
             self.fm_act = np.zeros((self.env.num_envs, 7), dtype=np.float32)
             self._last_obs["agent_partial-action"] = self.fm_act
 
+            print(self._last_obs)
+            print(self._last_obs.keys())
             self.img = self._last_obs["simpler-img"]
             del self._last_obs["simpler-img"]
 
