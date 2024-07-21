@@ -10,5 +10,6 @@ from .buffer import base
 from .buffer.base import Buffer
 from .env.base import Env
 from .env.foundation.base import RTX, FoundationModel, OctoB, OctoS, RT1Model, Strategy
+from .env.foundation.dont import Dont
 from .env.obs_mode.base import (Hybrid, Image, LowDim, ObsMode, Oracle,
                                 OracleCentral)

@@ -30,6 +30,7 @@ class OffPolicy(Algo):
     warmup_zero_action: bool = True
 
 
+@store
 @dataclass
 class SAC(OffPolicy):
     name: str = "sac"

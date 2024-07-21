@@ -108,7 +108,7 @@ def main(cfg):
     algo = {
         "ppo": PPO,
         "a2c": A2C,
-        "sac": RP_SAC if cfg.env.fm_loc.value == "central" else SAC,
+        "sac": SAC,
         "awac": AWAC,
         "rp_sac": RP_SAC,
         "tqc": TQC,
@@ -132,6 +132,10 @@ def main(cfg):
         model = AWAC("MultiInputPolicy", env, algocn)
 
     else:
+
+        algo_keys = 'policy,env,learning_rate,buffer_size,learning_starts,batch_size,tau,gamma,train_freq,gradient_steps,action_noise,replay_buffer_class,replay_buffer_kwargs,optimize_memory_usage,ent_coef,target_update_interval,target_entropy,use_sde,sde_sample_freq,use_sde_at_warmup,stats_window_size,tensorboard_log,policy_kwargs,verbose,seed,device,_init_setup_model,use_original_space,warmup_zero_action,' 
+        algo_kwargs = {k: v for k, v in algo_kwargs.items() if k in algo_keys}
+
         model = algo(
             "MultiInputPolicy",
             env,

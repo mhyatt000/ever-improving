@@ -18,7 +18,7 @@ def store(cls):
 
     def wrapper(cls):
         tree = inspect.getfile(cls).split(".")[0].split("/")
-        name = cls.name # tree[-1] 
+        name = str(cls.name) # tree[-1] 
         base = tree.index("cn")
         group = '/'.join(tree[base + 1:-1])
 

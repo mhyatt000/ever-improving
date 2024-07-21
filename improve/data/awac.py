@@ -103,6 +103,7 @@ def unscale(action):
 
 
 def preprocess(x: dict):
+    print(x.keys())
     proc = {
         "mp4": decord2mp4,
         "npz": lambda x: x["arr_0"],
@@ -208,11 +209,13 @@ def main():
     dataset = ["sunny-eon-12", "sleek-shadow-99"]
     dataset = ["sunny-eon-12"]
     dataset = ["sleek-cosmos-131"]
-    exp_root = [osp.join(HOME, "improve_logs", x) for x in dataset]
+    dataset = ["still-resonance-165"]
+    dnames = [osp.join(HOME, "improve_logs", x) for x in dataset]
 
     # dnames = [osp.join(e, "eval") for e in exp_root]
-    dnames = [osp.join(e, "train") for e in exp_root]
+    # dnames = [osp.join(e, "train") for e in dnames]
     fnames = list(find_tarballs(dnames))
+
     dataset = mk_dataset(fnames)
 
     reward = 0

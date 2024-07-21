@@ -20,7 +20,7 @@ import improve.wrapper.dict_util as du
 
 class ExtraObservationWrapper(Wrapper):
 
-    def __init__(self, env):
+    def __init__(self, env, use_image):
         super().__init__(env)
 
         # other low dim obs
@@ -42,10 +42,12 @@ class ExtraObservationWrapper(Wrapper):
         for k, v in additions.items():
             self.observation_space[k] = v
 
-        image = self.get_image(self.observation_space.sample())
-        self.observation_space["simpler-img"] = Box(
-            low=0, high=255, shape=image.shape, dtype=np.uint8
-        )
+        self.use_image = use_image
+        if use_image:
+            image = self.get_image(self.observation_space.sample())
+            self.observation_space["simpler-img"] = Box(
+                low=0, high=255, shape=image.shape, dtype=np.uint8
+            )
 
     def observation(self, observation):
         """Returns a modified observation."""
@@ -60,7 +62,9 @@ class ExtraObservationWrapper(Wrapper):
         observation["eef-pose"] = np.array([*tcp.p, *tcp.q])
         observation["obj-pose"] = np.array([*obj.p, *obj.q])
         observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
-        observation["simpler-img"] = self.get_image(observation)
+
+        if self.use_image:
+            observation["simpler-img"] = self.get_image(observation)
 
         return observation
 

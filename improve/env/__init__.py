@@ -18,7 +18,8 @@ from improve.wrapper.simpler.misc import (DownscaleImgWrapper,
                                           GraspDenseRewardWrapper)
 from improve.wrapper.simpler.no_rotation import NoRotationWrapper
 from improve.wrapper.simpler.reach_task import ReachTaskWrapper
-from improve.wrapper.simpler.rescale import RTXRescaleWrapper, ActionRescaleWrapper
+from improve.wrapper.simpler.rescale import (ActionRescaleWrapper,
+                                             RTXRescaleWrapper)
 from improve.wrapper.simpler.source_target import SourceTargetWrapper
 from improve.wrapper.wandb.record import VecRecord
 from improve.wrapper.wandb.vec import WandbVecMonitor
@@ -74,7 +75,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
             **extra,
         )
 
-        if cfg.algo.name == 'awac':
+        if cfg.algo.name == "awac" or cfg.env.foundation.name is None:
             env = ActionRescaleWrapper(env)
 
         if cfg.env.fm_loc.value == "env":
@@ -92,7 +93,10 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
             if cfg.env.action_mask_dims:
                 env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
 
-        env = ExtraObservationWrapper(env)
+        env = ExtraObservationWrapper(
+            env,
+            use_image=cfg.env.obs_mode.mode.value == "rgb",
+        )
 
         if cfg.env.foundation.task in MULTI_OBJ_ENVS:
             print("using src tgt wrapper")

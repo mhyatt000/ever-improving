@@ -49,10 +49,12 @@ class OracleCentral(Oracle):
     obs_keys: List[str] = default(OracleKeys + LowDimKeys + RPKeys + ImageKeys)
 
 
+@store
+@dataclass
 class LowDim(ObsMode):
     name: str = "lowdim"
-    mode: str = Mode.STATE_DICT
-    obs_keys: None = None
+    mode: Mode = Mode.STATE_DICT
+    obs_keys: List[str] = default(OracleKeys + LowDimKeys)
 
 @store
 @dataclass
