@@ -9,7 +9,7 @@ defaults:
   - override /algo: rp_sac
   - override /buffer: base # no HER for now!
   - override /env/foundation: rtx
-  - override /env/obs_mode: oracle-central
+  - override /env/obs_mode: drawer
 
   - _self_
 
@@ -17,7 +17,7 @@ log_dir: ${callback.log_path}
 sweep_id: "jul11_l2bc_rtx"
 
 train:
-  n_steps: ${r_toint:1e6}            # 1M
+  n_steps: ${r_toint:1.5e4}            # 1M
   use_zero_init: True                # cant zero without foundation model
 
 algo:
@@ -42,9 +42,9 @@ env:
     - -4
 
   fm_loc: CENTRAL
-  n_envs: 8
+  n_envs: 2
   foundation:
-    batch_size: 8
+    batch_size: 2
     cached: True
 
 hydra:
@@ -58,11 +58,9 @@ hydra:
   sweeper:
     params:
       env.residual_scale: 1
-        # env.foundation.task: can
-
       env.foundation.task: 
-        google_robot_pick_coke_can
-        # google_robot_move_near,
-        # google_robot_open_drawer,
-        # google_robot_close_drawer,
+        # google_robot_pick_coke_can,
+        # google_robot_open_drawer
+        google_robot_close_drawer
         # google_robot_place_apple_in_closed_top_drawer
+        # google_robot_move_near,

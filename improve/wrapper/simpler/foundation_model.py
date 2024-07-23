@@ -56,10 +56,12 @@ class ExtraObservationWrapper(Wrapper):
         observation["agent"]["qpos-cos"] = np.cos(qpos)
 
         # eef and obj pose
-        tcp, obj = self.get_tcp().pose, self.obj_pose
+        ### CHANGED
+        # tcp, obj = self.get_tcp().pose, self.obj_pose
+        tcp = self.get_tcp().pose
+
         observation["eef-pose"] = np.array([*tcp.p, *tcp.q])
-        observation["obj-pose"] = np.array([*obj.p, *obj.q])
-        observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
+        # observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
         observation["simpler-img"] = self.get_image(observation)
 
         return observation

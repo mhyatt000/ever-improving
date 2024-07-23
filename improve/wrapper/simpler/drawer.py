@@ -19,14 +19,16 @@ class DrawerWrapper(Wrapper):
         
     def drawer_wrt_eef(self):
         """Get the drawer pose with respect to the end-effector frame"""
-        return self.drawer_pose.p - self.get_tcp().pose.p
+        return self.drawer_obj.pose.p - self.get_tcp().pose.p
    
     def observation(self, observation):
-        drawer_pos = self.drawer.pose
+        drawer_pos = self.drawer_obj.pose
         drawer_pos = np.hstack((drawer_pos.p, drawer_pos.q))
         
         observation["drawer-pose"] = drawer_pos
         observation["drawer-pose-wrt-eef"] = self.drawer_wrt_eef()
+        
+        return observation
     
     def reset(self, **kwargs):  
         obs, info = super().reset(**kwargs)

@@ -10,7 +10,7 @@ from improve import cn
 
 class ActionRescaler:
 
-    def __init__(self, strategy: cn.Strategy, residual_scale):
+    def __init__(self, strategy: cn.Strategy, residual_scale=1.0):
         self.strategy = strategy.value
         self.residual_scale = residual_scale
 

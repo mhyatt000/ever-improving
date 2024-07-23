@@ -39,11 +39,19 @@ def concat(arr):
 
     return merge(arr, _concat_helper)
 
-def stack(arr):
+
+def stack(arr, force=False):
     """Stack a list of Dicts on 0 dim."""
 
     def _stack_helper(x, y):
-        assert isinstance(x, np.ndarray) and isinstance(y, np.ndarray)
+        if force==True:
+            x,y = np.array(x), np.array(y)
+        else:
+            ### CHANGED
+            if not isinstance(x, np.ndarray) or not isinstance(y, np.ndarray):
+                print(type(x), type(y))
+                print(x, y)
+            assert isinstance(x, np.ndarray) and isinstance(y, np.ndarray)
 
         if len(x.shape) == len(y.shape):
             return np.stack([x, y])
@@ -76,6 +84,17 @@ def apply(d, func):
         return [apply(item, func) for item in d]
     else:
         return func(d)
+
+
+def apply_mappable(d, func):
+    """Recursively apply func to items in d."""
+
+    if isinstance(d, (OrderedDict, dict)):
+        return {k: apply_mappable(v, func) for k, v in d.items()}
+    else:
+        return func(d)
+
+
 
 
 def apply_both(a, b, func):

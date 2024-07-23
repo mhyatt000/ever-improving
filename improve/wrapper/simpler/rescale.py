@@ -1,4 +1,7 @@
 import gymnasium as gym
+from gymnasium.spaces.box import Box
+from improve import cn
+from improve.env.action_rescale import ActionRescaler
 import numpy as np
 from gymnasium import spaces
 
@@ -81,6 +84,28 @@ class RTXRescaleWrapper(gym.Wrapper):
         # ActionSpaceWrapper ... shape might be less than 7
         action = np.concatenate([action, np.zeros(7 - len(action))])
         action = preprocess_action(action)
+
+        ob, rew, terminated, truncated, info = super().step(action)
+        return ob, rew, terminated, truncated, info
+
+    def reset(self, *args, **kwargs):
+        return super().reset(*args, **kwargs)
+
+
+class ActionRescaleWrapper(gym.Wrapper):
+    def __init__(self, env):
+        """Rescale the action space of the environment
+        new since jul15
+        """
+        super().__init__(env)
+
+        self.scaler = ActionRescaler(cn.Strategy.CLIP, residual_scale=1.0)
+        # dont need the strategies
+
+    def step(self, action):
+
+        action = self.scaler.scale_action(np.array([action]))[0]
+        action[-1] = preprocess_gripper(action[-1])
 
         ob, rew, terminated, truncated, info = super().step(action)
         return ob, rew, terminated, truncated, info

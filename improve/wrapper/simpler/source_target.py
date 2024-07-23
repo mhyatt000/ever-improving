@@ -14,18 +14,17 @@ class SourceTargetWrapper(Wrapper):
         self.env = env
         self.observation_space = self.env.observation_space
         # add src/target object pose to observation space
-        self.observation_space["src-pose"] = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
-        )
-        self.observation_space["tgt-pose"] = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
-        )
-        self.observation_space["src-pose-wrt-eef"] = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
-        )
-        self.observation_space["tgt-pose-wrt-eef"] = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
-        )
+        new_spaces = {
+            "src-pose": 7,
+            "tgt-pose": 7,
+            "src-wrt-eef": 3,
+            "tgt-wrt-eef": 3,
+        }
+        
+        for space, dim in new_spaces.items():
+            self.observation_space[space] = gym.spaces.Box(
+                low=-np.inf, high=np.inf, shape=(dim,), dtype=np.float32)
+        
 
     def objs_wrt_eef(self, obj_pose):
         """Get the object pose with respect to the end-effector frame"""
@@ -42,8 +41,8 @@ class SourceTargetWrapper(Wrapper):
         observation["tgt-pose"] = tgt_pose
 
         # calculate the distance wrt to eef
-        observation["src-pose-wrt-eef"] = self.objs_wrt_eef(self.source_obj_pose)
-        observation["tgt-pose-wrt-eef"] = self.objs_wrt_eef(self.target_obj_pose)
+        observation["src-wrt-eef"] = self.objs_wrt_eef(self.source_obj_pose)
+        observation["tgt-wrt-eef"] = self.objs_wrt_eef(self.target_obj_pose)
 
         return observation
 
@@ -63,24 +62,28 @@ def main(cfg):
 
     from improve.env import make_env
 
-    # multi_obj_envs = []
+    multi_obj_envs = []
     for task in simpler.ENVIRONMENTS:
         cfg.env.foundation.task = task
-        env = make_env(cfg)()
+        env = simpler.make(cfg.env.foundation.task)
         
-        if not env:
-            print("Skipping", task)
+        try:
+            getattr(env, 'source_obj_pose')
+            multi_obj_envs.append(task)
+            print(f"Task {task} is a multi-obj environment")
+        except:
+            print(f"Task {task} is not a multi-obj environment")
+            getattr(env, 'obj_pose')
 
-        final_subtask = env.is_final_subtask()
-        if final_subtask:
-            pass
-        else:
-            print("Current task", env.get_language_instruction())
-            
-        while not final_subtask:
-            env.advance_to_next_subtask()
-            final_subtask = env.is_final_subtask()
-            print("\tsubtask", env.get_language_instruction())
+        # final_subtask = env.is_final_subtask()
+        # print("Final subtask", task)
+
+        # if not final_subtask:
+        #     print("Current task", task)
+        #     while not final_subtask:
+        #         env = env.advance_to_next_subtask()
+        #         final_subtask = env.is_final_subtask()
+        #         print("\tsubtask", final_subtask)
 
         # try:
         #     getattr(env, 'source_obj_pose')
@@ -91,12 +94,12 @@ def main(cfg):
 
         env.close()
 
-    # print(multi_obj_envs)
+    print(multi_obj_envs)
 
-    # import json
+    import json
 
-    # # with open("multi_obj_envs.json", "w") as f:
-    # #     json.dump(multi_obj_envs, f, indent=4)
+    # with open("multi_obj_envs.json", "w") as f:
+    #     json.dump(multi_obj_envs, f, indent=4)
 
     # # env = simpler.make(cfg.env.task)
     # env = make_env(cfg)()

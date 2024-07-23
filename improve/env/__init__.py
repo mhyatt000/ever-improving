@@ -1,8 +1,9 @@
 import os.path as osp
 
 import gymnasium as gym
+from improve.wrapper.simpler.drawer import DrawerWrapper
 import simpler_env as simpler
-from mani_skill2.utils.wrappers import RecordEpisode
+# from mani_skill2.utils.wrappers import RecordEpisode
 from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
                                               VecMonitor, VecVideoRecorder)
 
@@ -18,7 +19,7 @@ from improve.wrapper.simpler.misc import (DownscaleImgWrapper,
                                           GraspDenseRewardWrapper)
 from improve.wrapper.simpler.no_rotation import NoRotationWrapper
 from improve.wrapper.simpler.reach_task import ReachTaskWrapper
-from improve.wrapper.simpler.rescale import RTXRescaleWrapper
+from improve.wrapper.simpler.rescale import RTXRescaleWrapper, ActionRescaleWrapper
 from improve.wrapper.simpler.source_target import SourceTargetWrapper
 from improve.wrapper.wandb.record import VecRecord
 from improve.wrapper.wandb.vec import WandbVecMonitor
@@ -32,7 +33,7 @@ MULTI_OBJ_ENVS = [
     "widowx_spoon_on_towel",
     "widowx_carrot_on_plate",
     "widowx_stack_cube",
-    "widowx_put_eggplant_in_basket",
+    # "widowx_put_eggplant_in_basket",
 ]
 
 
@@ -57,8 +58,9 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
 
         extra = {}
 
-        if cfg.env.obs_mode.mode != "rgb":
-            extra["obs_mode"] = cfg.env.obs_mode.mode
+        ### FIX THIS
+        if cfg.env.obs_mode.mode.value != "rgb":
+            extra["obs_mode"] = cfg.env.obs_mode.mode.value
         if cfg.env.task == "google_robot_pick_horizontal_coke_can":
             extra["success_from_episode_stats"] = False
 
@@ -74,7 +76,10 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
             **extra,
         )
 
-        if cfg.env.fm_loc == "env":
+        if cfg.algo.name == 'awac':
+            env = ActionRescaleWrapper(env)
+
+        if cfg.env.fm_loc.value == "env":
 
             if cfg.env.foundation.name:
                 env = FoundationModelWrapper(
@@ -92,7 +97,12 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         env = ExtraObservationWrapper(env)
 
         if cfg.env.foundation.task in MULTI_OBJ_ENVS:
+            print("using src tgt wrapper")
             env = SourceTargetWrapper(env)
+        
+        if "drawer" in cfg.env.foundation.task:
+            print("using drawer wrapper")
+            env = DrawerWrapper(env)
 
         if cfg.env.seed.force:
             if cfg.env.seed.seeds is not None:
@@ -103,7 +113,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         env = FlattenKeysWrapper(env)
         if cfg.env.obs_keys:
             env = FilterKeysWrapper(env, keys=cfg.env.obs_keys)
-
+            
         # dont need this wrapper if not using grasp task
         if cfg.env.reward == "dense" and not cfg.env.reach:
             env = GraspDenseRewardWrapper(env, clip=0.2)
@@ -117,7 +127,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # if cfg.env.no_quarternion:
         # env = NoRotationWrapper(env)
 
-        if cfg.env.fm_loc == "env":  # otherwise rescale is done in the algo
+        if cfg.env.fm_loc.value == "env":  # otherwise rescale is done in the algo
             if cfg.env.scale_strategy == "clip":
                 env = RTXRescaleWrapper(env)
 
@@ -138,9 +148,9 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # if max_episode_steps is not None:
         # env = ContinuousTaskWrapper(env)
 
-        if record_dir is not None:
-            print(f"TODO RECORD: {record_dir}")
-            # env = RecordEpisode(env, record_dir, info_on_video=True)
+        # if record_dir is not None:
+        # print(f"TODO RECORD: {record_dir}")
+        # env = RecordEpisode(env, record_dir, info_on_video=True)
 
         # print(env.observation_space)
 
@@ -152,23 +162,29 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
     return _init
 
 
-def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None):
+def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
 
     suffix = "eval" if eval_only else "train"
     record_dir = osp.join(log_dir, f"videos/{suffix}")
 
-    if cfg.env.foundation.name is None or cfg.env.fm_loc == "central":
+    if cfg.env.foundation.name is None or cfg.env.fm_loc.value == "central":
         eval_env = SubprocVecEnv(
             [make_env(cfg, record_dir=record_dir) for _ in range(num_envs)]
         )
         eval_env = VecMonitor(eval_env)  # attach this so SB3 can log reward metrics
         eval_env.seed(cfg.job.seed)
         eval_env.reset()
+        
+        if cfg.env.record:
+            env = VecRecord(eval_env, osp.join(log_dir, "train"), use_wandb=True)
+        else:
+            env = eval_env
 
         return (
             # big slow down
-            # VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=False,),
-            eval_env,
+            #VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=True,),
+            env,
+            # eval_env,
             VecRecord(
                 eval_env,
                 osp.join(log_dir, "eval"),
@@ -197,8 +213,8 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None)
         return env, eval_env
 
     # using foundation model ... only one env allowed
-    if cfg.env.foundation.name and cfg.env.fm_loc == "env":
-        num = 1 if cfg.env.fm_loc == "env" else num_envs
+    if cfg.env.foundation.name and cfg.env.fm_loc.value == "env":
+        num = 1 if cfg.env.fm_loc.value == "env" else num_envs
         print(cfg.env.foundation.name)
         env = SubprocVecEnv(
             [
@@ -215,6 +231,11 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None)
         env = VecMonitor(env)
         # if cfg.job.wandb.use:
         # env = WandbVecMonitor(env, logger)
+        
+        # add dataset recorder
+        if cfg.env.record:
+            env = VecRecord(env, log_dir, use_wandb=True)
+            print("recording data")
 
         print("wrapped env")
 

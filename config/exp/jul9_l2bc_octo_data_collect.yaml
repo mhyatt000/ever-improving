@@ -9,21 +9,23 @@ defaults:
   - override /algo: sac
   - override /buffer: base # no HER for now!
   - override /env/foundation: octo-small
-  - override /env/obs_mode: oracle-central
+  - override /env/obs_mode: src-target
 
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jul9_l2bc_octo"
+sweep_id: "jul9_l2bc_octo_data_collect"
 
 train:
-  n_steps: ${r_toint:1e6} # 1M
+  n_steps: ${r_toint:5e4} # 1M
   use_zero_init: True # cant zero without foundation model
 
 algo:
   buffer_size: ${r_toint:1e6}
   warmup_zero_action: True # gaussian
   batch_size: 512
+
+  # to use only FM
   learning_starts: ${r_toint:1e4}
 
   learning_rate: ${r_tofloat:3e-4}
@@ -57,8 +59,7 @@ hydra:
   sweeper:
     params:
       env.residual_scale: 1
-      env.foundation.task: 
-        widowx_put_eggplant_in_basket,
-        widowx_spoon_on_towel,
-        widowx_carrot_on_plate,
+      env.foundation.task:
+        # widowx_spoon_on_towel,
+        # widowx_carrot_on_plate,
         widowx_stack_cube
