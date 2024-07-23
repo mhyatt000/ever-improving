@@ -5,7 +5,9 @@ from typing import (Any, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar,
                     Union)
 
 import numpy as np
+import torch
 import torch as th
+import wandb
 from gymnasium import spaces
 from omegaconf import OmegaConf as OC
 from stable_baselines3.common.buffers import ReplayBuffer
@@ -22,33 +24,12 @@ from stable_baselines3.sac.policies import (Actor, CnnPolicy, MlpPolicy,
                                             MultiInputPolicy, SACPolicy)
 from stable_baselines3.sac.sac import SAC
 from torch.nn import functional as F
+from tqdm import tqdm
 
 import improve.wrapper.dict_util as du
-import wandb
 from improve import cn
-from improve.data.awac import ep2step, find_tarballs, mk_dataset
-
-
-def steps2batch(dataset):
-
-    def _mk_batch(steps):
-        obs = du.stack([s[0] for s in steps], force=True)
-        next_obs = du.stack([s[1] for s in steps], force=True)
-        actions = np.array([s[2] for s in steps])
-        rewards = np.array([s[3] for s in steps])
-        dones = np.array([s[4] for s in steps])
-        infos = [s[5] for s in steps]  # i guess these arent stacked?
-        return obs, next_obs, actions, rewards, dones, infos
-
-    queue = []
-    for sample in dataset:
-        steps = list(ep2step(sample))
-        for s in steps:
-            queue.append(s)
-            if len(queue) == 8:
-                batch = _mk_batch(queue)
-                queue = []
-                yield batch
+# from improve.data.awac import ep2step, find_tarballs, mk_dataset
+from improve.data.dl import DefaultTransform, MyOfflineDS
 
 
 class AWAC(SAC):
@@ -94,21 +75,35 @@ class AWAC(SAC):
         # SAC will set up the model
         assert self.dataset is not None
         self.dataset = [osp.join(self.log_path, d) for d in self.dataset]
-        fnames = list(find_tarballs(self.dataset))
-        # fnames = [x for x in list(find_tarballs(self.dataset)) if "eval" in x]
-        dataset = mk_dataset(fnames)
-        for batch in steps2batch(dataset):
-            # print(batch)
-            self.replay_buffer.add(*batch)
+        self.dataset = [osp.join(d, "train") for d in self.dataset]
+        self.dataset = [
+            MyOfflineDS(d, seq=1, transform=DefaultTransform()) for d in self.dataset
+        ][0]
 
-        """
-        for u in [model.actor.mu, model.actor.log_std]:
-            u.weight.data.fill_(0)
-            u.bias.data.fill_(0)
+        # concat does not support iterdataset
+        # self.dataset = torch.utils.data.ConcatDataset(self.dataset)
 
-        self.actor.log_std.weight.data.fill_(0.1)
-        self.actor.log_std.bias.data.fill_(1)
-        """
+        self.bs = 8
+        self.loader = torch.utils.data.DataLoader(
+            self.dataset,
+            batch_size=self.bs,
+            num_workers=0,  # 8?
+            shuffle=False,  # cuz iterdataset
+            # prefetch_factor=2,
+            pin_memory=True,
+            drop_last=True,
+        )
+
+        for batch in tqdm(self.loader):
+            infos = [du.apply(batch["infos"], lambda x: x[i]) for i in range(self.bs)]
+            self.replay_buffer.add(
+                batch["obs"],
+                batch["next_obs"],
+                batch["actions"],
+                batch["rewards"],
+                batch["dones"],
+                infos,
+            )
 
     def update(batch):
         """
@@ -248,8 +243,8 @@ class AWAC(SAC):
             # actor_losses.append(mse_loss.item())
             # actor_loss +=  mse_loss
 
-            # awac_loss = -(F.softmax(advantage / self.beta) * log_prob).mean()
-            awac_loss = -(th.exp(advantage / self.beta) * log_prob).mean()
+            awac_loss = -(F.softmax(advantage / self.beta) * log_prob).mean()
+            # awac_loss = -(th.exp(advantage / self.beta) * log_prob).mean()
             # awac_loss = (th.exp(advantage / self.beta) * mse_loss).mean()
             actor_losses.append(awac_loss.item())
             self.logger.record("train/awac_loss", awac_loss.item())

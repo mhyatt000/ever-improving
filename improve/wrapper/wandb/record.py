@@ -1,4 +1,5 @@
 import copy
+import torch
 import functools
 import io
 import os.path as osp
@@ -11,17 +12,18 @@ from typing import Optional, Tuple
 import gymnasium as gym
 import imageio
 import numpy as np
-import webdataset as wds
+import wandb
+# DONT USE import webdataset as wds
 from gymnasium import spaces
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.vec_env.base_vec_env import (VecEnv, VecEnvObs,
                                                            VecEnvStepReturn,
                                                            VecEnvWrapper)
 
-import wandb
 from improve.wrapper import dict_util as du
 
 
+"""
 def np2mp4b(data):
     vbytes = io.BytesIO()
     writer = imageio.get_writer(vbytes, format="mp4", mode="I", fps=5)
@@ -38,6 +40,7 @@ def np2npzb(data):
     np.savez_compressed(buf, data)
     buf.seek(0)
     return buf.getvalue()
+"""
 
 
 def isimg(o):
@@ -97,7 +100,7 @@ class VecRecord(VecEnvWrapper):
 
         now = time.strftime("%Y%m%d")
         self.fname = osp.join(self.output_dir, f"{now}-%06d.tar")
-        self.shard = wds.ShardWriter(self.fname)
+        # self.shard = wds.ShardWriter(self.fname)
         # sink.write(sample)
 
         self.episodes = [[] for _ in range(self.num_envs)]
@@ -253,7 +256,8 @@ class VecRecord(VecEnvWrapper):
         # print(obs[0]['agent_base_pose'])
 
         frames = self.renders[i][:, :, 512:1024]
-        vid = np2mp4b(frames)
+        # vid = np2mp4b(frames)
+        vid = frames
         self.renders[i] = None
 
         # print(len(ep))
@@ -271,31 +275,33 @@ class VecRecord(VecEnvWrapper):
         self.id_counter += 1
         self._episode_id[i] = self.id_counter
 
+        """ this was only for wds tarball
         obs = {
             f'obs.{k}.{"mp4" if isimg(v[0]) else "npz"}': (
                 np2mp4b(v) if isimg(v[0]) else np2npzb(v)
             )
             for k, v in obs.items()
         }
-
         next_obs = {
             f'next_obs.{k}.{"mp4" if isimg(v[0]) else "npz"}': (
                 np2mp4b(v) if isimg(v[0]) else np2npzb(v)
             )
             for k, v in next_obs.items()
         }
+        """
 
         sample = {
             "__key__": f"{id}",
             **obs,
             **next_obs,
-            "rewards.json": rewards,
-            "actions.json": actions,
-            "dones.json": dones,
-            "video.mp4": vid,
-            "infos.json": infos,
+            "rewards": np.array(rewards),
+            "actions": np.array(actions),
+            "dones": np.array(dones),
+            "video": np.array(vid),
+            "infos": np.array(infos),
         }
-        self.shard.write(sample)
+        torch.save(sample, f"{self.output_dir}/{id}.pt")
+        # self.shard.write(sample)
 
         if self.use_wandb:
             caption = f"ep_id={id} | reward={sum(rewards)} | {'success' if sum(rewards) > 0 else 'failure'}"
@@ -313,7 +319,7 @@ class VecRecord(VecEnvWrapper):
     def close(self) -> None:
         for i in range(self.num_envs):
             try_ex(self.flush(i))
-        self.shard.close()
+        # self.shard.close()
 
         return super().close()
 
