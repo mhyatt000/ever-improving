@@ -60,3 +60,6 @@ class Env:
     no_quarternion: bool = False
     reach: bool = False
     fm_loc: FMLoc = FMLoc.CENTRAL
+    
+    # record dataset
+    record: bool = False

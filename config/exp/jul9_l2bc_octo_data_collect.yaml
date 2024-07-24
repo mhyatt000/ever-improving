@@ -6,33 +6,30 @@
 
 defaults:
 # - /launcher: base
-  - override /algo: awac
-  - override /buffer: base 
+  - override /algo: sac
+  - override /buffer: base # no HER for now!
   - override /env/foundation: octo-small
-  - override /env/obs_mode: awac_drawer
-  # - override /env/obs_mode: awac
-  # - override /env/obs_mode: awac_multi
+  - override /env/obs_mode: src-target
 
   - _self_
 
 log_dir: ${callback.log_path}
-sweep_id: "jul15_awac"
+sweep_id: "jul9_l2bc_octo_data_collect"
 
 train:
-  n_steps: ${r_toint:1e6} # 1M
-  use_zero_init: False # cant zero with AWAC
+  n_steps: ${r_toint:5e4} # 1M
+  use_zero_init: True # cant zero without foundation model
 
 algo:
   buffer_size: ${r_toint:1e6}
-    # warmup_zero_action: True # gaussian
-    # batch_size: 1024
-    # learning_starts: ${r_toint:1e4}
+  warmup_zero_action: True # gaussian
+  batch_size: 512
+
+  # to use only FM
+  learning_starts: ${r_toint:1e4}
 
   learning_rate: ${r_tofloat:3e-4}
   target_entropy: -7.0 # from SAC applications
-
-  # for google can 
-  # dataset: [sleek-cosmos-131]
 
 env:
   goal:
@@ -42,11 +39,9 @@ env:
   fm_loc: CENTRAL
 
   downscale: 1
-  n_envs: 8
-
-  # why foundation?
+  n_envs: 6
   foundation:
-    batch_size: 2
+    batch_size: 6
   action_mask_dims: 
     - -1
     - -2
@@ -64,10 +59,7 @@ hydra:
   sweeper:
     params:
       env.residual_scale: 1
-      env.foundation.task: 
-        google_robot_pick_coke_can
-        # widowx_put_eggplant_in_basket
-        #
-        # widowx_spoon_on_towel
+      env.foundation.task:
+        # widowx_spoon_on_towel,
         # widowx_carrot_on_plate,
-        # widowx_stack_cube
+        widowx_stack_cube

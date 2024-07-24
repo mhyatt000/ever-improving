@@ -1,11 +1,6 @@
 import gymnasium as gym
 import numpy as np
-import simpler_env as simpler
 from gymnasium.core import Wrapper
-
-import hydra
-import improve
-import improve.hydra.resolver
 
 
 class SourceTargetWrapper(Wrapper):
@@ -18,9 +13,10 @@ class SourceTargetWrapper(Wrapper):
         new_spaces = {
             "src-pose": 7,
             "tgt-pose": 7,
-            "src-pose-wrt-eef": 3,
-            "tgt-pose-wrt-eef": 3,
+            "src-wrt-eef": 3,
+            "tgt-wrt-eef": 3,
         }
+
         for space, dim in new_spaces.items():
             self.observation_space[space] = gym.spaces.Box(
                 low=-np.inf, high=np.inf, shape=(dim,), dtype=np.float32
@@ -39,10 +35,8 @@ class SourceTargetWrapper(Wrapper):
 
         observation["src-pose"] = src_pose
         observation["tgt-pose"] = tgt_pose
-
-        # calculate the distance wrt to eef
-        observation["src-pose-wrt-eef"] = self.wrt_eef(self.source_obj_pose)
-        observation["tgt-pose-wrt-eef"] = self.wrt_eef(self.target_obj_pose)
+        observation["src-wrt-eef"] = self.objs_wrt_eef(self.source_obj_pose)
+        observation["tgt-wrt-eef"] = self.objs_wrt_eef(self.target_obj_pose)
 
         return observation
 

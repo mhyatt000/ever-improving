@@ -24,6 +24,11 @@ SourceTargetKeys = [
     "tgt-wrt-eef",
 ]
 
+DrawerKeys = [
+    "drawer-pose",
+    "drawer-pose-wrt-eef",
+]
+
 
 class Mode(Enum):
     RGB = "rgb"
@@ -79,6 +84,13 @@ class SrcTgt(ObsMode):
         SourceTargetKeys + LowDimKeys + RPKeys + OracleKeys + ImageKeys
     )
 
+@store
+@dataclass
+class Drawer(ObsMode):
+    name: str = "drawer"
+    obs_keys: List[str] = default(
+        DrawerKeys + LowDimKeys + RPKeys + ImageKeys
+    )
 
 @store
 @dataclass
@@ -86,4 +98,22 @@ class AWAC(ObsMode):
     name: str = "awac"
     # no img keys
     obs_keys: List[str] = default(LowDimKeys + OracleKeys)
+    # obs_keys: List[str] = default(ImageKeys)
+
+### CHANGED
+@store
+@dataclass
+class AWACMulti(ObsMode):
+    name: str = "awac_multi"
+    # no img keys
+    obs_keys: List[str] = default(LowDimKeys + SourceTargetKeys)
+    # obs_keys: List[str] = default(ImageKeys)
+    
+### CHANGED
+@store
+@dataclass
+class AWACDrawer(ObsMode):
+    name: str = "awac_drawer"
+    # no img keys
+    obs_keys: List[str] = default(LowDimKeys + DrawerKeys)
     # obs_keys: List[str] = default(ImageKeys)

@@ -33,7 +33,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
 
 @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
 def main(cfg):
-
+    
     if cfg.job.wandb.use:
         print("Using wandb")
         run = wandb.init(

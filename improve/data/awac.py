@@ -81,16 +81,39 @@ LowDimKeys = [
     "eef-pose",
 ]
 
+SourceTargetKeys = [
+    "src-pose",
+    "tgt-pose",
+    "src-wrt-eef",
+    "tgt-wrt-eef",
+]
+
+DrawerKeys = [
+    "drawer-pose",
+    "drawer-pose-wrt-eef",
+]
+
 RPKeys = ["agent_partial-action"]
 OracleKeys = ["obj-wrt-eef"]
 ImageKeys = ["simpler-img"]
 
 
-def filter_keys(obs):
+def filter_keys(obs, task=None):
 
     if "simpler-img" in obs:
         obs["simpler-img"] = np.transpose(obs["simpler-img"], (0, 3, 1, 2))
-    obs = {k: v for k, v in obs.items() if k in LowDimKeys + OracleKeys}
+
+    obs_keys = LowDimKeys
+    if any(word in task for word in ["spoon", "near", "carrot", "cube"]):
+        obs_keys += SourceTargetKeys
+    elif "drawer" in task:
+        obs_keys += DrawerKeys
+    else:
+        obs_keys += OracleKeys
+
+    obs = {k: v for k, v in obs.items() if k in obs_keys}  ### CHANGED
+    # obs = {k: v for k, v in obs.items() if k in LowDimKeys + OracleKeys}#OracleKeys
+    # obs = {k: v for k, v in obs.items() if k in LowDimKeys + SourceTargetKeys}#OracleKeys}  ### CHANGED
     # obs = {k: v for k, v in obs.items() if k in ImageKeys}
     return obs
 
@@ -102,10 +125,8 @@ def unscale(action):
     return scaler.unscale_for_obs(action)
 
 
-def preprocess(x: dict):
-    print(x.keys())
+def preprocess(x: dict, task=None):
     proc = {
-        "mp4": decord2mp4,
         "npz": lambda x: x["arr_0"],
     }
 
@@ -125,8 +146,8 @@ def preprocess(x: dict):
     actions = scaler.unscale_for_obs(actions)
 
     return (
-        filter_keys(x["obs"]),
-        filter_keys(x["next_obs"]),
+        filter_keys(x["obs"], task=task),  # CHANGE THIS
+        filter_keys(x["next_obs"], task=task),
         actions,
         x["rewards"],
         x["dones"],
@@ -155,7 +176,7 @@ def ep2step(ep: Tuple[Any]):
         yield tuple(select(e, i) for e in ep)
 
 
-def mk_dataset(fnames):
+def mk_dataset(fnames, task=None):
 
     dataset = wds.DataPipeline(
         wds.SimpleShardList(fnames),
@@ -174,7 +195,7 @@ def mk_dataset(fnames):
         # this decodes the images and json
         wds.decode(),
         # wds.to_tuple("png", "json"),
-        wds.map(preprocess),
+        wds.map(lambda x: preprocess(x, task=task)),
         # wds.map(ep2step),
         # For IterableDataset objects, the batching needs to happen in the dataset.
         # wds.batched(16),

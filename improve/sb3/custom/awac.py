@@ -250,6 +250,8 @@ class AWAC(SAC):
             self.logger.record("train/awac_loss", awac_loss.item())
             actor_loss = awac_loss
 
+            ### TODO: take out gripper loss and see if distribution is at 0
+            ### TODO: for rtx exp, introduce another for 0 gripper action to add to gripper loss
             gripper_loss = F.smooth_l1_loss(
                 actions_pi, replay.actions, reduction="none"
             )[:, -1]

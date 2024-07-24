@@ -1,6 +1,7 @@
 import os.path as osp
 
 import gymnasium as gym
+from improve.wrapper.simpler.drawer import DrawerWrapper
 import simpler_env as simpler
 # from mani_skill2.utils.wrappers import RecordEpisode
 from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
@@ -58,6 +59,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
 
         extra = {}
 
+        ### FIX THIS
         if cfg.env.obs_mode.mode.value != "rgb":
             extra["obs_mode"] = cfg.env.obs_mode.mode.value
         if cfg.env.task == "google_robot_pick_horizontal_coke_can":
@@ -101,6 +103,10 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         if cfg.env.foundation.task in MULTI_OBJ_ENVS:
             print("using src tgt wrapper")
             env = SourceTargetWrapper(env)
+        
+        if "drawer" in cfg.env.foundation.task:
+            print("using drawer wrapper")
+            env = DrawerWrapper(env)
 
         if cfg.env.seed.force:
             if cfg.env.seed.seeds is not None:
@@ -111,7 +117,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         env = FlattenKeysWrapper(env)
         if cfg.env.obs_keys:
             env = FilterKeysWrapper(env, keys=cfg.env.obs_keys)
-
+            
         # dont need this wrapper if not using grasp task
         if cfg.env.reward == "dense" and not cfg.env.reach:
             env = GraspDenseRewardWrapper(env, clip=0.2)
@@ -150,6 +156,8 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         # print(f"TODO RECORD: {record_dir}")
         # env = RecordEpisode(env, record_dir, info_on_video=True)
 
+        # print(env.observation_space)
+
         return env
 
     # if cfg.job.wandb.use:
@@ -170,11 +178,17 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
         eval_env = VecMonitor(eval_env)  # attach this so SB3 can log reward metrics
         eval_env.seed(cfg.job.seed)
         eval_env.reset()
+        
+        if cfg.env.record:
+            env = VecRecord(eval_env, osp.join(log_dir, "train"), use_wandb=True)
+        else:
+            env = eval_env
 
         return (
             # big slow down
-            # VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=True,),
-            eval_env,
+            #VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=True,),
+            env,
+            # eval_env,
             VecRecord(
                 eval_env,
                 osp.join(log_dir, "eval"),
@@ -221,6 +235,11 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
         env = VecMonitor(env)
         # if cfg.job.wandb.use:
         # env = WandbVecMonitor(env, logger)
+        
+        # add dataset recorder
+        if cfg.env.record:
+            env = VecRecord(env, log_dir, use_wandb=True)
+            print("recording data")
 
         print("wrapped env")
 

@@ -246,11 +246,11 @@ class VecRecord(VecEnvWrapper):
         ep = self.episodes[i]
 
         obs = [x["obs"] for x in ep]
-        obs = du.stack(obs)
+        obs = du.stack(obs, force=True)
 
         # TODO fix this... youre essentially writing 2x the data
         next_obs = [x["next_obs"] for x in ep]
-        next_obs = du.stack(next_obs)
+        next_obs = du.stack(next_obs, force=True)
 
         # print(du.apply(obs, lambda x: type(x)))
         # print(obs[0]['agent_base_pose'])

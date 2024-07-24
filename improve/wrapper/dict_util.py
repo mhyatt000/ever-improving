@@ -47,6 +47,10 @@ def stack(arr, force=False):
         if force==True:
             x,y = np.array(x), np.array(y)
         else:
+            ### CHANGED
+            if not isinstance(x, np.ndarray) or not isinstance(y, np.ndarray):
+                print(type(x), type(y))
+                print(x, y)
             assert isinstance(x, np.ndarray) and isinstance(y, np.ndarray)
 
         if len(x.shape) == len(y.shape):

@@ -1,0 +1,66 @@
+# @package _global_
+
+# help with sweepers
+# https://stackoverflow.com/questions/70619014/specify-hydra-multirun-sweeps-in-a-config-file
+# https://github.com/facebookresearch/hydra/issues/1376#issuecomment-1011704938
+
+defaults:
+# - /launcher: base
+  - override /algo: rp_sac
+  - override /buffer: base # no HER for now!
+  - override /env/foundation: rtx
+  - override /env/obs_mode: drawer
+
+  - _self_
+
+log_dir: ${callback.log_path}
+sweep_id: "jul11_l2bc_rtx"
+
+train:
+  n_steps: ${r_toint:1.5e4}            # 1M
+  use_zero_init: True                # cant zero without foundation model
+
+algo:
+  buffer_size: ${r_toint:1e6}
+  warmup_zero_action: True           # zero or (False=gaussian)
+  batch_size: 512 #                  
+  learning_starts: ${r_toint:1e4}   
+
+  learning_rate: ${r_tofloat:3e-4}
+  target_entropy: -7.0               # from SAC applications
+
+env:
+  goal:
+    use: False
+  use_original_space: False         # ppo doesnt support this rn
+
+  downscale: 1
+  action_mask_dims: 
+    - -1
+    - -2
+    - -3
+    - -4
+
+  fm_loc: CENTRAL
+  n_envs: 2
+  foundation:
+    batch_size: 2
+    cached: True
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+  mode: MULTIRUN # needed or else -m flag
+  sweeper:
+    params:
+      env.residual_scale: 1
+      env.foundation.task: 
+        # google_robot_pick_coke_can,
+        # google_robot_open_drawer
+        google_robot_close_drawer
+        # google_robot_place_apple_in_closed_top_drawer
+        # google_robot_move_near,
