@@ -149,7 +149,7 @@ class AWAC(SAC):
         # Update learning rate according to lr schedule
         self._update_learning_rate(optimizers)
 
-        # ent_coef_losses, ent_coefs = [], []
+        ent_coef_losses, ent_coefs = [], []
         actor_losses, critic_losses = [], []
 
         for gradient_step in range(gradient_steps):
@@ -160,9 +160,32 @@ class AWAC(SAC):
             if self.use_sde:
                 self.actor.reset_noise()
 
-            """
-            # entropy opt was here
-            """
+            # Action by the current actor for the sampled state
+            actions_pi, log_prob = self.actor.action_log_prob(replay_data.observations)
+            log_prob = log_prob.reshape(-1, 1)
+
+            ent_coef_loss = None
+            if self.ent_coef_optimizer is not None and self.log_ent_coef is not None:
+                # Important: detach the variable from the graph
+                # so we don't change it with other losses
+                # see https://github.com/rail-berkeley/softlearning/issues/60
+                ent_coef = th.exp(self.log_ent_coef.detach())
+                ent_coef_loss = -(
+                    self.log_ent_coef * (log_prob + self.target_entropy).detach()
+                ).mean()
+                ent_coef_losses.append(ent_coef_loss.item())
+            else:
+                ent_coef = self.ent_coef_tensor
+
+            ent_coefs.append(ent_coef.item())
+
+            # Optimize entropy coefficient, also called
+            # entropy temperature or alpha in the paper
+            if ent_coef_loss is not None and self.ent_coef_optimizer is not None:
+                self.ent_coef_optimizer.zero_grad()
+                ent_coef_loss.backward()
+                self.ent_coef_optimizer.step()
+
 
             #
             # compute critic loss
@@ -179,9 +202,13 @@ class AWAC(SAC):
                     dim=1,
                 )
                 next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
-                # td error but NO entropy term
+                # add entropy term
+                next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+                # td error + entropy term
+
                 target_q_values = (
-                    replay.rewards + (1 - replay.dones) * self.gamma * next_q_values
+                    replay.rewards
+                    + (1 - replay.dones) * self.gamma * next_q_values
                 )
 
             # Get current Q-values estimates for each critic network
@@ -239,7 +266,7 @@ class AWAC(SAC):
 
             mse_loss = F.mse_loss(actions_pi, replay.actions, reduction="none").mean(1)
 
-            # self.logger.record("train/mse_loss", mse_loss.item())
+            self.logger.record("train/mse_loss", mse_loss.item())
             # actor_losses.append(mse_loss.item())
             # actor_loss +=  mse_loss
 
@@ -285,6 +312,10 @@ class AWAC(SAC):
             self.logger.record("stats/prediction/roll", wandb.Histogram(act[:, 5]))
             self.logger.record("stats/prediction/gripper", wandb.Histogram(act[:, 6]))
 
+            # model qval predictions
+            q = q.view(-1).cpu().detach().numpy()
+            self.logger.record("stats/prediction/q", wandb.Histogram(q))
+
             # Optimize the actor
             self.actor.optimizer.zero_grad()
             actor_loss.backward()
@@ -312,15 +343,15 @@ class AWAC(SAC):
         self._n_updates += gradient_steps
 
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        # self.logger.record("train/ent_coef", np.mean(ent_coefs))
+        self.logger.record("train/ent_coef", np.mean(ent_coefs))
 
         advantage = advantage.cpu().detach().numpy()
         self.logger.record("stats/advantage", wandb.Histogram(advantage))
 
         self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
-        # if len(ent_coef_losses) > 0:
-        # self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
+        if len(ent_coef_losses) > 0:
+            self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
     def learn(
         self,
