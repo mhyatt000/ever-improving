@@ -35,8 +35,10 @@ class SourceTargetWrapper(Wrapper):
 
         observation["src-pose"] = src_pose
         observation["tgt-pose"] = tgt_pose
-        observation["src-wrt-eef"] = self.objs_wrt_eef(self.source_obj_pose)
-        observation["tgt-wrt-eef"] = self.objs_wrt_eef(self.target_obj_pose)
+
+        # calculate the distance wrt to eef
+        observation["src-wrt-eef"] = self.wrt_eef(self.source_obj_pose)
+        observation["tgt-wrt-eef"] = self.wrt_eef(self.target_obj_pose)
 
         return observation
 

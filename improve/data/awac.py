@@ -100,9 +100,7 @@ ImageKeys = ["simpler-img"]
 
 def filter_keys(obs, task=None):
 
-    if "simpler-img" in obs:
-        obs["simpler-img"] = np.transpose(obs["simpler-img"], (0, 3, 1, 2))
-
+    # TODO make concise... use the proper cn.env.obs_mode as specified in the cfg
     obs_keys = LowDimKeys
     if any(word in task for word in ["spoon", "near", "carrot", "cube"]):
         obs_keys += SourceTargetKeys
@@ -111,10 +109,11 @@ def filter_keys(obs, task=None):
     else:
         obs_keys += OracleKeys
 
-    obs = {k: v for k, v in obs.items() if k in obs_keys}  ### CHANGED
-    # obs = {k: v for k, v in obs.items() if k in LowDimKeys + OracleKeys}#OracleKeys
-    # obs = {k: v for k, v in obs.items() if k in LowDimKeys + SourceTargetKeys}#OracleKeys}  ### CHANGED
-    # obs = {k: v for k, v in obs.items() if k in ImageKeys}
+    obs = {k: v for k, v in obs.items() if k in obs_keys}
+
+    if "simpler-img" in obs: # after filter to reduce compute cost
+        obs["simpler-img"] = np.transpose(obs["simpler-img"], (0, 3, 1, 2))
+
     return obs
 
 

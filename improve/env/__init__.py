@@ -1,29 +1,10 @@
 import os.path as osp
 
 import gymnasium as gym
-from improve.wrapper.simpler.drawer import DrawerWrapper
+import improve.wrapper as W # TODO add all the wrappers to wrapper.__init__.py
 import simpler_env as simpler
-# from mani_skill2.utils.wrappers import RecordEpisode
 from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
                                               VecMonitor, VecVideoRecorder)
-
-from improve.wrapper.force_seed import ForceSeedWrapper
-from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
-from improve.wrapper.sb3.successinfo import SuccessInfoWrapper
-from improve.wrapper.simpler import (ActionSpaceWrapper,
-                                     ExtraObservationWrapper,
-                                     FoundationModelWrapper)
-from improve.wrapper.simpler.misc import (DownscaleImgWrapper,
-                                          FilterKeysWrapper,
-                                          FlattenKeysWrapper,
-                                          GraspDenseRewardWrapper)
-from improve.wrapper.simpler.no_rotation import NoRotationWrapper
-from improve.wrapper.simpler.reach_task import ReachTaskWrapper
-from improve.wrapper.simpler.rescale import (ActionRescaleWrapper,
-                                             RTXRescaleWrapper)
-from improve.wrapper.simpler.source_target import SourceTargetWrapper
-from improve.wrapper.wandb.record import VecRecord
-from improve.wrapper.wandb.vec import WandbVecMonitor
 
 from .action_rescale import ActionRescaler
 
@@ -78,12 +59,13 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         )
 
         if cfg.algo.name == "awac" or cfg.env.foundation.name is None:
-            env = ActionRescaleWrapper(env)
+            env = W.ActionRescaleWrapper(env)
+            env = W.AwacRewardWrapper(env)
+            print("shifting reward dist to [-1, 0]")
 
         if cfg.env.fm_loc.value == "env":
-
             if cfg.env.foundation.name:
-                env = FoundationModelWrapper(
+                env = W.FoundationModelWrapper(
                     env,
                     task=cfg.env.foundation.task,
                     policy=cfg.env.foundation.name,
@@ -93,64 +75,65 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
                 )
 
             if cfg.env.action_mask_dims:
-                env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
+                env = W.ActionSpaceWrapper(env, cfg.env.action_mask_dims)
 
-        env = ExtraObservationWrapper(
+        env = W.StickyGripperWrapper(env, task=cfg.env.foundation.task)
+        env = W.ExtraObservationWrapper(
             env,
             use_image=cfg.env.obs_mode.mode.value == "rgb",
         )
 
         if cfg.env.foundation.task in MULTI_OBJ_ENVS:
             print("using src tgt wrapper")
-            env = SourceTargetWrapper(env)
+            env = W.SourceTargetWrapper(env)
         
         if "drawer" in cfg.env.foundation.task:
             print("using drawer wrapper")
-            env = DrawerWrapper(env)
+            env = W.DrawerWrapper(env)
 
         if cfg.env.seed.force:
             if cfg.env.seed.seeds is not None:
-                env = ForceSeedWrapper(env, seeds=cfg.env.seed.seeds, verbose=True)
+                env = W.ForceSeedWrapper(env, seeds=cfg.env.seed.seeds, verbose=True)
             else:
-                env = ForceSeedWrapper(env, seed=cfg.env.seed.value, verbose=True)
+                env = W.ForceSeedWrapper(env, seed=cfg.env.seed.value, verbose=True)
 
-        env = FlattenKeysWrapper(env)
+        env = W.FlattenKeysWrapper(env)
         if cfg.env.obs_keys:
-            env = FilterKeysWrapper(env, keys=cfg.env.obs_keys)
+            env = W.FilterKeysWrapper(env, keys=cfg.env.obs_keys)
             
         # dont need this wrapper if not using grasp task
         if cfg.env.reward == "dense" and not cfg.env.reach:
-            env = GraspDenseRewardWrapper(env, clip=0.2)
+            env = W.GraspDenseRewardWrapper(env, clip=0.2)
 
         if cfg.env.downscale != 1:
-            env = DownscaleImgWrapper(env, downscale=cfg.env.downscale)
+            env = W.DownscaleImgWrapper(env, downscale=cfg.env.downscale)
 
-        # NOTE: replaced by ActionSpaceWrapper since it is more general
+        # NOTE: replaced by W.ActionSpaceWrapper since it is more general
         # must be closer to simpler than rescale
         # this way it overrides the rescale
         # if cfg.env.no_quarternion:
-        # env = NoRotationWrapper(env)
+        # env = W.NoRotationWrapper(env)
 
         if cfg.env.fm_loc.value == "env":  # otherwise rescale is done in the algo
             if cfg.env.scale_strategy == "clip":
-                env = RTXRescaleWrapper(env)
+                env = W.RTXRescaleWrapper(env)
 
         if cfg.env.reach:
-            env = ReachTaskWrapper(
+            env = W.ReachTaskWrapper(
                 env,
                 use_sparse_reward=cfg.env.reward == "sparse",
                 thresh=0.05,
                 reward_clip=0.2,
             )
 
-        env = SuccessInfoWrapper(env)
+        env = W.SuccessInfoWrapper(env)
 
-        # env = WandbActionStatWrapper( env, logger, names=["x", "y", "z", "rx", "ry", "rz", "gripper"],)
+        # env = W.WandbActionStatWrapper( env, logger, names=["x", "y", "z", "rx", "ry", "rz", "gripper"],)
 
         # For training, we regard the task as a continuous task with infinite horizon.
-        # you can use the ContinuousTaskWrapper here for that
+        # you can use the W.ContinuousTaskWrapper here for that
         # if max_episode_steps is not None:
-        # env = ContinuousTaskWrapper(env)
+        # env = W.ContinuousTaskWrapper(env)
 
         # if record_dir is not None:
         # print(f"TODO RECORD: {record_dir}")
@@ -169,34 +152,32 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
 def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
 
     suffix = "eval" if eval_only else "train"
-    record_dir = osp.join(log_dir, f"videos/{suffix}")
+    record_dir = osp.join(log_dir, f"videos/{suffix}") if cfg.job.wandb.use else None
 
     if cfg.env.foundation.name is None or cfg.env.fm_loc.value == "central":
-        eval_env = SubprocVecEnv(
+        venv = SubprocVecEnv(
             [make_env(cfg, record_dir=record_dir) for _ in range(num_envs)]
         )
-        eval_env = VecMonitor(eval_env)  # attach this so SB3 can log reward metrics
-        eval_env.seed(cfg.job.seed)
-        eval_env.reset()
-        
-        if cfg.env.record:
-            env = VecRecord(eval_env, osp.join(log_dir, "train"), use_wandb=True)
-        else:
-            env = eval_env
+        venv = VecMonitor(venv)  # attach this so SB3 can log reward metrics
 
-        return (
-            # big slow down
-            #VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=True,),
-            env,
-            # eval_env,
-            VecRecord(
-                eval_env,
-                osp.join(log_dir, "eval"),
-                use_wandb=True,
-            ),
-        )
+        venv.seed(cfg.job.seed)
+        venv.reset()
 
+        if not cfg.job.wandb.use: # if not using wandb, dont record anything
+            env, eval_env = venv, venv
+            return env, eval_env
+
+        eval_env = W.VecRecord(venv, osp.join(log_dir, "eval"), use_wandb=True)
+        if not cfg.env.record: # if not recording for offline, only wrap eval
+            return venv, eval_env
+
+        env = W.VecRecord(venv, osp.join(log_dir, "train"), use_wandb=True)
+        return env, eval_env
+
+        # this was from maniskill2
         # return eval_env, VecVideoRecorder(eval_env, record_dir, record_video_trigger=lambda x: True)
+
+    raise NotImplementedError("No eval only until this function is fixed.")
 
         if eval_only:
             env = eval_env
@@ -210,13 +191,14 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
             )
             env = VecMonitor(env)
             # if cfg.job.wandb.use:
-            # env = WandbVecMonitor(env, logger)
+            # env = W.WandbVecMonitor(env, logger)
 
             env.seed(cfg.job.seed)
             env.reset()
         return env, eval_env
 
-    # using foundation model ... only one env allowed
+    raise NotImplementedError("Only foundation model allowed for now.")
+    """
     if cfg.env.foundation.name and cfg.env.fm_loc.value == "env":
         num = 1 if cfg.env.fm_loc.value == "env" else num_envs
         print(cfg.env.foundation.name)
@@ -234,11 +216,11 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
 
         env = VecMonitor(env)
         # if cfg.job.wandb.use:
-        # env = WandbVecMonitor(env, logger)
+        # env = W.WandbVecMonitor(env, logger)
         
         # add dataset recorder
         if cfg.env.record:
-            env = VecRecord(env, log_dir, use_wandb=True)
+            env = W.VecRecord(env, log_dir, use_wandb=True)
             print("recording data")
 
         print("wrapped env")
@@ -248,3 +230,4 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
         eval_env = env
 
         return env, eval_env
+    """

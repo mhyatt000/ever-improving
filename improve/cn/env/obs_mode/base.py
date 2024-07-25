@@ -81,7 +81,8 @@ class Hybrid(ObsMode):
 class SrcTgt(ObsMode):
     name: str = "src-tgt"
     obs_keys: List[str] = default(
-        SourceTargetKeys + LowDimKeys + RPKeys + OracleKeys + ImageKeys
+        SourceTargetKeys + LowDimKeys + RPKeys + ImageKeys
+        # SourceTargetKeys + LowDimKeys + RPKeys + OracleKeys + ImageKeys
     )
 
 @store
@@ -100,7 +101,6 @@ class AWAC(ObsMode):
     obs_keys: List[str] = default(LowDimKeys + OracleKeys)
     # obs_keys: List[str] = default(ImageKeys)
 
-### CHANGED
 @store
 @dataclass
 class AWACMulti(ObsMode):
@@ -109,11 +109,8 @@ class AWACMulti(ObsMode):
     obs_keys: List[str] = default(LowDimKeys + SourceTargetKeys)
     # obs_keys: List[str] = default(ImageKeys)
     
-### CHANGED
 @store
 @dataclass
 class AWACDrawer(ObsMode):
     name: str = "awac_drawer"
-    # no img keys
-    obs_keys: List[str] = default(LowDimKeys + DrawerKeys)
-    # obs_keys: List[str] = default(ImageKeys)
+    obs_keys: List[str] = default(LowDimKeys + DrawerKeys) # no img keys

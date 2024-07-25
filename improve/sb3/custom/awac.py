@@ -33,18 +33,8 @@ from improve.data.dl import DefaultTransform, MyOfflineDS
 
 
 class AWAC(SAC):
-    """
-    Advantage Weighted Actor Critic (AWAC)
-    Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor,
-    This implementation borrows code from original implementation (https://github.com/haarnoja/sac)
-    from OpenAI Spinning Up (https://github.com/openai/spinningup), from the softlearning repo
-    (https://github.com/rail-berkeley/softlearning/)
-    and from Stable Baselines (https://github.com/hill-a/stable-baselines)
-    Paper: https://arxiv.org/abs/1801.01290
-    Introduction to AWAC: https://spinningup.openai.com/en/latest/algorithms/sac.html
-
-    Note: we use double q target and not value target as discussed
-    in https://github.com/hill-a/stable-baselines/issues/270
+    """ Advantage Weighted Actor Critic (AWAC)
+    modified from Sb3 SAC
     """
 
     policy_aliases: ClassVar[Dict[str, Type[BasePolicy]]] = {
@@ -62,6 +52,7 @@ class AWAC(SAC):
         policy: Union[str, Type[SACPolicy]],
         env: Union[GymEnv, str],
         algocn: cn.AWAC,
+        task: str,
     ):
         self.algocn = algocn
 
@@ -75,6 +66,7 @@ class AWAC(SAC):
         # SAC will set up the model
         assert self.dataset is not None
         self.dataset = [osp.join(self.log_path, d) for d in self.dataset]
+
         self.dataset = [osp.join(d, "train") for d in self.dataset]
         self.dataset = [
             MyOfflineDS(d, seq=1, transform=DefaultTransform()) for d in self.dataset
@@ -93,6 +85,20 @@ class AWAC(SAC):
             pin_memory=True,
             drop_last=True,
         )
+
+        """ from wds
+        fnames = list(find_tarballs(self.dataset))
+        # fnames = [x for x in list(find_tarballs(self.dataset)) if "eval" in x]
+        self.task = task
+        dataset = mk_dataset(fnames, 
+                             self.task)
+        for batch in steps2batch(dataset):
+            self.replay_buffer.add(*batch)
+
+        # for u in [model.actor.mu, model.actor.log_std]:
+        # u.weight.data.fill_(0)
+        # u.bias.data.fill_(0)
+        """
 
         for batch in tqdm(self.loader):
             infos = [du.apply(batch["infos"], lambda x: x[i]) for i in range(self.bs)]
@@ -186,7 +192,6 @@ class AWAC(SAC):
                 ent_coef_loss.backward()
                 self.ent_coef_optimizer.step()
 
-
             #
             # compute critic loss
             #
@@ -207,8 +212,7 @@ class AWAC(SAC):
                 # td error + entropy term
 
                 target_q_values = (
-                    replay.rewards
-                    + (1 - replay.dones) * self.gamma * next_q_values
+                    replay.rewards + (1 - replay.dones) * self.gamma * next_q_values
                 )
 
             # Get current Q-values estimates for each critic network
@@ -262,6 +266,8 @@ class AWAC(SAC):
             # this is the log prob of the replay.actions given actor(obs)
             # clip actions because otherwise log_prob will be nan
             log_prob = dist.log_prob(th.clip(replay.actions, -1, 1)).reshape(-1, 1)
+            # log_prob = dist.custom_log_prob(replay.actions).reshape(-1, 1)
+
             # log_prob = th.where(th.isnan(log_prob), 0, log_prob)
 
             mse_loss = F.mse_loss(actions_pi, replay.actions, reduction="none").mean(1)
@@ -284,7 +290,13 @@ class AWAC(SAC):
             )[:, -1]
             open = gripper_loss[replay.actions[:, -1] == 1.0].mean()
             close = gripper_loss[replay.actions[:, -1] == -1.0].mean()
-            gripper_loss = open + close
+
+            # added neutral gripper loss for rtx (to turn off gripper loss set weight to 0)
+            neutral = 0
+            if "google_robot" in self.task:
+                neutral = gripper_loss[replay.actions[:, -1] == 0.0].mean()
+
+            gripper_loss = open + close + neutral
             actor_loss += self.gripper_loss_weight * gripper_loss
             self.logger.record("train/gripper_loss", gripper_loss.item())
 
