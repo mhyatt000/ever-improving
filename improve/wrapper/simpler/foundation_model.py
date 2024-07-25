@@ -39,6 +39,14 @@ class ExtraObservationWrapper(Wrapper):
             "obj-pose": mk_space((7,)),
         }
 
+        try:
+            obj = self.env.obj
+            self.has_obj = True
+        except Exception as e:
+            self.has_obj = False
+            additions.pop("obj-wrt-eef")
+            additions.pop("obj-pose")
+
         for k, v in additions.items():
             self.observation_space[k] = v
 
@@ -57,16 +65,17 @@ class ExtraObservationWrapper(Wrapper):
         observation["agent"]["qpos-sin"] = np.sin(qpos)
         observation["agent"]["qpos-cos"] = np.cos(qpos)
 
-        ### CHANGED eef and obj pose
-        # tcp, obj = self.get_tcp().pose, self.obj_pose
-        tcp = self.get_tcp().pose
-        observation["eef-pose"] = np.array([*tcp.p, *tcp.q])
-
-        # observation["obj-pose"] = np.array([*obj.p, *obj.q])
-        # observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
-
         if self.use_image:
             observation["simpler-img"] = self.get_image(observation)
+
+        if self.has_obj:
+            obj = self.env.obj
+            observation["obj-pose"] = np.array([*obj.p, *obj.q])
+            observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
+
+        tcp = self.get_tcp().pose
+        observation["eef-pose"] = np.array([*tcp.p, *tcp.q])
+        observation["simpler-img"] = self.get_image(observation)
 
         return observation
 
