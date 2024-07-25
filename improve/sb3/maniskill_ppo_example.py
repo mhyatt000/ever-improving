@@ -1,3 +1,4 @@
+import os
 import os.path as osp
 import warnings
 from pprint import pprint
@@ -52,7 +53,10 @@ def main(cfg):
 
     num_envs = cfg.env.n_envs
     max_episode_steps = cfg.env.max_episode_steps
-    log_dir = osp.join(cfg.callback.log_path, wandb.run.name)
+    
+    ### CHANGED
+    log_dir = osp.join(cfg.callback.log_path, wandb.run.name) if cfg.job.wandb.use else None
+    
     rollout_steps = cfg.algo.get("n_steps", None) or 4800
 
     if cfg.job.seed is not None:
@@ -129,7 +133,7 @@ def main(cfg):
 
     elif cfg.algo.name == "awac":
         algocn = OC.to_container(cfg.algo, resolve=True)
-        model = AWAC("MultiInputPolicy", env, algocn)
+        model = AWAC("MultiInputPolicy", env, algocn, cfg.env.task)
 
     else:
         model = algo(
@@ -187,7 +191,7 @@ def main(cfg):
             save_vecnormalize=True,
         )
 
-        callbacks = [checkpoint_callback, eval_callback]
+        callbacks = [checkpoint_callback, eval_callback] if log_dir else [eval_callback]
 
         if cfg.job.wandb.use:
             wandbCb = WandbCallback(
@@ -208,7 +212,8 @@ def main(cfg):
             progress_bar=True,
         )
         # Save the final model
-        model.save(osp.join(log_dir, "latest_model"))
+        if log_dir:
+            model.save(osp.join(log_dir, "latest_model"))
 
     # Evaluate the model
     returns, ep_lens = evaluate_policy(

@@ -79,7 +79,8 @@ class Hybrid(ObsMode):
 class SrcTgt(ObsMode):
     name: str = "src-tgt"
     obs_keys: List[str] = default(
-        SourceTargetKeys + LowDimKeys + RPKeys + OracleKeys + ImageKeys
+        SourceTargetKeys + LowDimKeys + RPKeys + ImageKeys
+        # SourceTargetKeys + LowDimKeys + RPKeys + OracleKeys + ImageKeys
     )
 
 @store

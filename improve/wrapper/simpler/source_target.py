@@ -1,11 +1,6 @@
 import gymnasium as gym
 import numpy as np
-import simpler_env as simpler
 from gymnasium.core import Wrapper
-
-import hydra
-import improve
-import improve.hydra.resolver
 
 
 class SourceTargetWrapper(Wrapper):
@@ -54,66 +49,3 @@ class SourceTargetWrapper(Wrapper):
         obs, reward, success, truncated, info = self.env.step(action)
         obs = self.observation(obs)
         return obs, reward, success, truncated, info
-
-
-@hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
-def main(cfg):
-    print(cfg)
-
-    from improve.env import make_env
-
-    multi_obj_envs = []
-    for task in simpler.ENVIRONMENTS:
-        cfg.env.foundation.task = task
-        env = simpler.make(cfg.env.foundation.task)
-        
-        try:
-            getattr(env, 'source_obj_pose')
-            multi_obj_envs.append(task)
-            print(f"Task {task} is a multi-obj environment")
-        except:
-            print(f"Task {task} is not a multi-obj environment")
-            getattr(env, 'obj_pose')
-
-        # final_subtask = env.is_final_subtask()
-        # print("Final subtask", task)
-
-        # if not final_subtask:
-        #     print("Current task", task)
-        #     while not final_subtask:
-        #         env = env.advance_to_next_subtask()
-        #         final_subtask = env.is_final_subtask()
-        #         print("\tsubtask", final_subtask)
-
-        # try:
-        #     getattr(env, 'source_obj_pose')
-        #     multi_obj_envs.append(task)
-        #     print(f"Task {task} is a multi-obj environment")
-        # except:
-        #     print(f"Task {task} is not a multi-obj environment")
-
-        env.close()
-
-    print(multi_obj_envs)
-
-    import json
-
-    # with open("multi_obj_envs.json", "w") as f:
-    #     json.dump(multi_obj_envs, f, indent=4)
-
-    # # env = simpler.make(cfg.env.task)
-    # env = make_env(cfg)()
-    # env = SourceTargetWrapper(env)
-
-    # obs, info = env.reset()
-    # print(obs.keys())
-
-    # obs, reward, success, truncated, info = env.step(env.action_space.sample())
-    # print("src-pose", obs['src-pose'])
-    # print("tgt-pose", obs['tgt-pose'])
-    # print("src-pose-wrt-eef", obs['src-pose-wrt-eef'])
-    # print("tgt-pose-wrt-eef", obs['tgt-pose-wrt-eef'])
-
-
-if __name__ == "__main__":
-    main()

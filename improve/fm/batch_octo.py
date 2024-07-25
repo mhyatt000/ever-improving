@@ -67,7 +67,7 @@ class BatchedOctoInference(OctoInference):
         self.cached = cached
         if self.cached:
             del self.model.tokenizer
-            tf.config.experimental.set_visible_devices([], "GPU")
+        tf.config.experimental.set_visible_devices([], "GPU")
 
         """
         self.fwd = jax.jit(

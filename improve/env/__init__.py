@@ -1,7 +1,9 @@
 import os.path as osp
 
 import gymnasium as gym
+from improve.wrapper.simpler.awac_reward import AwacRewardWrapper
 from improve.wrapper.simpler.drawer import DrawerWrapper
+from improve.wrapper.simpler.sticky_gripper import StickyGripperWrapper
 import simpler_env as simpler
 # from mani_skill2.utils.wrappers import RecordEpisode
 from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
@@ -78,9 +80,10 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
 
         if cfg.algo.name == 'awac':
             env = ActionRescaleWrapper(env)
+            env = AwacRewardWrapper(env)
+            print("shifting reward dist to [-1, 0]")
 
         if cfg.env.fm_loc.value == "env":
-
             if cfg.env.foundation.name:
                 env = FoundationModelWrapper(
                     env,
@@ -94,6 +97,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
             if cfg.env.action_mask_dims:
                 env = ActionSpaceWrapper(env, cfg.env.action_mask_dims)
 
+        env = StickyGripperWrapper(env, task=cfg.env.foundation.task)
         env = ExtraObservationWrapper(env)
 
         if cfg.env.foundation.task in MULTI_OBJ_ENVS:
@@ -165,7 +169,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
 def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
 
     suffix = "eval" if eval_only else "train"
-    record_dir = osp.join(log_dir, f"videos/{suffix}")
+    record_dir = osp.join(log_dir, f"videos/{suffix}") if cfg.job.wandb.use else None
 
     if cfg.env.foundation.name is None or cfg.env.fm_loc.value == "central":
         eval_env = SubprocVecEnv(
@@ -175,21 +179,30 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
         eval_env.seed(cfg.job.seed)
         eval_env.reset()
         
-        if cfg.env.record:
-            env = VecRecord(eval_env, osp.join(log_dir, "train"), use_wandb=True)
-        else:
-            env = eval_env
-
-        return (
-            # big slow down
-            #VecRecord( eval_env, osp.join(log_dir, "train"), use_wandb=True,),
-            env,
-            # eval_env,
-            VecRecord(
+        ### CHANGED
+        if cfg.job.wandb.use:
+            if cfg.env.record:
+                env = VecRecord(eval_env, osp.join(log_dir, "train"), use_wandb=True)
+            else:
+                env = eval_env
+            
+            eval_env = VecRecord(
                 eval_env,
                 osp.join(log_dir, "eval"),
                 use_wandb=True,
-            ),
+            )
+        else:
+            env = eval_env  # create new subprocenv ??
+            
+            # env = SubprocVecEnv(
+            #     [make_env(cfg, record_dir=record_dir) for _ in range(num_envs)]
+            # )
+            # env.seed(cfg.job.seed)
+            # env.reset()
+
+        return (
+            env,
+            eval_env
         )
 
         # return eval_env, VecVideoRecorder(eval_env, record_dir, record_video_trigger=lambda x: True)

@@ -81,6 +81,7 @@ class AWAC(SAC):
         policy: Union[str, Type[SACPolicy]],
         env: Union[GymEnv, str],
         algocn: cn.AWAC,
+        task: str
     ):
         self.algocn = algocn
 
@@ -96,8 +97,9 @@ class AWAC(SAC):
         self.dataset = [osp.join(self.log_path, d) for d in self.dataset]
         fnames = list(find_tarballs(self.dataset))
         # fnames = [x for x in list(find_tarballs(self.dataset)) if "eval" in x]
+        self.task = task
         dataset = mk_dataset(fnames, 
-                             env.get_language_instruction())
+                             self.task)
         for batch in steps2batch(dataset):
             self.replay_buffer.add(*batch)
 
@@ -240,6 +242,8 @@ class AWAC(SAC):
             # this is the log prob of the replay.actions given actor(obs)
             # clip actions because otherwise log_prob will be nan
             log_prob = dist.log_prob(th.clip(replay.actions, -1, 1)).reshape(-1, 1)
+            # log_prob = dist.custom_log_prob(replay.actions).reshape(-1, 1)
+            
             # log_prob = th.where(th.isnan(log_prob), 0, log_prob)
 
             mse_loss = F.mse_loss(actions_pi, replay.actions, reduction="none").mean(1)
@@ -262,7 +266,13 @@ class AWAC(SAC):
             )[:, -1]
             open = gripper_loss[replay.actions[:, -1] == 1.0].mean()
             close = gripper_loss[replay.actions[:, -1] == -1.0].mean()
-            gripper_loss = open + close
+            
+            # added neutral gripper loss for rtx (to turn off gripper loss set weight to 0)
+            neutral = 0
+            if "google_robot" in self.task:
+                neutral = gripper_loss[replay.actions[:, -1] == 0.0].mean()
+            
+            gripper_loss = open + close + neutral
             actor_loss += self.gripper_loss_weight * gripper_loss
             self.logger.record("train/gripper_loss", gripper_loss.item())
 

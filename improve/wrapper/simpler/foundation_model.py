@@ -17,9 +17,7 @@ from simpler_env.utils.env.observation_utils import \
 
 import improve.wrapper.dict_util as du
 
-
 class ExtraObservationWrapper(Wrapper):
-
     def __init__(self, env):
         super().__init__(env)
 
@@ -46,6 +44,8 @@ class ExtraObservationWrapper(Wrapper):
         self.observation_space["simpler-img"] = Box(
             low=0, high=255, shape=image.shape, dtype=np.uint8
         )
+        
+        self.has_obj = True
 
     def observation(self, observation):
         """Returns a modified observation."""
@@ -57,11 +57,19 @@ class ExtraObservationWrapper(Wrapper):
 
         # eef and obj pose
         ### CHANGED
-        # tcp, obj = self.get_tcp().pose, self.obj_pose
+        if self.has_obj:
+            try:
+                obj = self.env.obj
+                observation["obj-pose"] = np.array([*obj.p, *obj.q])
+                observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
+            except:
+                self.observation_space.pop("obj-pose") if "obj-pose" in self.observation_space else None
+                self.observation_space.pop("obj-wrt-eef") if "obj-wrt-eef" in self.observation_space else None
+                self.has_obj = False
+                print("No object found")
+                
         tcp = self.get_tcp().pose
-
         observation["eef-pose"] = np.array([*tcp.p, *tcp.q])
-        # observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
         observation["simpler-img"] = self.get_image(observation)
 
         return observation
