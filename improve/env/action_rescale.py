@@ -50,8 +50,11 @@ class ActionRescaler:
 
             # vectorized now
             translation = np.linalg.norm(total_action[:, :3], axis=-1)
-            results = np.array([rpy_to_axis_angle(*a[3:6]) for a in total_action])
-            axis, rotation = zip(*results)
+            rpy = total_action[:,3:6]
+
+            results = [rpy_to_axis_angle(*item) for item in rpy]
+            axis = np.array([r[0] for r in results])
+            rotation = np.array([r[1] for r in results])
 
             for i in range(len(total_action)):
                 if abs(translation[i]) > self.max["translation"]:

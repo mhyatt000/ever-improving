@@ -6,7 +6,7 @@
 
 defaults:
 # - /launcher: base
-  - override /algo: sac
+  - override /algo: rp_sac
   - override /buffer: base # no HER for now!
   - override /env/foundation: octo-small
   - override /env/obs_mode: oracle-central

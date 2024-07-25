@@ -1,10 +1,11 @@
 import os.path as osp
 
 import gymnasium as gym
-import improve.wrapper as W # TODO add all the wrappers to wrapper.__init__.py
 import simpler_env as simpler
 from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
                                               VecMonitor, VecVideoRecorder)
+
+import improve.wrapper as W  # TODO add all the wrappers to wrapper.__init__.py
 
 from .action_rescale import ActionRescaler
 
@@ -86,7 +87,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         if cfg.env.foundation.task in MULTI_OBJ_ENVS:
             print("using src tgt wrapper")
             env = W.SourceTargetWrapper(env)
-        
+
         if "drawer" in cfg.env.foundation.task:
             print("using drawer wrapper")
             env = W.DrawerWrapper(env)
@@ -100,7 +101,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
         env = W.FlattenKeysWrapper(env)
         if cfg.env.obs_keys:
             env = W.FilterKeysWrapper(env, keys=cfg.env.obs_keys)
-            
+
         # dont need this wrapper if not using grasp task
         if cfg.env.reward == "dense" and not cfg.env.reach:
             env = W.GraspDenseRewardWrapper(env, clip=0.2)
@@ -163,12 +164,12 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
         venv.seed(cfg.job.seed)
         venv.reset()
 
-        if not cfg.job.wandb.use: # if not using wandb, dont record anything
+        if not cfg.job.wandb.use:  # if not using wandb, dont record anything
             env, eval_env = venv, venv
             return env, eval_env
 
         eval_env = W.VecRecord(venv, osp.join(log_dir, "eval"), use_wandb=True)
-        if not cfg.env.record: # if not recording for offline, only wrap eval
+        if not cfg.env.record:  # if not recording for offline, only wrap eval
             return venv, eval_env
 
         env = W.VecRecord(venv, osp.join(log_dir, "train"), use_wandb=True)
@@ -179,23 +180,23 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
 
     raise NotImplementedError("No eval only until this function is fixed.")
 
-        if eval_only:
-            env = eval_env
-        else:
-            # Create vectorized environments for training
-            env = SubprocVecEnv(
-                [
-                    make_env(cfg, max_episode_steps=max_episode_steps)
-                    for _ in range(num_envs)
-                ]
-            )
-            env = VecMonitor(env)
-            # if cfg.job.wandb.use:
-            # env = W.WandbVecMonitor(env, logger)
+    if eval_only:
+        env = eval_env
+    else:
+        # Create vectorized environments for training
+        env = SubprocVecEnv(
+            [
+                make_env(cfg, max_episode_steps=max_episode_steps)
+                for _ in range(num_envs)
+            ]
+        )
+        env = VecMonitor(env)
+        # if cfg.job.wandb.use:
+        # env = W.WandbVecMonitor(env, logger)
 
-            env.seed(cfg.job.seed)
-            env.reset()
-        return env, eval_env
+        env.seed(cfg.job.seed)
+        env.reset()
+    return env, eval_env
 
     raise NotImplementedError("Only foundation model allowed for now.")
     """

@@ -160,7 +160,7 @@ class VecRecord(VecEnvWrapper):
         info = None
         from pprint import pprint
 
-        pprint(obs.keys())
+        # pprint(obs.keys())
         return obs
 
     def step_async(self, actions: np.ndarray):
@@ -438,7 +438,7 @@ class TMP(gym.Wrapper):
             obs = np.stack(obs)
             sample["obs.npz"] = obs
         else:
-            print(obs[0])
+            # print(obs[0])
             raise NotImplementedError(type(obs[0]))
 
         if len(self._episode_data) == 1:
