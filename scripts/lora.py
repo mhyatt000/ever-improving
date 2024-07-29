@@ -38,7 +38,7 @@ from octo.utils.typing import Config, Data, Params, PRNGKey
 import os.path as osp
 
 from pprint import pprint
-import lora_octo
+from improve import lora_octo
 import simpler_env as simpler
 import lorax
 
