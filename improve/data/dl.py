@@ -66,7 +66,7 @@ LowDimKeys = [
 ]
 
 RPKeys = ["agent_partial-action"]
-OracleKeys = ["obj-wrt-eef"]
+OracleKeys = ["obj-pose", "obj-wrt-eef"]    ### CHANGED (added obj pose to OracleKeys)
 ImageKeys = ["simpler-img"]
 
 
@@ -123,21 +123,45 @@ def steps2batch(dataset):
 
 
 class MyOfflineDS(IterableDataset):
-    def __init__(self, root=".", seq=2, transform=None):
+    def __init__(self, root=".", seq=2, transform=None, shift_reward=False):
         super(MyOfflineDS).__init__()
 
         self.root = root
-        self.samples = list({x.split(".")[0] for x in os.listdir(root)})
-        self.samples = [x for x in self.samples if not x.endswith("py")]
+        
+        # TODO: comment this out
+        self.samples = list({x.split(".")[0] for x in os.listdir(root) if x.endswith("pt")})
+        self.samples = [x for x in self.samples if not (x.endswith("py"))]
 
         self.transform = transform
         self.seq = seq
+        
+        self.shift_reward = shift_reward
 
     def decode(self, idx):
         # print(idx)
         path = osp.join(self.root, f"{idx}.pt")
         data = torch.load(path)
-
+        
+        mp4_names = ["obs", "next_obs", "video"]
+        
+        for name in mp4_names:
+            decoded_mp4 = decord2mp4(osp.join(self.root, f"{idx}.{name}.mp4")) 
+            if name in data:
+                data[name]['simpler-img'] = decoded_mp4
+            else:
+                data[name] = decoded_mp4
+                
+        # check for older datasets
+        if "__key__" in data:
+            del data["__key__"]
+            
+        ### CHANGED (added reward shifting)
+        if self.shift_reward:
+            data["rewards"] = data["rewards"] - 1.0
+        
+        # Add monte carlo reward
+        for i in range(len(data["rewards"]) -2, -1, -1):
+            data["rewards"][i] = 0.99 * data["rewards"][i+1]
 
         # TODO fix so that pt is written correctly
         infos = data["infos"].item()
@@ -158,7 +182,7 @@ class MyOfflineDS(IterableDataset):
     def __iter__(self):
         worker = torch.utils.data.get_worker_info()
         # print(worker)
-
+        
         samples = (
             self.samples
             if worker is None

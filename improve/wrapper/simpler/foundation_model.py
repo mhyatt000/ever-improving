@@ -39,13 +39,17 @@ class ExtraObservationWrapper(Wrapper):
             "obj-pose": mk_space((7,)),
         }
 
-        try:
-            obj = self.env.obj
+        if "eggplant" not in env.get_language_instruction():
+            try:
+                obj = self.env.obj
+                self.has_obj = True
+            except Exception as e:
+                self.has_obj = False
+                additions.pop("obj-wrt-eef")
+                additions.pop("obj-pose")
+                print("env has no obj")
+        else:
             self.has_obj = True
-        except Exception as e:
-            self.has_obj = False
-            additions.pop("obj-wrt-eef")
-            additions.pop("obj-pose")
 
         for k, v in additions.items():
             self.observation_space[k] = v
@@ -69,7 +73,10 @@ class ExtraObservationWrapper(Wrapper):
             observation["simpler-img"] = self.get_image(observation)
 
         if self.has_obj:
-            obj = self.env.obj
+            if "eggplant" in self.env.get_language_instruction():
+                obj = self.env.source_obj_pose
+            else:
+                obj = self.env.obj
             observation["obj-pose"] = np.array([*obj.p, *obj.q])
             observation["obj-wrt-eef"] = np.array(self.obj_wrt_eef())
 

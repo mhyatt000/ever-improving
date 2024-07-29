@@ -13,7 +13,7 @@ LowDimKeys = [
 ]
 
 RPKeys = ["agent_partial-action"]
-OracleKeys = ["obj-wrt-eef"]
+OracleKeys = ["obj-pose", "obj-wrt-eef"]    ### CHANGED (added obj pose to oracle keys)
 ImageKeys = ["simpler-img"]
 
 

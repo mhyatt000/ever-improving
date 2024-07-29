@@ -18,6 +18,7 @@ class AWAC(OffPolicy):
     num_samples: int = 3
     gripper_loss_weight: float = 1.0
 
+    use_entropy: bool = False
     ent_coef: str = "0"
     target_entropy: str = "0"
 

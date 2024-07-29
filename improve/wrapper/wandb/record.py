@@ -1,4 +1,5 @@
 import copy
+import gc
 import torch
 import functools
 import io
@@ -56,6 +57,16 @@ def try_ex(func, *args, **kwargs):
     except Exception as e:
         print(e)
         return None
+    
+def np2mp4b(data):
+    vbytes = io.BytesIO()
+    writer = imageio.get_writer(vbytes, format="mp4", mode="I", fps=5)
+
+    for frame in data:
+        writer.append_data(frame)
+    writer.close()
+    vbytes.seek(0)  # Rewind the file-like object to the beginning
+    return vbytes.getvalue()
 
 
 class VecRecord(VecEnvWrapper):
@@ -289,17 +300,28 @@ class VecRecord(VecEnvWrapper):
             for k, v in next_obs.items()
         }
         """
-
+        
+        obs = {k: v if not isimg(v[0]) else 
+               open(f"{self.output_dir}/{id}.obs.mp4", "wb").write(np2mp4b(v)) 
+               for k, v in obs.items()}
+                
+        next_obs = {k: v if not isimg(v[0]) else
+                    open(f"{self.output_dir}/{id}.next_obs.mp4", "wb").write(np2mp4b(v))
+                    for k, v in next_obs.items()}
+        
+        open(f"{self.output_dir}/{id}.video.mp4", "wb").write(np2mp4b(vid))
+        
         sample = {
-            "__key__": f"{id}",
-            **obs,
-            **next_obs,
+            # "__key__": f"{id}",
+            "obs": obs,
+            "next_obs": next_obs,
             "rewards": np.array(rewards),
             "actions": np.array(actions),
             "dones": np.array(dones),
-            "video": np.array(vid),
+            # "video": np.array(vid),
             "infos": np.array(infos),
         }
+        
         torch.save(sample, f"{self.output_dir}/{id}.pt")
         # self.shard.write(sample)
 
@@ -315,10 +337,11 @@ class VecRecord(VecEnvWrapper):
             wandb.log(videos)
 
         self.episodes[i] = []
+        gc.collect()
 
     def close(self) -> None:
-        for i in range(self.num_envs):
-            try_ex(self.flush(i))
+        # for i in range(self.num_envs):
+            # try_ex(self.flush(i))
         # self.shard.close()
 
         return super().close()
