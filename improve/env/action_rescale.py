@@ -10,7 +10,7 @@ from improve import cn
 
 class ActionRescaler:
 
-    def __init__(self, strategy: cn.Strategy, residual_scale=1.0):
+    def __init__(self, strategy=cn.Strategy.CLIP, residual_scale=1.0):
         self.strategy = strategy.value
         self.residual_scale = residual_scale
 
@@ -50,7 +50,7 @@ class ActionRescaler:
 
             # vectorized now
             translation = np.linalg.norm(total_action[:, :3], axis=-1)
-            rpy = total_action[:,3:6]
+            rpy = total_action[:, 3:6]
 
             results = [rpy_to_axis_angle(*item) for item in rpy]
             axis = np.array([r[0] for r in results])

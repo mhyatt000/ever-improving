@@ -1,31 +1,25 @@
-"""
-This script demonstrates how to finetune Octo to a new observation space (single camera + proprio)
-and new action space (bimanual) using a simulated ALOHA cube handover dataset (https://tonyzhaozh.github.io/aloha/).
-
-To run this example, first download and extract the dataset from here: https://rail.eecs.berkeley.edu/datasets/example_sim_data.zip
-
-python examples/02_finetune_new_observation_action.py --pretrained_path=hf://rail-berkeley/octo-small --data_dir=...
-"""
-
-import improve.wrapper.dict_util as du
-from dataclasses import dataclass
-from typing import Any, Optional, Union
+import os.path as osp
+from dataclasses import asdict, dataclass
+from pprint import pprint
+from typing import Any, Optional, Sequence, Tuple, Union
 
 import flax
 import flax.linen as nn
+import gymnasium as gym
 import jax
 import jax.numpy as jnp
+import lorax
 import numpy as np
 import optax
 import qax
+import simpler_env as simpler
 import tensorflow as tf
-import tqdm
 import wandb
 from absl import app, flags, logging
 from flax import struct
 from octo.data.dataset import make_single_dataset
 from octo.data.utils.data_utils import NormalizationType
-from octo.model.components.action_heads import L1ActionHead
+from octo.model.components.action_heads import L1ActionHead, MSEActionHead
 from octo.model.components.tokenizers import LowdimObsTokenizer
 from octo.model.octo_model import OctoModel
 from octo.utils.jax_utils import initialize_compilation_cache
@@ -33,17 +27,20 @@ from octo.utils.spec import ModuleSpec
 from octo.utils.train_utils import (TrainState, freeze_weights, merge_params,
                                     process_text)
 from octo.utils.typing import Config, Data, Params, PRNGKey
+from tqdm import tqdm
 
+import improve.wrapper.dict_util as du
+from improve import cn, lora_octo
+from improve.env.action_rescale import ActionRescaler
+from improve.util.config import default
 
-import os.path as osp
-
-from pprint import pprint
-from improve import lora_octo
-import simpler_env as simpler
-import lorax
-
-
-from dataclasses import asdict, dataclass
+"""
+This script demonstrates how to finetune Octo to a new observation space (single camera + proprio)
+and new action space (bimanual) using a simulated ALOHA cube handover dataset (https://tonyzhaozh.github.io/aloha/).
+To run this example, first download and extract the dataset from here: 
+    https://rail.eecs.berkeley.edu/datasets/example_sim_data.zip
+python examples/02_finetune_new_observation_action.py --pretrained_path=hf://rail-berkeley/octo-small --data_dir=...
+"""
 
 
 @dataclass
@@ -54,12 +51,16 @@ class MyConfig:
     freeze_transformer: bool = False
 
     seed: int = 0
-    batch_size: int = 64 # 8  # 16 is slow
-    grad_acc: Optional[int] = 8  # really should be ≈128
+    batch_size: int = 4
+    # batch_size: int = 64
+    grad_acc: Optional[int] = 32  # really should be ≈128
     grad_clip: Optional[int] = 2
 
     train_steps: int = int(3e5)
     sweep_id: str = "lora"
+
+    env: cn.Env = default(cn.Env())
+    task: str = "widowx_put_eggplant_in_basket"
 
 
 cfg = MyConfig()
@@ -89,20 +90,403 @@ class MyTrainState:
         )
 
 
-def main(_):
+def isimg(o):
+    if isinstance(o, np.ndarray) and o.ndim == 3:
+        return o.shape[-1] in [1, 3, 4]
+    return False
 
+
+from transforms3d.euler import euler2axangle
+
+from improve.fm.batch_octo import BatchedActionEnsembler
+
+
+class OXE2SimplerProcesser:
+
+    def __init__(
+        self,
+        dataset_id="bridge_dataset",
+        policy_setup="widowx_bridge",
+        batch_size=cfg.batch_size,
+    ):
+
+        self.action_scale = 1
+
+        if dataset_id == "bridge_dataset":
+            self.action_mean = np.array(
+                [
+                    0.00021161,
+                    0.00012614,
+                    -0.00017022,
+                    -0.00015062,
+                    -0.00023831,
+                    0.00025646,
+                    0.0,
+                ]
+            )
+            self.action_std = np.array(
+                [
+                    0.00963721,
+                    0.0135066,
+                    0.01251861,
+                    0.02806791,
+                    0.03016905,
+                    0.07632624,
+                    1.0,
+                ]
+            )
+        elif dataset_id == "fractal20220817_data":
+            self.action_mean = np.array(
+                [
+                    0.00696389,
+                    0.00627008,
+                    -0.01263256,
+                    0.04330839,
+                    -0.00570499,
+                    0.00089247,
+                    0.0,
+                ]
+            )
+            self.action_std = np.array(
+                [
+                    0.06925472,
+                    0.06019009,
+                    0.07354742,
+                    0.15605888,
+                    0.1316399,
+                    0.14593437,
+                    1.0,
+                ]
+            )
+        else:
+            raise NotImplementedError(
+                f"{dataset_id} not supported yet for custom octo model checkpoints."
+            )
+        self.automatic_task_creation = False
+
+        self.batch_size = batch_size
+
+        self.horizon = 2  # state history
+        self.pred_action_horizon = 4
+        self.exec_horizon = 1  # RHC receding horizon control
+
+        # from policy_setup
+        self.policy_setup = policy_setup
+        self.action_ensemble = True
+        self.action_ensemble_temp = 0.0
+        self.sticky_gripper_num_repeat = 1  # 15 for google robot
+
+        if self.action_ensemble:
+            self.action_ensembler = BatchedActionEnsembler(
+                self.pred_action_horizon, self.action_ensemble_temp, self.batch_size
+            )
+        else:
+            self.action_ensembler = None
+
+        from collections import deque
+
+        self.image_history = deque(maxlen=self.horizon)
+
+    def reset(self):
+
+        self.image_history.clear()
+        if self.action_ensemble:
+            self.action_ensembler.reset()
+        self.num_image_history = 0
+
+        self.sticky_action_is_on = np.full((self.batch_size,), False)
+        self.gripper_action_repeat = np.full((self.batch_size,), 0)
+        self.sticky_gripper_action = np.full((self.batch_size,), 0.0)
+        # parent removed this ... maybe its for the alternate method?
+        # self.gripper_is_closed = False
+        self.previous_gripper_action = np.full((self.batch_size,), np.nan)
+
+    def _add_image_to_history(self, image: np.ndarray) -> None:
+        self.image_history.append(image)
+        self.num_image_history = min(self.num_image_history + 1, self.horizon)
+
+    def _obtain_image_history_and_mask(self) -> tuple[np.ndarray, np.ndarray]:
+        ax = 1  # 0 if self.batch_size == 1 else 1
+        images = np.stack(self.image_history, axis=ax)  # stack for OctoInference
+        horizon = len(self.image_history)
+        # note: this should be of float type, not a bool type
+        pad_mask = np.ones(horizon, dtype=np.float64)
+        pad_mask[: horizon - min(horizon, self.num_image_history)] = 0
+        # pad_mask = np.ones(self.horizon, dtype=np.float64) # note: this should be of float type, not a bool type
+        # pad_mask[:self.horizon - self.num_image_history] = 0
+        return images, pad_mask
+
+    def pre_step(self, obs):
+        # resized in env wrapper
+        # image = self._resize_image(image)
+
+        self._add_image_to_history(obs["observation"]["image_primary"])
+        images, pad_mask = self._obtain_image_history_and_mask()
+        pad_mask = np.repeat(pad_mask[None, :], self.batch_size, axis=0)
+        obs["observation"]["image_primary"] = images
+        obs["observation"]["pad_mask"] = pad_mask
+
+        return obs
+
+    def __call__(self, nactions):
+
+        # 1. ensemble
+        # 2. unnormalize
+        # 3. maybe scale
+        # 4. rpy to axangle
+        # 5. sticky gripper
+
+        if self.action_ensemble:
+            nactions = self.action_ensembler.ensemble_action(nactions)
+
+        # octo predicts normalized actions
+
+        raw_actions = nactions * self.action_std[None] + self.action_mean[None]
+        raw_action = {
+            "world_vector": np.array(raw_actions[:, :3]),
+            "rotation_delta": np.array(raw_actions[:, 3:6]),
+            # range [0, 1]; 1 = open; 0 = close
+            "open_gripper": np.array(raw_actions[:, 6:7]),
+        }
+
+        # process raw_action to obtain the action to be sent to the maniskill2 environment
+        action = {}
+        action["world_vector"] = raw_action["world_vector"] * self.action_scale
+        action_rotation_delta = np.asarray(
+            raw_action["rotation_delta"], dtype=np.float64
+        )
+
+        axangles = []
+        for rotation_delta in action_rotation_delta:
+            roll, pitch, yaw = rotation_delta
+            ax, angle = euler2axangle(roll, pitch, yaw)
+            axangle = ax * angle
+            axangles.append(axangle[None])
+
+        action["rot_axangle"] = np.concatenate(axangles, axis=0) * self.action_scale
+
+        if self.policy_setup == "google_robot":
+            print("google robot")
+            current_gripper_action = raw_action["open_gripper"]
+
+            # wow. what a mess when vectorized
+            # alternative implementation
+            relative_gripper_action = np.where(
+                np.isnan(self.previous_gripper_action),
+                np.zeros_like(self.previous_gripper_action),
+                self.previous_gripper_action - current_gripper_action,
+            )
+            self.previous_gripper_action = current_gripper_action
+
+            to_stick = np.logical_and(
+                np.abs(relative_gripper_action) > 0.5,
+                (self.sticky_action_is_on is False),
+            )
+            self.sticky_action_is_on = np.where(
+                to_stick, True, self.sticky_action_is_on
+            )
+            self.sticky_gripper_action = np.where(
+                to_stick, relative_gripper_action, self.sticky_gripper_action
+            )
+
+            self.gripper_action_repeat += self.sticky_action_is_on.astype(int)
+            relative_gripper_action = np.where(
+                self.sticky_action_is_on,
+                self.sticky_gripper_action,
+                relative_gripper_action,
+            )
+
+            reset = self.gripper_action_repeat == self.sticky_gripper_num_repeat
+            self.sticky_action_is_on = np.where(reset, False, self.sticky_action_is_on)
+            self.gripper_action_repeat = np.where(reset, 0, self.gripper_action_repeat)
+            self.sticky_gripper_action = np.where(
+                reset, 0.0, self.sticky_gripper_action
+            )
+
+            action["gripper"] = relative_gripper_action
+
+        elif self.policy_setup == "widowx_bridge":
+            # binarize gripper action to 1 (open) and -1 (close)
+            action["gripper"] = 2.0 * (raw_action["open_gripper"] > 0.5) - 1.0
+            # self.gripper_is_closed = (action['gripper'] < 0.0)
+
+        action["terminate_episode"] = np.array([0.0] * self.batch_size)
+
+        return raw_action, action
+
+
+class ResizeImageWrapper(gym.ObservationWrapper):
+    def __init__(
+        self,
+        env: gym.Env,
+        resize_size: Optional[Union[Tuple, Sequence[Tuple]]],
+    ):
+        super().__init__(env)
+        assert isinstance(
+            self.observation_space, gym.spaces.Dict
+        ), "Only Dict observation spaces are supported."
+        spaces = self.observation_space.spaces
+        self.resize_size = resize_size
+
+        logging.info(f"Resizing images:")
+        for k, v in self.observation_space.sample().items():
+            if isimg(v):
+                spaces[k] = gym.spaces.Box(
+                    low=0,
+                    high=255,  # pixel brightness
+                    shape=resize_size + (3,),
+                    dtype=np.uint8,
+                )
+        self.observation_space = gym.spaces.Dict(spaces)
+
+    def observation(self, observation):
+        for k, v in observation.items():
+            if isimg(v):
+                image = tf.image.resize(
+                    v, size=self.resize_size, method="lanczos3", antialias=True
+                )
+                image = tf.cast(
+                    tf.clip_by_value(tf.round(image), 0, 255), tf.uint8
+                ).numpy()
+                observation[k] = image
+        return observation
+
+
+def mk_envs():
+    import warnings
+
+    warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
+
+    import gymnasium as gym
+    from octo.utils import gym_wrappers as GW
+    from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
+                                                  VecMonitor, VecVideoRecorder)
+
+    import improve.wrapper as W
+    from improve.fm.batch_octo import BatchedOctoInference
+
+    def _init() -> gym.Env:
+
+        env = simpler.make(
+            cfg.task,
+            # cant find simpler-img if you specify the mode
+            render_mode="cameras",
+            # max_episode_steps=max_episode_steps,
+            renderer_kwargs={
+                "offscreen_only": True,
+                "device": "cuda:0",
+            },
+            # **extra,
+        )
+
+        # oxes does this
+        # env = W.ActionRescaleWrapper(env)
+        # env = W.StickyGripperWrapper(env, task=cfg.task)
+
+        env = W.ExtraObservationWrapper(env, use_image=True)
+        env = W.FlattenKeysWrapper(env)
+        env = W.FilterKeysWrapper(env, keys=["simpler-img"])
+        env = W.SuccessInfoWrapper(env)
+        # print(env.observation_space)
+
+        # TODO octo needs gymnasium as gym
+
+        # requires key.startswith('image_')
+        env = ResizeImageWrapper(env, (256, 256))
+        # env = GW.HistoryWrapper(env, 2)
+        # env = GW.TemporalEnsembleWrapper(env, 4)
+
+        # env = GW.RHCWrapper(env, 2)
+        return env
+
+    # batch must match n_envs :(
+    venv = SubprocVecEnv([_init for _ in range(cfg.batch_size)])
+    # venv = VecMonitor(venv)  # attach this so SB3 can log reward metrics
+
+    venv.seed(0)
+    venv.reset()
+    # venv = W.VecRecord(venv, osp.join("log_dir", "train"), use_wandb=True)
+    return venv
+
+
+class EvalCallback:
+
+    def __init__(self, venv, step_func, transform=None, oxes=None):
+        self.venv = venv
+        self.step_func = step_func
+        self.transform = transform
+        self.oxes = oxes
+        self.rescaler = ActionRescaler()
+
+    def __call__(self, i=None):
+
+        if self.oxes is not None:
+            self.oxes.reset()
+
+        dones = np.zeros(cfg.batch_size, dtype="int")
+
+        rewards = np.zeros(cfg.batch_size)
+        lengths = np.zeros(cfg.batch_size, dtype="int")
+        obs = self.venv.reset()  # venv reset has no info
+
+        obs = self.transform(obs) if self.transform is not None else obs
+        obs = self.oxes.pre_step(obs) if self.oxes is not None else obs
+
+        states = None
+        episode_starts = np.ones((self.venv.num_envs,), dtype=bool)
+
+        # print(jax.tree.map(lambda arr: (arr.shape, str(arr.dtype)), obs))
+
+        bar = tqdm("eval callback", total=120, leave=False)
+        with bar:
+            while not dones.all():
+
+                # actions = np.array(self.step_func(obs))
+                actions = self.step_func(obs)
+                if self.oxes is not None:
+                    raw, actions = self.oxes(actions)
+
+                actions = self.rescaler.dict2act(actions)
+
+                # names = ["x", "y", "z", "yaw", "pitch", "roll", "gripper"]
+                # for i, n in enumerate(names):
+                # wandb.log({f"pred/{n}": wandb.Histogram(actions[:, i])})
+
+                obs, rew, done, info = self.venv.step(actions)
+                obs = self.transform(obs) if self.transform is not None else obs
+                obs = self.oxes.pre_step(obs) if self.oxes is not None else obs
+                # done = terminated or truncated
+
+                rewards = rewards + rew
+                lengths = lengths + 1
+                dones = np.logical_or(dones, done)
+
+                bar.set_description(f"rewards: {rewards.sum()}")
+                bar.update()
+
+        stats = {"SR": rewards.mean(), "length": lengths.mean()}
+        return stats
+
+
+def step_randoms(*args):
+    import numpy as np
+
+    return np.random.rand(cfg.batch_size, 4, 7)
+
+
+def main():
+    # """
     print("Using wandb")
     wrun = wandb.init(
         project="lora",
-        dir= osp.join(osp.expanduser('~'),'improve_logs'), # cfg.callback.log_path,
+        dir=osp.join(osp.expanduser("~"), "improve_logs"),  # cfg.callback.log_path,
         job_type="train",
         # sync_tensorboard=True,
         monitor_gym=True,
-        config=asdict(cfg) , # OC.to_container(cfg, resolve=True),
+        config=asdict(cfg),  # OC.to_container(cfg, resolve=True),
     )
     wandb.config.update({"name": wrun.name})
-
-
+    # """
 
     assert (
         cfg.batch_size % jax.device_count() == 0
@@ -122,6 +506,11 @@ def main(_):
     model_type = f"hf://rail-berkeley/{model_type}"
     pretrained_model = OctoModel.load_pretrained(model_type)
 
+    # pretrained = pretrained_model
+    # dataset_id = "bridge_dataset"
+    # action_mean = pretrained.dataset_statistics[dataset_id]["action"]["mean"]
+    # action_std = pretrained.dataset_statistics[dataset_id]["action"]["std"]
+
     # from demo
     # pretrained_model = OctoModel.load_pretrained(cfg.pretrained_path)
 
@@ -139,8 +528,6 @@ def main(_):
         batch = process_text(batch, text_processor)
         del batch["dataset_name"]
         return batch
-
-
 
     dataset = iter(lora_octo.octo_dataset(cfg.batch_size))
     batch = next(dataset)
@@ -185,13 +572,16 @@ def main(_):
         obs_keys=["proprio"],
     )
     # Fully override the old action head with a new one (for smaller changes, you can use update_module_config)
-    config["model"]["heads"]["action"] = ModuleSpec.create(
-        L1ActionHead,
-        pred_horizon=5,  # 50 for aloha but thats too much for simpler
-        action_dim=14,
-        readout_key="readout_action",
-    )
     """
+    config["model"]["heads"]["value"] = ModuleSpec.create(
+        MSEActionHead,
+        pred_horizon=4,  # 50 for aloha but thats too much for simpler
+        max_action=1.0,
+        action_dim=1,
+        readout_key="readout_value",
+    )
+    config["model"]["readouts"]["value"] = 2
+    print(config)
 
     # initialize weights for modified Octo model, then merge in all applicable pre-trained weights
     # new position encodings for proprio inputs & weights for new action head will remain "from scratch"
@@ -209,7 +599,6 @@ def main(_):
     model = model.replace(params=merged_params)
     del pretrained_model
 
-
     def decision_fn(path, param):
 
         path = [str(p.key) for p in path]
@@ -226,11 +615,14 @@ def main(_):
             print(f"Using LoRA with dim={dim} for param {joined} | {param.shape}")
             return dim
 
-        if ("heads_action" and "diffusion_model" in path) and (
+        if ("heads_action" in path and "diffusion_model" in path) and (
             "Dense_0" in path or "Dense_1" in path
         ):
             print(f"Using LoRA with dim={dim} for param {joined}")
             return dim
+
+        if "heads_value" in path:
+            return lorax.LORA_FULL
 
         print(joined)
         return lorax.LORA_FREEZE
@@ -242,7 +634,7 @@ def main(_):
     lora_spec = lorax.simple_spec(
         model.params, decision_fn=decision_fn, tune_vectors=True
     )
-    print(lora_spec)
+    # print(lora_spec)
 
     def LoRAify(obj):
         """
@@ -285,9 +677,8 @@ def main(_):
     lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0))
     # target_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(1))
 
-    learning_rate = optax.join_schedules(
-        [optax.linear_schedule(0, 3e-5, 100), optax.constant_schedule(3e-5)], [100]
-    )
+    learning_rate = optax.cosine_decay_schedule(3e-4, cfg.train_steps)
+    # learning_rate = optax.join_schedules( [optax.linear_schedule(0, 3e-5, 100), optax.constant_schedule(3e-5)], [100])
     tx = optax.adamw(
         learning_rate=learning_rate, weight_decay=1e-4, mu_dtype=jnp.bfloat16
     )
@@ -348,7 +739,16 @@ def main(_):
             pad_mask=batch["observation"]["pad_mask"],
             train=train,
         )
-        return action_loss, action_metrics
+        value_loss, value_metrics = bound_module.heads["value"].loss(
+            transformer_embeddings,
+            batch["value"],
+            pad_mask=batch["observation"]["pad_mask"],
+            train=train,
+        )
+
+        loss = action_loss + value_loss
+        metrics = {"action": action_metrics, "value": value_metrics}
+        return loss, metrics
 
     @jax.jit
     def train_step(state, batch):
@@ -359,9 +759,81 @@ def main(_):
         new_state = state.apply_gradients(grads=grads, rng=rng)
         return new_state, info
 
+    @lorax.lora
+    def _model_step(params, batch, rng, train=False):
+        """for evaluation in env"""
+        # use the params and rng from the state
+        bound_module = model.module.bind(
+            {"params": params}, rngs={"dropout": train_state.rng}
+        )
+
+        transformer_embeddings = bound_module.octo_transformer(
+            batch["observation"],
+            batch["task"],
+            batch["observation"]["pad_mask"],
+            train=train,
+        )
+
+        actions = bound_module.heads["action"].predict_action(
+            transformer_embeddings,
+            rng=train_state.rng,
+            train=False,
+        )
+
+        # print(actions)
+        # print(actions.shape)
+        return actions
+
+        """
+        action_loss, action_metrics = bound_module.heads["action"].loss(
+            transformer_embeddings,  # Action head knows to pull out the action readout_key
+            batch["action"],
+            pad_mask=batch["observation"]["pad_mask"],
+            train=train,
+        )
+        """
+        # outs = bound_module( batch["observation"], batch["task"], batch["observation"]["pad_mask"], train=train,)
+        # actions = outs["action"]
+        return actions
+
+    #
+    #
+    #
+
+    @jax.jit
+    def model_step(batch):
+        return _model_step(train_state.params, batch, train_state.rng)
+
+    def transform(obs):
+        obs["task"] = {"language_instruction": lang}
+        return obs
+
+    venv = mk_envs()
+    from improve.fm.oxes import OXESimplerInference, PolicyStepper
+
+    stepper = PolicyStepper(
+        model_type="func",
+        dataset_id="bridge_dataset",
+        func=model_step,
+        transform=transform,
+    )
+
+    oxes = OXESimplerInference(stepper, batch_size=cfg.batch_size)
+    oxes.reset(descs)
+
+    def og_step(obs):
+        raw, act = oxes.step(obs)
+        return act
+
+    evalcallback = EvalCallback(venv, og_step)
+
+    #
+    #
+    #
+
     # run finetuning loop
     logging.info("Starting finetuning...")
-    for i in tqdm.tqdm(range(cfg.train_steps), total=cfg.train_steps, dynamic_ncols=True):
+    for i in tqdm(range(cfg.train_steps), total=cfg.train_steps, dynamic_ncols=True):
         batch = next(dataset)
         batch["task"] = {"language_instruction": lang}
         # batch = example_batch
@@ -371,7 +843,14 @@ def main(_):
         if (i + 1) % 100 == 0:
             print(update_info)
             update_info = jax.device_get(update_info)
-            wandb.log( du.flatten({"training": update_info}, delim="/"), step=i)
+
+            lr = train_state.opt_state.inner_state.hyperparams["learning_rate"]
+            update_info.update({"learning_rate": lr})
+
+            evals = evalcallback(i)
+            wandb.log(
+                du.flatten({"training": update_info, "eval": evals}, delim="/"), step=i
+            )
 
         # if (i + 1) % 1000 == 0:
         # save checkpoint
@@ -379,4 +858,4 @@ def main(_):
 
 
 if __name__ == "__main__":
-    app.run(main)
+    main()

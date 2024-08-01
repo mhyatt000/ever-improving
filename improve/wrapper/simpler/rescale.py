@@ -1,9 +1,10 @@
 import gymnasium as gym
-from gymnasium.spaces.box import Box
-from improve import cn
-from improve.env.action_rescale import ActionRescaler
 import numpy as np
 from gymnasium import spaces
+from gymnasium.spaces.box import Box
+
+from improve import cn
+from improve.env.action_rescale import ActionRescaler
 
 
 def _rescale_action_with_bound(

@@ -57,6 +57,11 @@ class BatchedOctoInference(OctoInference):
         del self.model
         self.model = new
 
+        # TODO
+        # self.policy_setup = policy_setup
+        # from SIMPLER OctoInference policy_setup
+        self.action_ensemble = True
+        self.action_ensemble_temp = 0.0
         if self.action_ensemble:
             self.action_ensembler = BatchedActionEnsembler(
                 self.pred_action_horizon, self.action_ensemble_temp, self.batch_size

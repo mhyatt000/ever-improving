@@ -1,56 +1,53 @@
 import os
 import os.path as osp
 import warnings
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from functools import partial
 from pprint import pprint
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
-import improve
-import improve.wrapper.dict_util as du
-from improve.env import make_env, make_envs
+import hydra
 import jax
 import jax.numpy as jnp
+import lorax
 import numpy as np
 import octo
-from octo.utils.train_callbacks import RolloutVisualizationCallback
 import optax
 import simpler_env as simpler
 import tensorflow as tf
+import torch
 import wandb
 import webdataset as wds
 from flax import struct
-import lorax
-import hydra
-from improve.data.lorax import find_tarballs, mk_dataset, preprocess
-from improve.fm.batch_octo import BatchedOctoInference
-from improve.fm.cache import load_task_embedding
 from jax.sharding import Mesh, NamedSharding, PartitionSpec
 from octo.model.octo_model import OctoModel
+from octo.utils.train_callbacks import RolloutVisualizationCallback
 from octo.utils.train_utils import (Timer, TrainState, check_config_diff,
                                     create_optimizer, format_name_with_config,
                                     merge_params, process_text)
 from octo.utils.typing import Config, Data, Params, PRNGKey
 from omegaconf import OmegaConf as OC
+from stable_baselines3.common.utils import set_random_seed
 from tqdm import tqdm
 from transformers import FlaxGPT2LMHeadModel
 
-import torch
-
-from stable_baselines3.common.utils import set_random_seed
-
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+import improve
+import improve.wrapper.dict_util as du
+from improve.data.lorax import find_tarballs, mk_dataset, preprocess
+from improve.env import make_env, make_envs
+from improve.fm.batch_octo import BatchedOctoInference
+from improve.fm.cache import load_task_embedding
 
 # prevent tensorflow from using GPU memory since it's only used for data loading
 tf.config.set_visible_devices([], "GPU")
+
 
 @dataclass
 class MyConfig:
     num_steps: int = int(3e5)
     seed: int = 0
     batch_size: int = 8  # 16 is slow
-    grad_acc: Optional[int] = 4 # really should be ≈128
+    grad_acc: Optional[int] = 4  # really should be ≈128
     grad_clip: Optional[int] = 2
 
     sweep_id: str = "lora"
@@ -94,7 +91,17 @@ def run(train_state, train_data_iter, train_step, lang, rollout_callback):
             # batch = next(train_data_iter)
             # BUG: Dummy Data
             batch = {
-                'action': np.zeros((8, 5, 7), dtype='float32'), 'observation': {'image_primary': np.zeros((8, 2, 256, 256, 3), dtype='uint8'), 'pad_mask': np.zeros((8, 2), dtype='int32')}, 'task': {'language_instruction': {'attention_mask': np.zeros((8, 16), dtype='int64'), 'input_ids': np.zeros((8, 16), dtype='int64')}}
+                "action": np.zeros((8, 5, 7), dtype="float32"),
+                "observation": {
+                    "image_primary": np.zeros((8, 2, 256, 256, 3), dtype="uint8"),
+                    "pad_mask": np.zeros((8, 2), dtype="int32"),
+                },
+                "task": {
+                    "language_instruction": {
+                        "attention_mask": np.zeros((8, 16), dtype="int64"),
+                        "input_ids": np.zeros((8, 16), dtype="int64"),
+                    }
+                },
             }
             batch["task"] = {"language_instruction": lang}
 
@@ -104,7 +111,6 @@ def run(train_state, train_data_iter, train_step, lang, rollout_callback):
             # )
             # breakpoint()
             # {'action': ((8, 5, 7), 'float32'), 'observation': {'image_primary': ((8, 2, 256, 256, 3), 'uint8'), 'pad_mask': ((8, 2), 'int32')}, 'task': {'language_instruction': {'attention_mask': ((8, 16), 'int64'), 'input_ids': ((8, 16), 'int64')}}}
-
 
             # print(batch.items())
             # print(batch["action"])
@@ -117,26 +123,32 @@ def run(train_state, train_data_iter, train_step, lang, rollout_callback):
             # print(update_info)
             flattened_actions = update_info["actions"].reshape(-1, 7)
 
-            loggedInfo = {x:update_info[x] for x in update_info if x!='actions'}
+            loggedInfo = {x: update_info[x] for x in update_info if x != "actions"}
 
             wandb.log(loggedInfo, step=i)
             # wandb.log(update_info, step=i)
             print("wandb logged for loggedInfo")
 
-
             # Log histograms for each component
-            components = ['x', 'y', 'z', 'yaw', 'pitch', 'roll', 'gripper_state']
+            components = ["x", "y", "z", "yaw", "pitch", "roll", "gripper_state"]
 
             for j, component in enumerate(components):
-                wandb.log({f"prediction/actions/{component}": wandb.Histogram(flattened_actions[:, j])}, step=i)
+                wandb.log(
+                    {
+                        f"prediction/actions/{component}": wandb.Histogram(
+                            flattened_actions[:, j]
+                        )
+                    },
+                    step=i,
+                )
                 print("wandb logged for", component)
 
         timer.tock("total")
 
         cfg.eval_interval = 10
-        if (i+1) % cfg.eval_interval == 0:
+        if (i + 1) % cfg.eval_interval == 0:
             print("Evaluating...")
-            if (rollout_callback is not None):
+            if rollout_callback is not None:
                 with timer("rollout"):
                     rollout_metrics = rollout_callback(train_state, i + 1)
                     wandb.log(rollout_metrics, step=i)
@@ -181,33 +193,50 @@ def tuple2dict(x):
     }
 
 
-def future_actions(x: dict) -> None:
-    actions = x["action"]
-    n = actions.shape[0]
+def make_values(x: dict):
+    rew = x["reward"].tolist()
 
-    # Create a new array of zeros with shape (n, 5, 7)
-    new_actions = jnp.zeros((n, 5, 7))
+    for i in range(len(rew) - 2, -1, -1):
+        rew[i] = 0.99 * rew[i + 1]
+    x["value"] = jnp.expand_dims(jnp.array(rew), axis=-1)
 
-    # Use roll to shift the array and vmap to apply it over a range of shifts
-    def get_future_actions(idx):
-        return jnp.stack(
-            [jnp.roll(actions, -shift, axis=0)[idx] for shift in range(5)], axis=0
-        )
-
-    get_future_actions_vmap = jax.vmap(get_future_actions, in_axes=(0,))
-    new_actions = get_future_actions_vmap(jnp.arange(n))
-
-    # Handle edge cases where we roll beyond the length of the array
-    mask = jnp.arange(n).reshape(-1, 1) + jnp.arange(5) < n
-    # new_actions = jnp.where(mask[:, :, None], new_actions, actions[-1])
-
-    # should predict 0s when done
-    new_actions = jnp.where(mask[:, :, None], new_actions, jnp.zeros_like(actions[-1]))
-
-    x["action"] = new_actions
     return x
 
 
+def future_actions(x: dict):
+    return mk_horizon(x, 5, "action")
+
+
+def mk_horizon(x: dict, horizon, key):
+
+    things = x[key]
+    n = things.shape[0]
+    dims = list(things.shape[1:])
+
+    # Create a new array of zeros with shape (n, horizon, 7)
+    new = jnp.zeros([n, horizon] + dims)
+
+    # Use roll to shift the array and vmap to apply it over a range of shifts
+    def get_future(idx):
+        return jnp.stack(
+            [jnp.roll(things, -shift, axis=0)[idx] for shift in range(horizon)], axis=0
+        )
+
+    get_future_vmap = jax.vmap(get_future, in_axes=(0,))
+    new = get_future_vmap(jnp.arange(n))
+
+    # Handle edge cases where we roll beyond the length of the array
+    mask = jnp.arange(n).reshape(-1, 1) + jnp.arange(horizon) < n
+    # new = jnp.where(mask[:, :, None], new, actions[-1])
+
+    # should predict 0s when done
+    new = jnp.where(mask[:, :, None], new, jnp.zeros_like(things[-1]))
+
+    x[key] = new
+    return x
+
+
+"""
 def split_sample(x, n=8):
     l = len(x["done"])
     out = []
@@ -215,6 +244,7 @@ def split_sample(x, n=8):
         stop, start = -i * n, -(i + 1) * n
         out.append(jax.tree.map(lambda a: a[start:stop], x))
     yield out
+"""
 
 
 def split_sample(x, n=8):
@@ -270,6 +300,7 @@ def prepare_octo(x):
     x["observation"] = {}
     x["observation"]["image_primary"] = _resize_image(x["obs"]["simpler-img"])
     x["action"] = x["action"][0]
+    x["value"] = x["value"][0] if "value" in x else x['value']
     del x["obs"]
 
     x.pop("__key__", None)
@@ -297,7 +328,7 @@ def is_batch(x, batch_size):
     # print(x.keys())
     # pprint(jax.tree.map(lambda arr: (arr.shape, str(arr.dtype)), x))
     x = {k: v for k, v in x.items() if "__" not in k}
-    sz = jax.tree.reduce(lambda s, arr: s and arr.shape[0] == cfg.batch_size, x, True)
+    sz = jax.tree.reduce(lambda s, arr: s and arr.shape[0] == batch_size, x, True)
     return sz
 
 
@@ -310,7 +341,7 @@ def octo_dataset(batch_size):
     dnames = [osp.join(e, "train") for e in exp_root]
     fnames = list(find_tarballs(dnames))
     print(fnames)
-    fnames = [f for f in fnames if 'pt' in f]
+    fnames = [f for f in fnames if "pt" in f]
 
     dataset = wds.DataPipeline(
         # wds.SimpleShardList(fnames),
@@ -327,11 +358,14 @@ def octo_dataset(batch_size):
         # this shuffles the samples in memory
         wds.shuffle(500),  # shuffles the samples... too much shuffle will kill
         # this decodes the images and json
-        wds.decode(), # BUG: conflicts with having multiple workers, but we want multiple workers
+        wds.decode(),  # BUG: conflicts with having multiple workers, but we want multiple workers
         # wds.to_tuple("png", "json"),
         wds.map(preprocess),
         wds.map(tuple2dict),  # not needed if already dict
-        wds.map(future_actions),
+        wds.map(lambda x: mk_horizon(x, 5, "action")),
+        wds.map(make_values),
+        wds.select(lambda x: x['reward'].sum() > 0 ), # only successful episode
+        wds.map(lambda x: mk_horizon(x, 5, "value")),
         wds.map(split_sample),
         wds.filters.unlisted(),  # (split_sample)
         # wds.to_tuple(),
@@ -341,9 +375,8 @@ def octo_dataset(batch_size):
         wds.map(get_mask),
         wds.map(get_task),
         wds.batched(batch_size, collation_fn=dict_collate),
-        wds.select(lambda x: is_batch(x,batch_size)),
+        wds.select(lambda x: is_batch(x, batch_size)),
     )
-
 
     loader = wds.WebLoader(
         dataset,
@@ -384,11 +417,11 @@ def main():
     print("Using wandb")
     wrun = wandb.init(
         project="awac",
-        dir= osp.join(osp.expanduser('~'),'improve_logs'), # cfg.callback.log_path,
+        dir=osp.join(osp.expanduser("~"), "improve_logs"),  # cfg.callback.log_path,
         job_type="train",
         # sync_tensorboard=True,
         monitor_gym=True,
-        config=asdict(cfg) , # OC.to_container(cfg, resolve=True),
+        config=asdict(cfg),  # OC.to_container(cfg, resolve=True),
     )
     wandb.config.update({"name": wrun.name})
 
@@ -659,9 +692,8 @@ def main():
         history_length=2,
         model_pred_horizon=model.config["model"]["heads"]["action"]["kwargs"].get(
             "pred_horizon", 1
-        )
+        ),
     )
-
 
     run(train_state, iter(dataset), train_step, lang, rollout_callback)
 

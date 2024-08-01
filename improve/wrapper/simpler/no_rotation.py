@@ -27,11 +27,13 @@ class NoRotationWrapper(gym.Wrapper):
         )
 
         self.env = env
-        self.env.agent.reset(self.qpos)
+        agent = self.env.get_wrapper_attr('agent'),
+        agent.reset(self.qpos)
 
     def reset(self):
         things = self.env.reset()
-        self.env.agent.reset(self.qpos)
+        agent = self.env.get_wrapper_attr('agent'),
+        agent.reset(self.qpos)
         return things
 
     def step(self, action):

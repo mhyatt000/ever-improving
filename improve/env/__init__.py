@@ -4,10 +4,9 @@ import gymnasium as gym
 import simpler_env as simpler
 from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
                                               VecMonitor, VecVideoRecorder)
-
 import improve.wrapper as W  # TODO add all the wrappers to wrapper.__init__.py
 
-from .action_rescale import ActionRescaler
+from improve.env.action_rescale import ActionRescaler
 
 MULTI_OBJ_ENVS = [
     "google_robot_move_near_v0",
@@ -232,3 +231,21 @@ def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
 
         return env, eval_env
     """
+
+import hydra
+import improve
+
+@hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
+def main(cfg):
+
+    env, eval_env = make_envs(
+        cfg,
+        'log_dir',
+        eval_only=False,
+        num_envs=8,
+    )
+    print(env)
+
+
+if __name__ == "__main__":
+    main()
