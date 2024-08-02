@@ -63,3 +63,4 @@ class Env:
     
     # record dataset
     record: bool = False
+    shift_reward: bool = False

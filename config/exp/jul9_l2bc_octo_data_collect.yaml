@@ -9,7 +9,7 @@ defaults:
   - override /algo: sac
   - override /buffer: base # no HER for now!
   - override /env/foundation: octo-small
-  - override /env/obs_mode: src-tgt
+  - override /env/obs_mode: oracle-central
 
   - _self_
 
@@ -60,14 +60,7 @@ hydra:
     params:
       env.residual_scale: 1
       env.foundation.task:
-<<<<<<< HEAD
-        # widowx_spoon_on_towel,
-        # widowx_carrot_on_plate,
-        widowx_stack_cube
-=======
         widowx_put_eggplant_in_basket
         # widowx_spoon_on_towel,
         # widowx_carrot_on_plate,
-        
         # widowx_stack_cube
->>>>>>> 2eca8fe26f57c69b1e55c287dbc24eeca4af5ad4

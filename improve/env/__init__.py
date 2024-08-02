@@ -40,7 +40,6 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
 
         extra = {}
 
-        ### FIX THIS
         if cfg.env.obs_mode.mode.value != "rgb":
             extra["obs_mode"] = cfg.env.obs_mode.mode.value
         if cfg.env.task == "google_robot_pick_horizontal_coke_can":
@@ -60,8 +59,11 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
 
         if cfg.algo.name == "awac" or cfg.env.foundation.name is None:
             env = W.ActionRescaleWrapper(env)
-            env = W.AwacRewardWrapper(env)
-            print("shifting reward dist to [-1, 0]")
+            
+            if cfg.env.shift_reward:
+                env = W.AwacRewardWrapper(env)
+                print("shifting reward dist to [-1, 0]")
+
 
         if cfg.env.fm_loc.value == "env":
             if cfg.env.foundation.name:

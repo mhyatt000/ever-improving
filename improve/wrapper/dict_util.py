@@ -75,8 +75,8 @@ def merge(arr, func):
 
 def apply(d, func):
     """Recursively apply func to items in d."""
-
     if isinstance(d, Dict):
+        print(k for k in d.spaces.keys())
         return Dict({k: apply(v, func) for k, v in d.spaces.items()})
     elif isinstance(d, (OrderedDict, dict)):
         return {k: apply(v, func) for k, v in d.items()}

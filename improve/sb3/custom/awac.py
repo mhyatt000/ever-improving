@@ -31,6 +31,32 @@ from improve import cn
 # from improve.data.awac import ep2step, find_tarballs, mk_dataset
 from improve.data.dl import DefaultTransform, MyOfflineDS
 
+from improve.env.action_rescale import ActionRescaler, _rescale_action_with_bound
+
+
+scaler = ActionRescaler(cn.Strategy.CLIP, residual_scale=1.0)
+
+### CHANGED for awac rescaling
+def awac_buffer_scale(action):
+    def _unscale_fm_action(action):
+        action["world_vector"] = _rescale_action_with_bound(
+            action["world_vector"],
+            low=-1.75,
+            high=1.75,
+            post_scaling_min=-1,
+            post_scaling_max=1,
+        )
+        action["rot_axangle"] = _rescale_action_with_bound(
+            action["rot_axangle"],
+            low=-1.4,
+            high=1.4,
+            post_scaling_min=-1,
+            post_scaling_max=1,
+        )
+        return action
+    
+    return scaler.dict2act(_unscale_fm_action(scaler.act2dict(action)))
+
 
 class AWAC(SAC):
     """ Advantage Weighted Actor Critic (AWAC)
@@ -53,6 +79,7 @@ class AWAC(SAC):
         env: Union[GymEnv, str],
         algocn: cn.AWAC,
         task: str,
+        shift_reward: bool = False,
     ):
         self.algocn = algocn
 
@@ -69,7 +96,7 @@ class AWAC(SAC):
 
         self.dataset = [osp.join(d, "train") for d in self.dataset]
         self.dataset = [
-            MyOfflineDS(d, seq=1, transform=DefaultTransform()) for d in self.dataset
+            MyOfflineDS(d, seq=1, transform=DefaultTransform(), shift_reward=shift_reward) for d in self.dataset
         ][0]
 
         # concat does not support iterdataset
@@ -105,7 +132,7 @@ class AWAC(SAC):
             self.replay_buffer.add(
                 batch["obs"],
                 batch["next_obs"],
-                batch["actions"],
+                awac_buffer_scale(batch["actions"]),
                 batch["rewards"],
                 batch["dones"],
                 infos,
@@ -167,7 +194,7 @@ class AWAC(SAC):
                 self.actor.reset_noise()
 
             # Action by the current actor for the sampled state
-            actions_pi, log_prob = self.actor.action_log_prob(replay_data.observations)
+            actions_pi, log_prob = self.actor.action_log_prob(replay.observations)
             log_prob = log_prob.reshape(-1, 1)
 
             ent_coef_loss = None
@@ -208,12 +235,15 @@ class AWAC(SAC):
                 )
                 next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
                 # add entropy term
-                next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+                
+                ### CHANGED take out entropy due to exploding entropy coef
+                # next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
-
-                target_q_values = (
-                    replay.rewards + (1 - replay.dones) * self.gamma * next_q_values
-                )
+                target_q_values = replay.rewards
+                
+                if self.algocn.use_entropy:
+                    next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+                    target_q_values += (1 - replay.dones) * self.gamma * next_q_values                
 
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
@@ -265,14 +295,15 @@ class AWAC(SAC):
 
             # this is the log prob of the replay.actions given actor(obs)
             # clip actions because otherwise log_prob will be nan
-            log_prob = dist.log_prob(th.clip(replay.actions, -1, 1)).reshape(-1, 1)
-            # log_prob = dist.custom_log_prob(replay.actions).reshape(-1, 1)
+            
+            # log_prob = dist.log_prob(th.clip(replay.actions, -1, 1)).reshape(-1, 1)
+            log_prob = dist.log_prob(replay.actions).reshape(-1, 1)
 
             # log_prob = th.where(th.isnan(log_prob), 0, log_prob)
 
             mse_loss = F.mse_loss(actions_pi, replay.actions, reduction="none").mean(1)
 
-            self.logger.record("train/mse_loss", mse_loss.item())
+            self.logger.record("train/mse_loss", mse_loss.mean())   ### CHANGED instead of .item()
             # actor_losses.append(mse_loss.item())
             # actor_loss +=  mse_loss
 
@@ -288,13 +319,13 @@ class AWAC(SAC):
             gripper_loss = F.smooth_l1_loss(
                 actions_pi, replay.actions, reduction="none"
             )[:, -1]
-            open = gripper_loss[replay.actions[:, -1] == 1.0].mean()
-            close = gripper_loss[replay.actions[:, -1] == -1.0].mean()
+            
+            ### CHANGED (default to 0 if NaN)
+            open = np.nan_to_num(gripper_loss[replay.actions[:, -1] == 1.0].mean())
+            close = np.nan_to_num(gripper_loss[replay.actions[:, -1] == -1.0].mean())
 
             # added neutral gripper loss for rtx (to turn off gripper loss set weight to 0)
-            neutral = 0
-            if "google_robot" in self.task:
-                neutral = gripper_loss[replay.actions[:, -1] == 0.0].mean()
+            neutral = np.nan_to_num(gripper_loss[replay.actions[:, -1] == 0.0].mean()) 
 
             gripper_loss = open + close + neutral
             actor_loss += self.gripper_loss_weight * gripper_loss
@@ -327,6 +358,10 @@ class AWAC(SAC):
             # model qval predictions
             q = q.view(-1).cpu().detach().numpy()
             self.logger.record("stats/prediction/q", wandb.Histogram(q))
+            
+            ### CHANGED (add q value plotting for replay buffer)
+            q = replay.rewards.view(-1).cpu().detach().numpy()
+            self.logger.record("stats/replay/q", wandb.Histogram(q))
 
             # Optimize the actor
             self.actor.optimizer.zero_grad()

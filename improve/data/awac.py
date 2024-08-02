@@ -94,7 +94,7 @@ DrawerKeys = [
 ]
 
 RPKeys = ["agent_partial-action"]
-OracleKeys = ["obj-wrt-eef"]
+OracleKeys = ["obj-pose", "obj-wrt-eef"]    ### CHANGED (added obj pose to OracleKeys)
 ImageKeys = ["simpler-img"]
 
 
@@ -108,6 +108,8 @@ def filter_keys(obs, task=None):
         obs_keys += DrawerKeys
     else:
         obs_keys += OracleKeys
+        
+    print("obs keys", obs_keys)
 
     obs = {k: v for k, v in obs.items() if k in obs_keys}
 
@@ -119,9 +121,26 @@ def filter_keys(obs, task=None):
 
 scaler = ActionRescaler(cn.Strategy.CLIP, residual_scale=1.0)
 
-
+### CHANGED for awac rescaling
 def unscale(action):
-    return scaler.unscale_for_obs(action)
+    def _unscale_fm_action(action):
+        action["world_vector"] = scaler._rescale_action_with_bound(
+            action["world_vector"],
+            low=-0.05,
+            high=0.05,
+            post_scaling_min=-1,
+            post_scaling_max=1,
+        )
+        action["rot_axangle"] = scaler._rescale_action_with_bound(
+            action["rot_axangle"],
+            low=-0.25,
+            high=0.25,
+            post_scaling_min=-1,
+            post_scaling_max=1,
+        )
+        return action
+    
+    return scaler.dict2act(_unscale_fm_action(scaler.act2dict(action)))
 
 
 def preprocess(x: dict, task=None):
@@ -142,7 +161,9 @@ def preprocess(x: dict, task=None):
         fm = scaler.scale_action(np.array(x["obs"]["agent_partial-action"]))
         # actions[:,:-1] += fm[:,:-1]
         actions[:, -1] = fm[:, -1]
-    actions = scaler.unscale_for_obs(actions)
+        
+    ### CHANGED (for awac rescaling [-1, 1])
+    actions = unscale(actions)
 
     return (
         filter_keys(x["obs"], task=task),  # CHANGE THIS

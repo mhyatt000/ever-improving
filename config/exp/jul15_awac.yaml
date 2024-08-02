@@ -9,8 +9,8 @@ defaults:
   - override /algo: awac
   - override /buffer: base 
   - override /env/foundation: octo-small
-  - override /env/obs_mode: awac_drawer
-  # - override /env/obs_mode: awac
+  # - override /env/obs_mode: awac_drawer
+  - override /env/obs_mode: awac
   # - override /env/obs_mode: awac_multi
 
   - _self_
@@ -65,8 +65,8 @@ hydra:
     params:
       env.residual_scale: 1
       env.foundation.task: 
-        google_robot_pick_coke_can
-        # widowx_put_eggplant_in_basket
+        # google_robot_pick_coke_can
+        widowx_put_eggplant_in_basket
         #
         # widowx_spoon_on_towel
         # widowx_carrot_on_plate,

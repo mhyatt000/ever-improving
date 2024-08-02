@@ -87,7 +87,11 @@ class ActionRescaler:
 
             action = np.array([f(a, b) for a, b in zip(action, bounds)])
             return action + model_action
-
+        
+        ### CHANGED
+        # if self.strategy == "awac_rescale":
+        #     return self.dict2act(_scale_action_awac(self.act2dict(action)))
+            
         if self.strategy is None:
             action = self.scale_action(action)  # to RTX space
             return action + model_action
@@ -122,20 +126,38 @@ class ActionRescaler:
                 "gripper": action[:, -1],
             }
 
+### CHANGED (for awac rescaling)
+# def _scale_action_awac(action: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+#     action["world_vector"] = _rescale_action_with_bound(
+#         action["world_vector"],
+#         low=-1.75,
+#         high=1.75,
+#         post_scaling_min=-1,
+#         post_scaling_max=1,
+#     )
+
+#     action["rot_axangle"] = _rescale_action_with_bound(
+#         action["rot_axangle"],
+#         low=-1.4,
+#         high=1.4,
+#         post_scaling_min=-1,
+#         post_scaling_max=1,
+#     )
+#     return action
 
 def _scale_action(action: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     action["world_vector"] = _rescale_action_with_bound(
         action["world_vector"],
-        low=-1.75,
-        high=1.75,
+        low=-1,    #-1.75,
+        high=1,    #1.75,
         post_scaling_min=-0.05,
         post_scaling_max=0.05,
     )
 
     action["rot_axangle"] = _rescale_action_with_bound(
         action["rot_axangle"],
-        low=-1.4,
-        high=1.4,
+        low=-1,        #-1.4,
+        high=1,       #1.4,
         post_scaling_min=-0.25,
         post_scaling_max=0.25,
     )
@@ -147,15 +169,15 @@ def _unscale_for_obs(action: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         action["world_vector"],
         low=-0.05,
         high=0.05,
-        post_scaling_min=-1.75,
-        post_scaling_max=1.75,
+        post_scaling_min=-1,   #-1.75,
+        post_scaling_max=1,   #1.75,
     )
     action["rot_axangle"] = _rescale_action_with_bound(
         action["rot_axangle"],
         low=-0.25,
         high=0.25,
-        post_scaling_min=-1.4,
-        post_scaling_max=1.4,
+        post_scaling_min=-1,   #-1.4,
+        post_scaling_max=1,   #1.4,
     )
     return action
 
