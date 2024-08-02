@@ -1,5 +1,6 @@
 import os.path as osp
 from dataclasses import asdict, dataclass
+from functools import partial
 from pprint import pprint
 from typing import Any, Optional, Sequence, Tuple, Union
 
@@ -17,6 +18,7 @@ import tensorflow as tf
 import wandb
 from absl import app, flags, logging
 from flax import struct
+from jax.sharding import Mesh, NamedSharding, PartitionSpec
 from octo.data.dataset import make_single_dataset
 from octo.data.utils.data_utils import NormalizationType
 from octo.model.components.action_heads import L1ActionHead, MSEActionHead
@@ -51,9 +53,13 @@ class MyConfig:
     freeze_transformer: bool = False
 
     seed: int = 0
-    batch_size: int = 4
+
+    gpus: int = jax.device_count()
+    batch_size: int = 64 * gpus
+
+    inference_size: int = 5
     # batch_size: int = 64
-    grad_acc: Optional[int] = 32  # really should be ≈128
+    grad_acc: Optional[int] = 8  # total = 64 * 8 = 512
     grad_clip: Optional[int] = 2
 
     train_steps: int = int(3e5)
@@ -352,7 +358,7 @@ class ResizeImageWrapper(gym.ObservationWrapper):
         return observation
 
 
-def mk_envs():
+def mk_envs(n_envs=cfg.inference_size):
     import warnings
 
     warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
@@ -400,7 +406,7 @@ def mk_envs():
         return env
 
     # batch must match n_envs :(
-    venv = SubprocVecEnv([_init for _ in range(cfg.batch_size)])
+    venv = SubprocVecEnv([_init for _ in range(n_envs)])
     # venv = VecMonitor(venv)  # attach this so SB3 can log reward metrics
 
     venv.seed(0)
@@ -423,10 +429,10 @@ class EvalCallback:
         if self.oxes is not None:
             self.oxes.reset()
 
-        dones = np.zeros(cfg.batch_size, dtype="int")
+        dones = np.zeros(cfg.inference_size, dtype="int")
 
-        rewards = np.zeros(cfg.batch_size)
-        lengths = np.zeros(cfg.batch_size, dtype="int")
+        rewards = np.zeros(cfg.inference_size)
+        lengths = np.zeros(cfg.inference_size, dtype="int")
         obs = self.venv.reset()  # venv reset has no info
 
         obs = self.transform(obs) if self.transform is not None else obs
@@ -471,7 +477,7 @@ class EvalCallback:
 def step_randoms(*args):
     import numpy as np
 
-    return np.random.rand(cfg.batch_size, 4, 7)
+    return np.random.rand(cfg.inference_size, 4, 7)
 
 
 def main():
@@ -487,6 +493,13 @@ def main():
     )
     wandb.config.update({"name": wrun.name})
     # """
+
+    # create a 1D mesh with a single axis named "batch"
+    mesh = Mesh(jax.devices(), axis_names="batch")
+    # Our batches will be data-parallel sharded -- each device will get a slice of the batch
+    dp_sharding = NamedSharding(mesh, PartitionSpec("batch"))
+    # Our model will be replicated across devices (we are only doing data parallelism, not model parallelism)
+    replicated_sharding = NamedSharding(mesh, PartitionSpec())
 
     assert (
         cfg.batch_size % jax.device_count() == 0
@@ -677,11 +690,9 @@ def main():
     lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0))
     # target_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(1))
 
-    learning_rate = optax.cosine_decay_schedule(3e-4, cfg.train_steps)
+    lrschedule = optax.cosine_decay_schedule(3e-4, cfg.train_steps)
     # learning_rate = optax.join_schedules( [optax.linear_schedule(0, 3e-5, 100), optax.constant_schedule(3e-5)], [100])
-    tx = optax.adamw(
-        learning_rate=learning_rate, weight_decay=1e-4, mu_dtype=jnp.bfloat16
-    )
+    tx = optax.adamw(learning_rate=lrschedule, weight_decay=1e-4, mu_dtype=jnp.bfloat16)
     if cfg.grad_acc:
         tx = optax.MultiSteps(tx, cfg.grad_acc)
     if cfg.grad_clip is not None:
@@ -746,11 +757,18 @@ def main():
             train=train,
         )
 
-        loss = action_loss + value_loss
+        loss = action_loss + 0.5 * value_loss
         metrics = {"action": action_metrics, "value": value_metrics}
         return loss, metrics
 
-    @jax.jit
+    @partial(
+        jax.jit,
+        # state is replicated, batch is data-parallel
+        in_shardings=(replicated_sharding, dp_sharding),
+        out_shardings=(replicated_sharding, replicated_sharding),
+        # allows jax to modify `state` in-place, saving a lot of memory
+        # donate_argnums=0,
+    )
     def train_step(state, batch):
         rng, dropout_rng = jax.random.split(state.rng)
         (loss, info), grads = jax.value_and_grad(loss_fn, has_aux=True)(
@@ -800,15 +818,31 @@ def main():
     #
     #
 
-    @jax.jit
+    @partial(
+        jax.jit,
+        # state is replicated, batch is data-parallel
+        in_shardings=(dp_sharding),
+        out_shardings=(replicated_sharding),
+        # allows jax to modify `state` in-place, saving a lot of memory
+        # donate_argnums=0,
+    )
     def model_step(batch):
-        return _model_step(train_state.params, batch, train_state.rng)
+        actions = _model_step(train_state.params, batch, train_state.rng)
+        return actions[: cfg.inference_size]
 
     def transform(obs):
+        zeros = jax.tree.map(
+            lambda arr: jnp.zeros(
+                (cfg.batch_size - cfg.inference_size, *arr.shape[1:])
+            ),
+            obs,
+        )
+        # zeros = jax.tree.map(lambda arr: jnp.zeros(arr), gapspec)
+        obs = jax.tree.map(lambda a, b: jnp.concatenate([a, b], axis=0), obs, zeros)
         obs["task"] = {"language_instruction": lang}
         return obs
 
-    venv = mk_envs()
+    venv = mk_envs(cfg.inference_size)
     from improve.fm.oxes import OXESimplerInference, PolicyStepper
 
     stepper = PolicyStepper(
@@ -818,7 +852,7 @@ def main():
         transform=transform,
     )
 
-    oxes = OXESimplerInference(stepper, batch_size=cfg.batch_size)
+    oxes = OXESimplerInference(stepper, batch_size=cfg.inference_size)
     oxes.reset(descs)
 
     def og_step(obs):
@@ -841,16 +875,21 @@ def main():
 
         train_state, update_info = train_step(train_state, batch)
         if (i + 1) % 100 == 0:
+            # if (i + 1) % 100 == 0:
             print(update_info)
             update_info = jax.device_get(update_info)
 
-            lr = train_state.opt_state.inner_state.hyperparams["learning_rate"]
+            lr = lrschedule(i)
+            print(f"Step {i}: LR: {lr}")
             update_info.update({"learning_rate": lr})
 
-            evals = evalcallback(i)
-            wandb.log(
-                du.flatten({"training": update_info, "eval": evals}, delim="/"), step=i
-            )
+            if (i + 1) % 1000 == 0:
+                evals = evalcallback(i)
+                evals = {"eval": evals}
+            else:
+                evals = {}
+
+            wandb.log(du.flatten({"training": update_info, **evals}, delim="/"), step=i)
 
         # if (i + 1) % 1000 == 0:
         # save checkpoint
