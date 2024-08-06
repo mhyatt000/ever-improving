@@ -458,7 +458,7 @@ class EvalCallback:
                 # done = terminated or truncated
 
                 rewards = rewards + rew
-                lengths = lengths + 1
+                lengths = lengths + 1 * np.logical_not(rewards)
                 dones = np.logical_or(dones, done)
 
                 bar.set_description(f"rewards: {rewards.sum()}")
@@ -847,9 +847,13 @@ def main():
             lr = train_state.opt_state.inner_state.hyperparams["learning_rate"]
             update_info.update({"learning_rate": lr})
 
-            evals = evalcallback(i)
+            evals = {}
+            if (i+1) % 500 == 0:
+                evals = evalcallback(i)
+                evals = {'eval': evals}
+
             wandb.log(
-                du.flatten({"training": update_info, "eval": evals}, delim="/"), step=i
+                du.flatten({"training": update_info, **evals}, delim="/"), step=i
             )
 
         # if (i + 1) % 1000 == 0:
