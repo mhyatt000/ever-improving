@@ -10,13 +10,14 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 import webdataset as wds
-from improve import cn
-from improve.env.action_rescale import ActionRescaler
-from improve.wrapper import dict_util as du
 from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
+
+from improve import cn
+from improve.env.action_rescale import ActionRescaler
+from improve.wrapper import dict_util as du
 
 # decord last
 _ = None
@@ -53,7 +54,7 @@ def b2mp4():
 
 
 def b2npz(b):
-    x =  np.load(io.BytesIO(b), encoding="bytes")["arr_0"].astype(np.float32)
+    x = np.load(io.BytesIO(b), encoding="bytes")["arr_0"].astype(np.float32)
     return torch.Tensor(x)
 
 
@@ -105,11 +106,19 @@ def filter_keys(obs):
     return obs
 
 
-scaler = ActionRescaler(cn.Strategy.CLIP, residual_scale=1.0)
+# scaler = ActionRescaler(cn.Strategy.CLIP, residual_scale=1.0)
 
 
 def unscale(action):
-    return scaler.unscale_for_obs(action)
+    """ this is un-scaling for Octo with widowX robot """
+    print('unscale called')
+    m = [0.00021161, 0.00012614, -0.00017022, -0.00015062, -0.00023831, 0.00025646, 0.0]
+    mean = np.array(m)
+    s = [0.00963721, 0.0135066, 0.01251861, 0.02806791, 0.03016905, 0.07632624, 1.0]
+    std = np.array(s)
+
+    out = (action - mean[None]) / std[None]
+    return out
 
 
 def preprocess(x: dict):
@@ -125,24 +134,27 @@ def preprocess(x: dict):
     x = {".".join(k.split(".")[:-1]): v for k, v in x.items()}
     x = du.nest(x, delim=".")
 
-    if 'infos' not in x:
-        x['infos'] = [None]
+    if "infos" not in x:
+        x["infos"] = [None]
 
-    x['state']['obs'].update(**x['obs'])
-    x['state']['next_obs'].update(**x['next_obs'])
-    x['state']['infos'] =  x['infos']
-    x = x['state']
-    x = du.apply(x, lambda x: x.numpy() if isinstance(x,torch.Tensor) else x)
+    x["state"]["obs"].update(**x["obs"])
+    x["state"]["next_obs"].update(**x["next_obs"])
+    x["state"]["infos"] = x["infos"]
+    x = x["state"]
+    x = du.apply(x, lambda x: x.numpy() if isinstance(x, torch.Tensor) else x)
 
     actions = np.array(x["actions"])
 
     # actions = scaler.scale_action(np.array(x["actions"]))
     if "agent_partial-action" in x["obs"]:
-        fm = scaler.scale_action(np.array(x["obs"]["agent_partial-action"]))
+        # dont add partial action since main action already has
         # actions[:,:-1] += fm[:,:-1]
+        # fm = scaler.scale_action(np.array(x["obs"]["agent_partial-action"]))
+        fm = np.array(x["obs"]["agent_partial-action"])
         actions[:, -1] = fm[:, -1]
-    actions = scaler.unscale_for_obs(actions)
-    x['actions'] = actions
+
+    actions = unscale(actions)
+    x["actions"] = actions
 
     # return x
     return (
