@@ -7,7 +7,7 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import flax
 import flax.linen as nn
 import gymnasium as gym
-from improve.offline.critic_heads import MSECriticHead
+from improve.offline.critic_heads import MECriticHead
 import jax
 import jax.numpy as jnp
 import lorax
