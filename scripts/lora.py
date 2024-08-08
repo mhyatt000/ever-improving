@@ -7,7 +7,6 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import flax
 import flax.linen as nn
 import gymnasium as gym
-from improve.offline.critic_heads import MSECriticHead
 import jax
 import jax.numpy as jnp
 import lorax
@@ -27,16 +26,17 @@ from octo.model.components.tokenizers import LowdimObsTokenizer
 from octo.model.octo_model import OctoModel
 from octo.utils.jax_utils import initialize_compilation_cache
 from octo.utils.spec import ModuleSpec
-from octo.utils.train_utils import (TrainState, freeze_weights, merge_params,
-                                    process_text)
+from octo.utils.train_utils import (Timer, TrainState, freeze_weights,
+                                    merge_params, process_text)
 from octo.utils.typing import Config, Data, Params, PRNGKey
 from tqdm import tqdm
 
 import improve.wrapper.dict_util as du
 from improve import cn, lora_octo
 from improve.env.action_rescale import ActionRescaler
-from improve.util.config import default
 from improve.offline.awac import mk_octo_adv_loss
+from improve.offline.critic_heads import MSECriticHead
+from improve.util.config import default
 
 """
 This script demonstrates how to finetune Octo to a new observation space (single camera + proprio)
@@ -483,7 +483,7 @@ def step_randoms(*args):
 
 
 def main():
-   
+
     print("Using wandb")
     wrun = wandb.init(
         project="lora",
@@ -595,7 +595,7 @@ def main():
     #     action_dim=1,
     #     readout_key="readout_value",
     # )
-    
+
     ### TODO: add the critic head
     config["model"]["heads"]["value"] = ModuleSpec.create(
         MSECriticHead,
@@ -603,10 +603,10 @@ def main():
         obs_horizon=2,
         pred_horizon=4,
         chunk_size=5,
-        max_critic=1.0, 
+        max_critic=1.0,
         readout_key="readout_value",
     )
-    
+
     config["model"]["readouts"]["value"] = 2
     print(config)
 
@@ -765,12 +765,11 @@ def main():
             pad_mask=batch["observation"]["pad_mask"],
             train=train,
         )
-        
-        ### TODO: should also take in action
-        value_loss, value_metrics = bound_module.heads["value"].loss(   
+
+        value_loss, value_metrics = bound_module.heads["value"].loss(
             transformer_embeddings,
-            batch["action"],
-            batch["value"], 
+            batch["action"],  # NEW: Q(s,a)
+            batch["value"],
             pad_mask=batch["observation"]["pad_mask"],
             train=train,
         )
@@ -780,7 +779,7 @@ def main():
         return loss, metrics
 
     loss_fn = mk_octo_adv_loss(model, beta=3.0)
-    print('using octo AWAC loss')
+    print("using octo AWAC loss")
 
     @partial(
         jax.jit,
@@ -886,35 +885,52 @@ def main():
     #
     #
 
+    timer = Timer()
+
     # run finetuning loop
     logging.info("Starting finetuning...")
     for i in tqdm(range(cfg.train_steps), total=cfg.train_steps, dynamic_ncols=True):
-        batch = next(dataset)
-        batch["task"] = {"language_instruction": lang}
-        # batch = example_batch
-        # batch = process_batch(batch, text_processor)
 
-        train_state, update_info = train_step(train_state, batch)
+        # timer.tick("total")
+
+        with timer("dataset"):
+            batch = next(dataset)
+            batch["task"] = {"language_instruction": lang}
+            # batch = example_batch
+            # batch = process_batch(batch, text_processor)
+
+        with timer("train"):
+            train_state, train_info = train_step(train_state, batch)
+
         if (i + 1) % 100 == 0:
             # if (i + 1) % 100 == 0:
-            print(update_info)
-            update_info = jax.device_get(update_info)
+            train_info = jax.device_get(train_info)
 
             lr = lrschedule(i)
-            print(f"Step {i}: LR: {lr}")
-            update_info.update({"learning_rate": lr})
+            # print(f"Step {i}: LR: {lr}")
+            train_info.update({"learning_rate": lr})
 
             evals = {}
             # if (i+1) % 500 == 0:
-            if (i+1) % 100 == 0:
-                evals = evalcallback(i)
-                evals = {'eval': evals}
+            if (i + 1) % 100 == 0:
+                with timer("rollout"):
+                    evals = evalcallback(i)
+                    evals = {"eval": evals}
 
-            wandb.log(du.flatten({"training": update_info, **evals}, delim="/"), step=i)
+            info = {
+                "training": train_info,
+                "timer": timer.get_average_times(),
+                **evals,
+            }
+            print(info)
+            with timer("wandb"):
+                wandb.log(du.flatten(info, delim="/"), step=i)
 
         # if (i + 1) % 1000 == 0:
         # save checkpoint
         # train_state.model.save_pretrained(step=i, checkpoint_path=cfg.save_dir)
+
+        # timer.tock("total")
 
 
 if __name__ == "__main__":

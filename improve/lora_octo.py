@@ -364,7 +364,7 @@ def octo_dataset(batch_size):
         wds.map(tuple2dict),  # not needed if already dict
         wds.map(lambda x: mk_horizon(x, 5, "action")),
         wds.map(make_values),
-        wds.select(lambda x: x['reward'].sum() > 0 ), # only successful episode
+        # wds.select(lambda x: x['reward'].sum() > 0 ), # only successful episode
         wds.map(lambda x: mk_horizon(x, 5, "value")),
         wds.map(split_sample),
         wds.filters.unlisted(),  # (split_sample)

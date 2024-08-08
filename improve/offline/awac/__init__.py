@@ -1,4 +1,7 @@
 from typing import Tuple
+from jax import Array
+import jax.numpy as jnp
+from jax.typing import ArrayLike
 
 import flax.linen as nn
 import jax
@@ -6,6 +9,8 @@ import jax.numpy as jnp
 import lorax
 import numpy as np
 from einops import rearrange
+from octo.model.components.action_heads import (_check_action_window_size,
+                                                chunk_actions)
 
 
 def advantage_loss(advantage: jnp.ndarray, objective: jnp.ndarray, beta: float):
@@ -42,7 +47,8 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta):
     )
 
     # call action loss first to init the diffusion model ?
-    action_loss, action_metrics = bound.heads["action"].loss(
+    action_loss, action_metrics = diffusion_loss(
+        bound.heads["action"],
         embeds,  # Action head knows to pull out the action readout_key
         batch["action"],
         pad_mask=batch["observation"]["pad_mask"],
@@ -50,18 +56,40 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta):
     )
 
     candidates = predict_actions(
-        bound.heads["action"], embeds, rng=rng, train=False
-    )  # sample_shape=(3),
+        bound.heads["action"],
+        embeds,
+        rng=rng,
+        train=False,
+        sample_shape=(3),
+    )
+
     # final = candidates[-1]  # or something like this
-    values = bound.heads["value"](embeds, candidates, train=False)
-    q = bound.heads["value"](embeds, batch["action"], train=False)
+
+    def toval(x):
+        return bound.heads["value"](embeds, x, train=False)
+
+    candidates = rearrange(candidates, "s b d w p a -> (s d) b w p a")
+
+    values = jax.vmap(toval)(candidates)  # (60, 64, 2, 4, 1)
+    values = values.squeeze(-1).mean(-1)[:, :, -1]  # (60,64)
+
+    chunked = chunk_actions(batch["action"], bound.heads["action"].pred_horizon)
+    q = bound.heads["value"](embeds, chunked, train=False)
+    q = q.squeeze(-1).mean(-1)[:, -1]  # (64)
+
+    action_metrics["q"] = q.mean()
+    action_metrics["value"] = values.mean()
 
     # final values are of least noisy candidates (q) others are candidates for (v)
     # a = q - v
-    a = q - values[:-1].mean(-1)
+    a = q - values.mean(0)  # (s d) b
     a = jax.lax.stop_gradient(a)  # stop gradient for critic during actor update
 
-    action_loss = advantage_loss(a, action_loss, beta)
+    # not reduced by mean() because it should be scaled by advantage
+    action_loss = advantage_loss(a, -action_loss, beta)
+    action_metrics["advantage"] = a.mean()
+    action_metrics["awac"] = action_loss
+    # reduced by advantage_loss with sum since softmax advantages sum to 1
 
     value_loss, value_metrics = bound.heads["value"].loss(
         embeds,
@@ -73,6 +101,94 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta):
 
     loss = action_loss + value_loss
     metrics = {"action": action_metrics, "value": value_metrics}
+    return loss, metrics
+
+
+def masked_mean(x, mask):
+    mask = jnp.broadcast_to(mask, x.shape)
+    loss = x*mask
+
+    return jnp.mean(x * mask) / jnp.clip(jnp.mean(mask), a_min=1e-5, a_max=None)
+
+
+def continuous_loss(
+    pred_value: ArrayLike,
+    ground_truth_value: ArrayLike,
+    mask: ArrayLike,
+    loss_type: str = "mse",
+) -> Array:
+    """
+    Args:
+        pred_value: shape (batch_dims...)
+        ground_truth_value: continuous values w/ shape (batch_dims...)
+        mask: broadcastable to ground_truth
+    """
+    if loss_type == "mse":
+        loss = jnp.square(pred_value - ground_truth_value)
+    elif loss_type == "l1":
+        loss = jnp.abs(pred_value - ground_truth_value)
+    else:
+        raise ValueError(f"Invalid loss type: {loss_type}")
+
+    mask = jnp.broadcast_to(mask, loss.shape)
+    loss = loss*mask
+
+    mse = jnp.square(pred_value - ground_truth_value)
+    mse = mse*mask
+    return loss, { "loss": loss.mean(), "mse": mse.mean() }
+
+
+def diffusion_loss(
+    head,
+    transformer_outputs,  # : Dict[str, TokenGroup],
+    actions,  # : ArrayLike,
+    pad_mask,  # : ArrayLike,
+    train: bool = True,
+):
+    """Computes the loss for the diffusion objective.
+
+    Args:
+        transformer_ouputs: must contain head.readout_key with shape (batch_size, window_size, num_tokens,
+            embedding_size)
+        actions: shape (batch_size, >= window_size + pred_horizon - 1, action_dim)
+        pad_mask: boolean array (batch, window_size) which is True if the timestep is not a padding timestep
+
+    Returns:
+        loss: float
+        metrics: dict
+    """
+    batch_size, window_size = pad_mask.shape
+    _check_action_window_size(actions, window_size, head.pred_horizon)
+    actions_chunked = chunk_actions(actions, head.pred_horizon)
+    actions_chunked = actions_chunked[:, :window_size]
+    # fold action_dim and pred_horizon into one dimension
+    actions_flat = rearrange(actions_chunked, "b w p a -> b w (p a)")
+    actions_flat = jnp.clip(actions_flat, -head.max_action, head.max_action)
+
+    # piggy-back on the dropout rng chain for diffusion rng
+    rng = head.make_rng("dropout")
+    time_key, noise_key = jax.random.split(rng)
+    time = jax.random.randint(
+        time_key, (batch_size, window_size, 1), 0, head.diffusion_steps
+    )
+    noise = jax.random.normal(noise_key, actions_flat.shape)
+
+    alpha_hat = head.alpha_hats[time]
+    alpha_1 = jnp.sqrt(alpha_hat)
+    alpha_2 = jnp.sqrt(1 - alpha_hat)
+    noisy_actions = alpha_1 * actions_flat + alpha_2 * noise
+
+    pred_eps = head(
+        transformer_outputs, train=train, time=time, noisy_actions=noisy_actions
+    )
+
+    loss, metrics = continuous_loss(
+        pred_eps, noise, pad_mask[:, :, None], loss_type=head.loss_type
+    )
+    # Sum over action dimension instead of averaging
+    loss = loss * head.action_dim
+    metrics["loss"] = metrics["loss"] * head.action_dim
+    metrics["mse"] = metrics["mse"] * head.action_dim
     return loss, metrics
 
 
@@ -106,13 +222,14 @@ def predict_actions(
 
         current_x = jnp.clip(current_x, -head.max_action, head.max_action)
 
-        return (current_x, rng), ()
+        # current_x is not returned as an output; only a carry
+        return (current_x, rng), current_x
 
     def sample_actions(rng):
         rng, key = jax.random.split(rng)
         batch_size, window_size = transformer_outputs[head.readout_key].tokens.shape[:2]
 
-        (actions_flat, _), () = jax.lax.scan(
+        (actions_flat, _), allact = jax.lax.scan(
             scan_fn,
             (
                 jax.random.normal(
@@ -124,16 +241,24 @@ def predict_actions(
             jnp.arange(head.diffusion_steps - 1, -1, -1),
         )
 
+        allact = jnp.stack(allact, axis=1)
+
+        # since all diffusion timesteps d are used
         actions = rearrange(
-            actions_flat,
-            "b w (p a) -> b w p a",
+            allact,
+            "b d w (p a) -> b d w p a",
             p=head.pred_horizon,
             a=head.action_dim,
         )
-        # to only get the last timestep in the window: return actions[:, -1]
-        return actions
+        # to only get the last timestep in the window:
+        # takes window=-1 from (bs,w,p,a) to (bs,p,a)
+        # return actions[:, -1]
+        # return actions[:, :, -1]  # last window with all diffusion steps
+        return actions  # for training use both windows
 
     n_samples = int(np.prod(sample_shape))
     actions = jax.vmap(sample_actions)(jax.random.split(rng, n_samples))
-    actions = actions.reshape(sample_shape + actions.shape)
     return actions
+    # TODO why does octo reshape?
+    # actions = actions.reshape(sample_shape + actions.shape)
+    # return actions

@@ -9,15 +9,14 @@ import numpy as np
 from einops import rearrange
 from jax import Array
 from jax.typing import ArrayLike
+# these can be borrowed from original octo code
+from octo.model.components.action_heads import (_check_action_window_size,
+                                                continuous_loss, masked_mean)
 from octo.model.components.base import TokenGroup
 from octo.model.components.diffusion import (cosine_beta_schedule,
                                              create_diffusion_model)
 from octo.model.components.tokenizers import BinTokenizer
 from octo.model.components.transformer import MAPHead
-# these can be borrowed from original octo code
-from octo.model.components.action_heads import (_check_action_window_size,
-                                                     continuous_loss,
-                                                     masked_mean)
 from octo.utils.typing import PRNGKey
 
 
@@ -133,8 +132,9 @@ class ContinuousCriticHead(nn.Module, CriticHead):
 
     readout_key: str = "readout_value"
     use_map: bool = False
+
     predictions: int = 1  # number of critics? TBD
-    obs_horizon: int = 2
+    obs_horizon: int = 2  # window size
     pred_horizon: int = 4
     chunk_size: int = 5
     action_dim: int = 7
@@ -147,8 +147,8 @@ class ContinuousCriticHead(nn.Module, CriticHead):
         if self.use_map:
             self.map_head = MAPHead()
 
-        self.action_embed = nn.Dense(self.obs_horizon * self.embedding_dim)
-        self.dense1 = nn.Dense(2 * self.embedding_dim)  # [action_embeds + obs_embeds]
+        self.action_embed = nn.Dense(self.embedding_dim)
+        self.dense1 = nn.Dense(self.embedding_dim)  # [action_embeds + obs_embeds]
         self.mean_proj = nn.Dense(self.pred_horizon * self.dim)
 
     def __call__(
@@ -173,26 +173,22 @@ class ContinuousCriticHead(nn.Module, CriticHead):
             embeddings = token_group.tokens.mean(axis=-2)
         # Now, embeddings is (batch_size, window_size, embedding_size)
 
-        if actions is None:
+        bs = embeddings.shape[0]
+        if actions is None:  # during initialization actions is not passed :(
+            # [bs, 2,4,7]
             actions = jnp.zeros(
-                (embeddings.shape[0], self.chunk_size, self.action_dim)
-            )  # [bs, 4, 7]
+                (bs, self.obs_horizon, self.pred_horizon, self.action_dim)
+            )
 
-        actions = actions.reshape(-1, self.chunk_size * self.action_dim)  # [bs, 28]
-        action_embeddings = self.action_embed(actions)  # [bs, 2 * 384]
-        action_embeddings = action_embeddings.reshape(
-            *embeddings.shape[0:-1], self.embedding_dim
-        )  # [bs, 2, 384]
+        actions = rearrange(actions, "b w p a -> b w (p a)")
+        act_emb = self.action_embed(actions)  # [bs, 2 , 384]
 
-        joined_embeddings = jnp.concatenate(
-            [embeddings, action_embeddings], axis=-1
-        )  # [bs, 2, 768]
-        output = self.dense1(joined_embeddings)  # [bs, 2, 768]
+        # [bs, 2, 768]
+        both = jnp.concatenate([embeddings, act_emb], axis=-1)
+        output = self.dense1(both)
 
-        mean = self.mean_proj(output)  # [bs, 2, 5]
-        mean = rearrange(
-            mean, "b w (p a) -> b w p a", p=self.pred_horizon, a=self.dim
-        )  # [bs, 2, 5, 1]
+        mean = self.mean_proj(output)
+        mean = rearrange(mean, "b w (p a) -> b w p a", p=self.pred_horizon, a=self.dim)
 
         mean = jnp.tanh(mean / self.max_critic) * self.max_critic
         return mean
@@ -217,35 +213,30 @@ class ContinuousCriticHead(nn.Module, CriticHead):
             loss: float
             metrics: dict
         """
-        # (batch, window_size, pred_horizon, action_dim)
-        # mean = self(transformer_outputs, train=train)
+        actions = chunk_actions(actions, self.pred_horizon)
+        b, w, p, a = actions.shape
 
-        ### TODO: for MSE critic head, measure MSE btwn pred_values and values and return mean of batch as loss
-        pred_values = self(transformer_outputs, actions, train=train)
+        src = self(transformer_outputs, actions, train=train)
+        # _check_action_window_size(src, w, self.pred_horizon)
+        src = src.squeeze(-1).mean(-1)
 
-        # window_size = mean.shape[1]
-        window_size = pred_values.shape[1]
-        _check_action_window_size(actions, window_size, self.pred_horizon)
-        # actions_chunked = chunk_actions(actions, self.pred_horizon)
-        # actions_chunked = actions_chunked[:, :window_size]
-        values_chunked = chunk_actions(values, self.pred_horizon)
-        values_chunked = values_chunked[:, :window_size]
-
-        # loss, metrics = continuous_loss(
-        #     mean, actions_chunked, pad_mask[:, :, None, None], loss_type=self.loss_type
-        # )
+        # chunk the values from the batch
+        # window_size = src.shape[1]
+        tgt = chunk_actions(values, self.pred_horizon)
+        tgt = tgt[:, :w]
+        tgt = tgt.squeeze(-1).mean(-1) # chunk level critic not intra-chunk critic
 
         loss, metrics = continuous_loss(
-            pred_values,
-            values_chunked,
-            pad_mask[:, :, None, None],
+            src,
+            tgt,
+            pad_mask, # pad_mask[:, :, None, None],
             loss_type=self.loss_type,
         )
 
-        # Sum over action dimension instead of averaging
-        loss = loss * self.action_dim
-        metrics["loss"] = metrics["loss"] * self.action_dim
-        metrics["mse"] = metrics["mse"] * self.action_dim
+        # Sum over dimension instead of averaging
+        loss = loss * self.dim
+        metrics["loss"] = metrics["loss"] * self.dim
+        metrics["mse"] = metrics["mse"] * self.dim
 
         return loss, metrics
 
@@ -270,6 +261,7 @@ class MSECriticHead(ContinuousCriticHead):
     loss_type: str = "mse"
     use_map: bool = True
 
-# TODO add options for 
+
+# TODO add options for
 # DiscreteCriiticHead (for QRDQN?)
 # DiffusionCriticHead
