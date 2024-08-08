@@ -111,7 +111,6 @@ def filter_keys(obs):
 
 def unscale(action):
     """ this is un-scaling for Octo with widowX robot """
-    print('unscale called')
     m = [0.00021161, 0.00012614, -0.00017022, -0.00015062, -0.00023831, 0.00025646, 0.0]
     mean = np.array(m)
     s = [0.00963721, 0.0135066, 0.01251861, 0.02806791, 0.03016905, 0.07632624, 1.0]

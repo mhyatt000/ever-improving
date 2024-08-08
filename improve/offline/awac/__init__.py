@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import flax.linen as nn
 import jax
 import jax.numpy as jnp
 import lorax
@@ -22,8 +23,15 @@ def advantage_loss(advantage: jnp.ndarray, objective: jnp.ndarray, beta: float):
     return actor_loss
 
 
+from functools import partial
+
+
+def mk_octo_adv_loss(model, beta):
+    return partial(octo_adv_loss_fn, model=model, beta=beta)
+
+
 @lorax.lora
-def octo_loss_fn(params, model, batch, rng, train=True):
+def octo_adv_loss_fn(params, batch, rng, train, model, beta):
     bound = model.module.bind({"params": params}, rngs={"dropout": rng})
 
     embeds = bound.octo_transformer(
@@ -33,18 +41,7 @@ def octo_loss_fn(params, model, batch, rng, train=True):
         train=train,
     )
 
-    actions = predict_actions(
-        bound.heads["action"], embeds, sample_shape=(3), rng=rng, train=train
-    )
-    final = actions[-1]  # or something like this
-    values = bound.heads["value"].predict_value(embeds, actions, train=False)
-    q = bound.heads["value"].predict_value(embeds, batch['action'], train=False)
-
-    # final values are of least noisy actions (q) others are candidates for (v)
-    # a = q - v
-    a = values[-1] - values[:-1].mean(-1)
-    a = jax.lax.stop_gradient(a)  # stop gradient for critic during actor update
-
+    # call action loss first to init the diffusion model ?
     action_loss, action_metrics = bound.heads["action"].loss(
         embeds,  # Action head knows to pull out the action readout_key
         batch["action"],
@@ -52,12 +49,24 @@ def octo_loss_fn(params, model, batch, rng, train=True):
         train=train,
     )
 
-    beta = 3.0  # hardcoded for now
+    candidates = predict_actions(
+        bound.heads["action"], embeds, rng=rng, train=False
+    )  # sample_shape=(3),
+    # final = candidates[-1]  # or something like this
+    values = bound.heads["value"](embeds, candidates, train=False)
+    q = bound.heads["value"](embeds, batch["action"], train=False)
+
+    # final values are of least noisy candidates (q) others are candidates for (v)
+    # a = q - v
+    a = q - values[:-1].mean(-1)
+    a = jax.lax.stop_gradient(a)  # stop gradient for critic during actor update
+
     action_loss = advantage_loss(a, action_loss, beta)
 
     value_loss, value_metrics = bound.heads["value"].loss(
         embeds,
-        batch["value"],
+        actions=batch["action"],
+        values=batch["value"],
         pad_mask=batch["observation"]["pad_mask"],
         train=train,
     )

@@ -7,7 +7,7 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import flax
 import flax.linen as nn
 import gymnasium as gym
-from improve.offline.critic_heads import MECriticHead
+from improve.offline.critic_heads import MSECriticHead
 import jax
 import jax.numpy as jnp
 import lorax
@@ -36,6 +36,7 @@ import improve.wrapper.dict_util as du
 from improve import cn, lora_octo
 from improve.env.action_rescale import ActionRescaler
 from improve.util.config import default
+from improve.offline.awac import mk_octo_adv_loss
 
 """
 This script demonstrates how to finetune Octo to a new observation space (single camera + proprio)
@@ -777,6 +778,9 @@ def main():
         loss = action_loss + 0.5 * value_loss
         metrics = {"action": action_metrics, "value": value_metrics}
         return loss, metrics
+
+    loss_fn = mk_octo_adv_loss(model, beta=3.0)
+    print('using octo AWAC loss')
 
     @partial(
         jax.jit,
