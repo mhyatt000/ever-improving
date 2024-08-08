@@ -463,8 +463,8 @@ class EvalCallback:
                 obs = self.oxes.pre_step(obs) if self.oxes is not None else obs
                 # done = terminated or truncated
 
-                rewards = rewards + rew
-                lengths = lengths + 1 * np.logical_not(rewards)
+                rewards = rewards + (rew * np.logical_not(rewards))
+                lengths = lengths + (1 * np.logical_not(rewards))
                 dones = np.logical_or(dones, done)
 
                 bar.set_description(f"rewards: {rewards.sum()}")
