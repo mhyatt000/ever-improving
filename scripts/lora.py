@@ -7,6 +7,7 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import flax
 import flax.linen as nn
 import gymnasium as gym
+from improve.offline.critic_heads import MSECriticHead
 import jax
 import jax.numpy as jnp
 import lorax
@@ -411,7 +412,7 @@ def mk_envs(n_envs=cfg.inference_size):
 
     venv.seed(0)
     venv.reset()
-    # venv = W.VecRecord(venv, osp.join("log_dir", "train"), use_wandb=True)
+    venv = W.VecRecord(venv, osp.join("log_dir", "train"), use_wandb=True)
     return venv
 
 
@@ -481,7 +482,7 @@ def step_randoms(*args):
 
 
 def main():
-    # """
+   
     print("Using wandb")
     wrun = wandb.init(
         project="lora",
@@ -490,9 +491,9 @@ def main():
         # sync_tensorboard=True,
         monitor_gym=True,
         config=asdict(cfg),  # OC.to_container(cfg, resolve=True),
+        # name="debug"
     )
     wandb.config.update({"name": wrun.name})
-    # """
 
     # create a 1D mesh with a single axis named "batch"
     mesh = Mesh(jax.devices(), axis_names="batch")
@@ -586,13 +587,25 @@ def main():
     )
     # Fully override the old action head with a new one (for smaller changes, you can use update_module_config)
     """
+    # config["model"]["heads"]["value"] = ModuleSpec.create(
+    #     MSEActionHead,
+    #     pred_horizon=4,  # 50 for aloha but thats too much for simpler
+    #     max_action=1.0,
+    #     action_dim=1,
+    #     readout_key="readout_value",
+    # )
+    
+    ### TODO: add the critic head
     config["model"]["heads"]["value"] = ModuleSpec.create(
-        MSEActionHead,
-        pred_horizon=4,  # 50 for aloha but thats too much for simpler
-        max_action=1.0,
-        action_dim=1,
+        MSECriticHead,
+        predictions=1,
+        obs_horizon=2,
+        pred_horizon=4,
+        chunk_size=5,
+        max_critic=1.0, 
         readout_key="readout_value",
     )
+    
     config["model"]["readouts"]["value"] = 2
     print(config)
 
@@ -712,6 +725,7 @@ def main():
 
     # `wrap_optimizer` uses the spec to freeze the appropriate subset of parameters.
     # The frozen parameters won't have optimizer states etc created for them
+    ### TODO: don't need to do this twice??
     tx = lorax.wrap_optimizer(tx, lora_spec)
     opt_state = tx.init(lora_params)
 
@@ -750,9 +764,12 @@ def main():
             pad_mask=batch["observation"]["pad_mask"],
             train=train,
         )
-        value_loss, value_metrics = bound_module.heads["value"].loss(
+        
+        ### TODO: should also take in action
+        value_loss, value_metrics = bound_module.heads["value"].loss(   
             transformer_embeddings,
-            batch["value"],
+            batch["action"],
+            batch["value"], 
             pad_mask=batch["observation"]["pad_mask"],
             train=train,
         )
@@ -884,7 +901,8 @@ def main():
             update_info.update({"learning_rate": lr})
 
             evals = {}
-            if (i+1) % 500 == 0:
+            # if (i+1) % 500 == 0:
+            if (i+1) % 100 == 0:
                 evals = evalcallback(i)
                 evals = {'eval': evals}
 
