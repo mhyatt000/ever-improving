@@ -133,21 +133,28 @@ class ContinuousCriticHead(nn.Module, CriticHead):
 
     readout_key: str = "readout_value"
     use_map: bool = False
-    predictions: int = 1 # number of critics? TBD
+    predictions: int = 1  # number of critics? TBD
+    obs_horizon: int = 2
+    pred_horizon: int = 4
+    chunk_size: int = 5
     action_dim: int = 7
-    dim: int = 1 
+    embedding_dim: int = 384
+    dim: int = 1
     max_critic: float = 1.0
     loss_type: str = "mse"
 
     def setup(self):
         if self.use_map:
             self.map_head = MAPHead()
-        self.mean_proj = nn.Dense(self.predictions* self.action_dim)
+
+        self.action_embed = nn.Dense(self.obs_horizon * self.embedding_dim)
+        self.dense1 = nn.Dense(2 * self.embedding_dim)  # [action_embeds + obs_embeds]
+        self.mean_proj = nn.Dense(self.pred_horizon * self.dim)
 
     def __call__(
         self,
         transformer_outputs: Dict[str, TokenGroup],
-        actions: ArrayLike,
+        actions: ArrayLike = None,
         train: bool = True,
     ) -> jax.Array:
         """
@@ -155,6 +162,7 @@ class ContinuousCriticHead(nn.Module, CriticHead):
             mean: Predicted values w/ shape (batch_size, window_size, pred_horizon, dim)
         """
         token_group = transformer_outputs[self.readout_key]
+
         assert token_group.tokens.ndim == 4, (
             f"Expected token_group.tokens to have shape (batch_size, window_size, num_tokens, embedding_size), "
             f"but got shape {token_group.tokens.shape}"
@@ -165,18 +173,35 @@ class ContinuousCriticHead(nn.Module, CriticHead):
             embeddings = token_group.tokens.mean(axis=-2)
         # Now, embeddings is (batch_size, window_size, embedding_size)
 
-        mean = self.mean_proj(embeddings)
+        if actions is None:
+            actions = jnp.zeros(
+                (embeddings.shape[0], self.chunk_size, self.action_dim)
+            )  # [bs, 4, 7]
+
+        actions = actions.reshape(-1, self.chunk_size * self.action_dim)  # [bs, 28]
+        action_embeddings = self.action_embed(actions)  # [bs, 2 * 384]
+        action_embeddings = action_embeddings.reshape(
+            *embeddings.shape[0:-1], self.embedding_dim
+        )  # [bs, 2, 384]
+
+        joined_embeddings = jnp.concatenate(
+            [embeddings, action_embeddings], axis=-1
+        )  # [bs, 2, 768]
+        output = self.dense1(joined_embeddings)  # [bs, 2, 768]
+
+        mean = self.mean_proj(output)  # [bs, 2, 5]
         mean = rearrange(
-            mean, "b w (p a) -> b w p a", p=self.pred_horizon, a=self.action_dim
-        )
-        mean = jnp.tanh(mean / self.max_action) * self.max_action
+            mean, "b w (p a) -> b w p a", p=self.pred_horizon, a=self.dim
+        )  # [bs, 2, 5, 1]
+
+        mean = jnp.tanh(mean / self.max_critic) * self.max_critic
         return mean
 
     def loss(
         self,
         transformer_outputs: Dict[str, TokenGroup],
         actions: ArrayLike,
-        values: ArrayLike,
+        values: ArrayLike,  # [63, 5, 1]
         pad_mask: ArrayLike,
         train: bool = True,
     ) -> Tuple[Array, Dict[str, Array]]:
@@ -193,23 +218,38 @@ class ContinuousCriticHead(nn.Module, CriticHead):
             metrics: dict
         """
         # (batch, window_size, pred_horizon, action_dim)
-        mean = self(transformer_outputs, train=train)
+        # mean = self(transformer_outputs, train=train)
 
-        window_size = mean.shape[1]
+        ### TODO: for MSE critic head, measure MSE btwn pred_values and values and return mean of batch as loss
+        pred_values = self(transformer_outputs, actions, train=train)
+
+        # window_size = mean.shape[1]
+        window_size = pred_values.shape[1]
         _check_action_window_size(actions, window_size, self.pred_horizon)
-        actions_chunked = chunk_actions(actions, self.pred_horizon)
-        actions_chunked = actions_chunked[:, :window_size]
+        # actions_chunked = chunk_actions(actions, self.pred_horizon)
+        # actions_chunked = actions_chunked[:, :window_size]
+        values_chunked = chunk_actions(values, self.pred_horizon)
+        values_chunked = values_chunked[:, :window_size]
+
+        # loss, metrics = continuous_loss(
+        #     mean, actions_chunked, pad_mask[:, :, None, None], loss_type=self.loss_type
+        # )
 
         loss, metrics = continuous_loss(
-            mean, actions_chunked, pad_mask[:, :, None, None], loss_type=self.loss_type
+            pred_values,
+            values_chunked,
+            pad_mask[:, :, None, None],
+            loss_type=self.loss_type,
         )
+
         # Sum over action dimension instead of averaging
         loss = loss * self.action_dim
         metrics["loss"] = metrics["loss"] * self.action_dim
         metrics["mse"] = metrics["mse"] * self.action_dim
+
         return loss, metrics
 
-    def predict_action(
+    def predict(
         self,
         transformer_outputs: Dict[str, TokenGroup],
         train: bool = True,
@@ -222,6 +262,12 @@ class ContinuousCriticHead(nn.Module, CriticHead):
         # (batch, pred_horizon, action_dim)
         mean = self(transformer_outputs, train=train)[:, -1]
         return jnp.broadcast_to(mean, sample_shape + mean.shape)
+
+
+class MSECriticHead(ContinuousCriticHead):
+    max_action: float = 5.0
+    loss_type: str = "mse"
+    use_map: bool = True
 
 
 class DiscreteActionHead(nn.Module, ActionHead):
