@@ -86,6 +86,7 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta):
     a = jax.lax.stop_gradient(a)  # stop gradient for critic during actor update
 
     # not reduced by mean() because it should be scaled by advantage
+    action_loss = action_loss.mean(-1)[:,-1] # no reduce means (bs,w,(p,a))
     action_loss = advantage_loss(a, -action_loss, beta)
     action_metrics["advantage"] = a.mean()
     action_metrics["awac"] = action_loss
