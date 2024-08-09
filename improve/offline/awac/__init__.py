@@ -13,7 +13,7 @@ from octo.model.components.action_heads import (_check_action_window_size,
                                                 chunk_actions)
 
 
-def advantage_loss(advantage: jnp.ndarray, objective: jnp.ndarray, beta: float):
+def advantage_loss(advantage: jnp.ndarray, objective: jnp.ndarray, beta: float, dist_fn=jax.nn.softmax):
     """abstract variant of AWAC loss
     policy loss is -softmax(advantage / beta) * objective
     in the original AWAC, objective is log_prob but could also be -mse
@@ -23,7 +23,7 @@ def advantage_loss(advantage: jnp.ndarray, objective: jnp.ndarray, beta: float):
     # exp(a / beta) is unbiased but high variance,
     # softmax(a / beta) is biased but lower variance.
     # sum() instead of mean(), because it should be multiplied by batch size.
-    actor_loss = -(jax.nn.softmax(advantage / beta) * objective).sum()
+    actor_loss = -(dist_fn(advantage / beta) * objective).sum()
 
     return actor_loss
 
@@ -36,7 +36,7 @@ def mk_octo_adv_loss(model, beta):
 
 
 @lorax.lora
-def octo_adv_loss_fn(params, batch, rng, train, model, beta):
+def octo_adv_loss_fn(params, batch, rng, train, model, beta, dist_fn=jnp.exp):
     bound = model.module.bind({"params": params}, rngs={"dropout": rng})
 
     embeds = bound.octo_transformer(
@@ -86,7 +86,7 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta):
     a = jax.lax.stop_gradient(a)  # stop gradient for critic during actor update
 
     # not reduced by mean() because it should be scaled by advantage
-    action_loss = advantage_loss(a, -action_loss, beta)
+    action_loss = advantage_loss(a, -action_loss, beta, dist_fn=dist_fn)
     action_metrics["advantage"] = a.mean()
     action_metrics["awac"] = action_loss
     # reduced by advantage_loss with sum since softmax advantages sum to 1
@@ -102,6 +102,46 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta):
     loss = action_loss + value_loss
     metrics = {"action": action_metrics, "value": value_metrics}
     return loss, metrics
+
+def mk_model_step(model, state):
+
+    @lorax.lora
+    def _model_step(params, batch, rng, train=False):
+        """for evaluation in env"""
+        # use the params and rng from the state
+        bound = model.module.bind( {"params": params}, rngs={"dropout": state.rng})
+
+        embeds = bound.octo_transformer(
+            batch["observation"],
+            batch["task"],
+            batch["observation"]["pad_mask"],
+            train=train,
+        )
+
+        candidates = predict_actions(
+            bound.heads["action"],
+            embeds,
+            rng=state.rng,
+            train=False,
+            sample_shape=(5),
+        )
+
+        def toval(x):
+            return bound.heads["value"](embeds, x, train=False)
+
+        candidates = rearrange(candidates, "s b d w p a -> (s d) b w p a")
+
+        values = jax.vmap(toval)(candidates)  # (60, 64, 2, 4, 1)
+        values = values.squeeze(-1).mean(-1)[:, :, -1]  # (60,64)
+
+        candidates = candidates[:, :, -1]  # (s d) b p a
+        actions = candidates[values.argmax(0)]
+
+        return actions
+
+    return _model_step
+
+
 
 
 def masked_mean(x, mask):

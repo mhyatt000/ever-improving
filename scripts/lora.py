@@ -34,7 +34,7 @@ from tqdm import tqdm
 import improve.wrapper.dict_util as du
 from improve import cn, lora_octo
 from improve.env.action_rescale import ActionRescaler
-from improve.offline.awac import mk_octo_adv_loss
+from improve.offline.awac import mk_octo_adv_loss, mk_model_step
 from improve.offline.critic_heads import MSECriticHead
 from improve.util.config import default
 
@@ -822,17 +822,8 @@ def main():
         # print(actions.shape)
         return actions
 
-        """
-        action_loss, action_metrics = bound_module.heads["action"].loss(
-            transformer_embeddings,  # Action head knows to pull out the action readout_key
-            batch["action"],
-            pad_mask=batch["observation"]["pad_mask"],
-            train=train,
-        )
-        """
-        # outs = bound_module( batch["observation"], batch["task"], batch["observation"]["pad_mask"], train=train,)
-        # actions = outs["action"]
-        return actions
+    # selects best of 5*20 proposals
+    _model_step = mk_model_step(model, train_state)
 
     #
     #
