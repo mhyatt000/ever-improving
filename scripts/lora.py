@@ -7,6 +7,7 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import flax
 import flax.linen as nn
 import gymnasium as gym
+import improve.wrapper.dict_util as du
 import jax
 import jax.numpy as jnp
 import lorax
@@ -18,25 +19,24 @@ import tensorflow as tf
 import wandb
 from absl import app, flags, logging
 from flax import struct
+from improve import cn, lora_octo
+from improve.env.action_rescale import ActionRescaler
+from improve.offline.awac import mk_model_step, mk_octo_adv_loss
+from improve.offline.critic_heads import MSECriticHead
+from improve.util.config import default
+from jax.experimental import multihost_utils
 from jax.sharding import Mesh, NamedSharding, PartitionSpec
+from tqdm import tqdm
+
 from octo.data.dataset import make_single_dataset
 from octo.data.utils.data_utils import NormalizationType
-from octo.model.components.action_heads import L1ActionHead, MSEActionHead
-from octo.model.components.tokenizers import LowdimObsTokenizer
+from octo.model.components.action_heads import L1ActionHead, MSEActionHead 
 from octo.model.octo_model import OctoModel
 from octo.utils.jax_utils import initialize_compilation_cache
 from octo.utils.spec import ModuleSpec
 from octo.utils.train_utils import (Timer, TrainState, freeze_weights,
                                     merge_params, process_text)
 from octo.utils.typing import Config, Data, Params, PRNGKey
-from tqdm import tqdm
-
-import improve.wrapper.dict_util as du
-from improve import cn, lora_octo
-from improve.env.action_rescale import ActionRescaler
-from improve.offline.awac import mk_octo_adv_loss, mk_model_step
-from improve.offline.critic_heads import MSECriticHead
-from improve.util.config import default
 
 """
 This script demonstrates how to finetune Octo to a new observation space (single camera + proprio)
@@ -64,7 +64,7 @@ class MyConfig:
     grad_acc: Optional[int] = 8  # total = 64 * 8 = 512
     grad_clip: Optional[int] = 2
 
-    train_steps: int = int(3e5)
+    train_steps: int = int(5e4)  # int(3e5)
     sweep_id: str = "lora"
 
     env: cn.Env = default(cn.Env())
@@ -104,9 +104,8 @@ def isimg(o):
     return False
 
 
-from transforms3d.euler import euler2axangle
-
 from improve.fm.batch_octo import BatchedActionEnsembler
+from transforms3d.euler import euler2axangle
 
 
 class OXE2SimplerProcesser:
@@ -366,12 +365,12 @@ def mk_envs(n_envs=cfg.inference_size):
     warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
 
     import gymnasium as gym
-    from octo.utils import gym_wrappers as GW
+    import improve.wrapper as W
+    from improve.fm.batch_octo import BatchedOctoInference
     from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
                                                   VecMonitor, VecVideoRecorder)
 
-    import improve.wrapper as W
-    from improve.fm.batch_octo import BatchedOctoInference
+    from octo.utils import gym_wrappers as GW
 
     def _init() -> gym.Env:
 
@@ -503,6 +502,11 @@ def main():
     # Our model will be replicated across devices (we are only doing data parallelism, not model parallelism)
     replicated_sharding = NamedSharding(mesh, PartitionSpec())
 
+    def shard(batch):
+        return multihost_utils.host_local_array_to_global_array(
+            batch, mesh, PartitionSpec("batch")
+        )
+
     assert (
         cfg.batch_size % jax.device_count() == 0
     ), "Batch size must be divisible by device count."
@@ -544,7 +548,10 @@ def main():
         del batch["dataset_name"]
         return batch
 
-    dataset = iter(lora_octo.octo_dataset(cfg.batch_size))
+    dataset = map(
+        shard,
+        iter(lora_octo.octo_dataset(cfg.batch_size)),
+    )
     batch = next(dataset)
 
     task = "widowx_put_eggplant_in_basket"
@@ -823,7 +830,7 @@ def main():
         return actions
 
     # selects best of 5*20 proposals
-    _model_step = mk_model_step(model, train_state)
+    # _model_step = mk_model_step(model, train_state)
 
     #
     #

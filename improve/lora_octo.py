@@ -312,7 +312,6 @@ def prepare_octo(x):
 def get_mask(x):
     mask_val = sum(x["reward"])
     # mask_val = mask_val if mask_val != 0 else -0.1
-    x["observation"]["pad_mask"] = jnp.array([0, 0])
     x["observation"]["pad_mask"] = jnp.array([1, 1])
     del x["reward"]
     return x
