@@ -1,7 +1,4 @@
 from typing import Tuple
-from jax import Array
-import jax.numpy as jnp
-from jax.typing import ArrayLike
 
 import flax.linen as nn
 import jax
@@ -9,11 +6,15 @@ import jax.numpy as jnp
 import lorax
 import numpy as np
 from einops import rearrange
+from jax import Array
+from jax.typing import ArrayLike
 from octo.model.components.action_heads import (_check_action_window_size,
                                                 chunk_actions)
 
 
-def advantage_loss(advantage: jnp.ndarray, objective: jnp.ndarray, beta: float, dist_fn=jax.nn.softmax):
+def advantage_loss(
+    advantage: jnp.ndarray, objective: jnp.ndarray, beta: float, dist_fn=jax.nn.softmax
+):
     """abstract variant of AWAC loss
     policy loss is -softmax(advantage / beta) * objective
     in the original AWAC, objective is log_prob but could also be -mse
@@ -86,6 +87,7 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta, dist_fn=jnp.exp):
     a = jax.lax.stop_gradient(a)  # stop gradient for critic during actor update
 
     # not reduced by mean() because it should be scaled by advantage
+    action_loss = action_loss.mean(-1)[:, -1]  # no reduce means (bs,w,(p,a))
     action_loss = advantage_loss(a, -action_loss, beta, dist_fn=dist_fn)
     action_metrics["advantage"] = a.mean()
     action_metrics["awac"] = action_loss
@@ -103,13 +105,14 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta, dist_fn=jnp.exp):
     metrics = {"action": action_metrics, "value": value_metrics}
     return loss, metrics
 
+
 def mk_model_step(model, state):
 
     @lorax.lora
     def _model_step(params, batch, rng, train=False):
         """for evaluation in env"""
         # use the params and rng from the state
-        bound = model.module.bind( {"params": params}, rngs={"dropout": state.rng})
+        bound = model.module.bind({"params": params}, rngs={"dropout": state.rng})
 
         embeds = bound.octo_transformer(
             batch["observation"],
@@ -142,11 +145,9 @@ def mk_model_step(model, state):
     return _model_step
 
 
-
-
 def masked_mean(x, mask):
     mask = jnp.broadcast_to(mask, x.shape)
-    loss = x*mask
+    loss = x * mask
 
     return jnp.mean(x * mask) / jnp.clip(jnp.mean(mask), a_min=1e-5, a_max=None)
 
@@ -171,11 +172,11 @@ def continuous_loss(
         raise ValueError(f"Invalid loss type: {loss_type}")
 
     mask = jnp.broadcast_to(mask, loss.shape)
-    loss = loss*mask
+    loss = loss * mask
 
     mse = jnp.square(pred_value - ground_truth_value)
-    mse = mse*mask
-    return loss, { "loss": loss.mean(), "mse": mse.mean() }
+    mse = mse * mask
+    return loss, {"loss": loss.mean(), "mse": mse.mean()}
 
 
 def diffusion_loss(
