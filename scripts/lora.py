@@ -7,7 +7,7 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import flax
 import flax.linen as nn
 import gymnasium as gym
-from improve.offline.critic_heads import MSECriticHead
+import improve.wrapper.dict_util as du
 import jax
 import jax.numpy as jnp
 import lorax
@@ -19,23 +19,24 @@ import tensorflow as tf
 import wandb
 from absl import app, flags, logging
 from flax import struct
+from improve import cn, lora_octo
+from improve.env.action_rescale import ActionRescaler
+from improve.offline.awac import mk_model_step, mk_octo_adv_loss
+from improve.offline.critic_heads import MSECriticHead, QRDQNCriticHead
+from improve.util.config import default
+from jax.experimental import multihost_utils
 from jax.sharding import Mesh, NamedSharding, PartitionSpec
+from tqdm import tqdm
+
 from octo.data.dataset import make_single_dataset
 from octo.data.utils.data_utils import NormalizationType
-from octo.model.components.action_heads import L1ActionHead, MSEActionHead
-from octo.model.components.tokenizers import LowdimObsTokenizer
+from octo.model.components.action_heads import L1ActionHead, MSEActionHead 
 from octo.model.octo_model import OctoModel
 from octo.utils.jax_utils import initialize_compilation_cache
 from octo.utils.spec import ModuleSpec
-from octo.utils.train_utils import (TrainState, freeze_weights, merge_params,
-                                    process_text)
+from octo.utils.train_utils import (Timer, TrainState, freeze_weights,
+                                    merge_params, process_text)
 from octo.utils.typing import Config, Data, Params, PRNGKey
-from tqdm import tqdm
-
-import improve.wrapper.dict_util as du
-from improve import cn, lora_octo
-from improve.env.action_rescale import ActionRescaler
-from improve.util.config import default
 
 """
 This script demonstrates how to finetune Octo to a new observation space (single camera + proprio)
@@ -56,18 +57,20 @@ class MyConfig:
     seed: int = 0
 
     gpus: int = jax.device_count()
-    batch_size: int = 64 * gpus
+    batch_size: int = 32 * gpus # reduce batch size from 64 for QRDQN
 
     inference_size: int = 5
     # batch_size: int = 64
     grad_acc: Optional[int] = 8  # total = 64 * 8 = 512
     grad_clip: Optional[int] = 2
 
-    train_steps: int = int(3e5)
+    offline_steps: int = int(1e3)
+    train_steps: int = int(5e4)  # int(3e5)
     sweep_id: str = "lora"
 
     env: cn.Env = default(cn.Env())
     task: str = "widowx_put_eggplant_in_basket"
+    log_path = osp.join(osp.expanduser("~"), "improve_logs")
 
 
 cfg = MyConfig()
@@ -103,9 +106,8 @@ def isimg(o):
     return False
 
 
-from transforms3d.euler import euler2axangle
-
 from improve.fm.batch_octo import BatchedActionEnsembler
+from transforms3d.euler import euler2axangle
 
 
 class OXE2SimplerProcesser:
@@ -365,12 +367,12 @@ def mk_envs(n_envs=cfg.inference_size):
     warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
 
     import gymnasium as gym
-    from octo.utils import gym_wrappers as GW
+    import improve.wrapper as W
+    from improve.fm.batch_octo import BatchedOctoInference
     from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
                                                   VecMonitor, VecVideoRecorder)
 
-    import improve.wrapper as W
-    from improve.fm.batch_octo import BatchedOctoInference
+    from octo.utils import gym_wrappers as GW
 
     def _init() -> gym.Env:
 
@@ -412,8 +414,10 @@ def mk_envs(n_envs=cfg.inference_size):
 
     venv.seed(0)
     venv.reset()
-    venv = W.VecRecord(venv, osp.join("log_dir", "train"), use_wandb=True)
-    return venv
+    log_dir = osp.join(cfg.log_path, wandb.run.name) 
+    eval_env = W.VecRecord(venv, osp.join(log_dir, "eval"), use_wandb=True)
+    venv = W.VecRecord(venv, osp.join(log_dir, "train"), use_wandb=True)
+    return venv, eval_env
 
 
 class EvalCallback:
@@ -463,9 +467,9 @@ class EvalCallback:
                 obs = self.transform(obs) if self.transform is not None else obs
                 obs = self.oxes.pre_step(obs) if self.oxes is not None else obs
                 # done = terminated or truncated
-
-                rewards = rewards + rew
-                lengths = lengths + 1 * np.logical_not(rewards)
+                
+                rewards = rewards + (rew * np.logical_not(rewards))
+                lengths = lengths + (1 * np.logical_not(rewards))
                 dones = np.logical_or(dones, done)
 
                 bar.set_description(f"rewards: {rewards.sum()}")
@@ -473,7 +477,39 @@ class EvalCallback:
 
         stats = {"SR": rewards.mean(), "length": lengths.mean()}
         return stats
+    
+    
+class RolloutCollector:
+    
+    def __init__(self, env, step_func, transform=None, oxes=None):
+        self.venv = env
+        self.step_func = step_func
+        self.transform = transform
+        self.oxes = oxes
+        self.rescaler = ActionRescaler()
+        self._prev_obs = self.venv.reset()
+        self.success_count = 0
+        self.ep_count = 0
+    
+    def collect_rollouts(self, n_rollouts=1):
+        for _ in range(n_rollouts):
+            actions = self.step_func(self._prev_obs)
+            if self.oxes is not None:
+                raw, actions = self.oxes(actions)
 
+            actions = self.rescaler.dict2act(actions)
+
+            obs, rew, done, info = self.venv.step(actions)
+            obs = self.transform(obs) if self.transform is not None else obs
+            obs = self.oxes.pre_step(obs) if self.oxes is not None else obs
+            self._prev_obs = obs    
+            
+            if done.any():
+                self.success_count += rew.sum()
+                self.ep_count += done.sum()
+                
+        return self.success_count, self.ep_count
+            
 
 def step_randoms(*args):
     import numpy as np
@@ -482,11 +518,11 @@ def step_randoms(*args):
 
 
 def main():
-   
+
     print("Using wandb")
     wrun = wandb.init(
         project="lora",
-        dir=osp.join(osp.expanduser("~"), "improve_logs"),  # cfg.callback.log_path,
+        dir=cfg.log_path,  # cfg.callback.log_path,
         job_type="train",
         # sync_tensorboard=True,
         monitor_gym=True,
@@ -501,6 +537,11 @@ def main():
     dp_sharding = NamedSharding(mesh, PartitionSpec("batch"))
     # Our model will be replicated across devices (we are only doing data parallelism, not model parallelism)
     replicated_sharding = NamedSharding(mesh, PartitionSpec())
+
+    def shard(batch):
+        return multihost_utils.host_local_array_to_global_array(
+            batch, mesh, PartitionSpec("batch")
+        )
 
     assert (
         cfg.batch_size % jax.device_count() == 0
@@ -543,9 +584,12 @@ def main():
         del batch["dataset_name"]
         return batch
 
-    dataset = iter(lora_octo.octo_dataset(cfg.batch_size))
+    dataset = map(
+        shard,
+        iter(lora_octo.octo_dataset(cfg.batch_size)),
+    )
     batch = next(dataset)
-
+    
     task = "widowx_put_eggplant_in_basket"
     env = simpler.make(task)
     descs = [env.get_language_instruction()] * cfg.batch_size
@@ -594,19 +638,21 @@ def main():
     #     action_dim=1,
     #     readout_key="readout_value",
     # )
-    
+
     ### TODO: add the critic head
     config["model"]["heads"]["value"] = ModuleSpec.create(
-        MSECriticHead,
+        # MSECriticHead,
+        QRDQNCriticHead, 
         predictions=1,
         obs_horizon=2,
         pred_horizon=4,
         chunk_size=5,
-        max_critic=1.0, 
+        max_critic=1.0,
         readout_key="readout_value",
     )
     
     config["model"]["readouts"]["value"] = 2
+    config["model"]["heads"]["action"]["module"] = "improve.offline.action_heads"
     print(config)
 
     # initialize weights for modified Octo model, then merge in all applicable pre-trained weights
@@ -703,9 +749,10 @@ def main():
     lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0))
     # target_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(1))
 
+    # TODO: lower lr - original lr 3e-4
     lrschedule = optax.cosine_decay_schedule(3e-4, cfg.train_steps)
     # learning_rate = optax.join_schedules( [optax.linear_schedule(0, 3e-5, 100), optax.constant_schedule(3e-5)], [100])
-    tx = optax.adamw(learning_rate=lrschedule, weight_decay=1e-4, mu_dtype=jnp.bfloat16)
+    tx = optax.adamw(learning_rate=lrschedule, weight_decay=1e-4, mu_dtype=jnp.bfloat16, alpha=1/32)    # originall 1e-4
     if cfg.grad_acc:
         tx = optax.MultiSteps(tx, cfg.grad_acc)
     if cfg.grad_clip is not None:
@@ -751,7 +798,7 @@ def main():
     @lorax.lora
     def loss_fn(params, batch, rng, train=True):
         bound_module = model.module.bind({"params": params}, rngs={"dropout": rng})
-
+        
         transformer_embeddings = bound_module.octo_transformer(
             batch["observation"],
             batch["task"],
@@ -764,12 +811,11 @@ def main():
             pad_mask=batch["observation"]["pad_mask"],
             train=train,
         )
-        
-        ### TODO: should also take in action
-        value_loss, value_metrics = bound_module.heads["value"].loss(   
+
+        value_loss, value_metrics = bound_module.heads["value"].loss(
             transformer_embeddings,
-            batch["action"],
-            batch["value"], 
+            batch["action"],  # NEW: Q(s,a)
+            batch["value"],
             pad_mask=batch["observation"]["pad_mask"],
             train=train,
         )
@@ -778,18 +824,22 @@ def main():
         metrics = {"action": action_metrics, "value": value_metrics}
         return loss, metrics
 
+    # TODO: lower beta - original beta 3.0 (smaller beta means more aggressive changes)
+    loss_fn = mk_octo_adv_loss(model, beta=2.0)
+    print("using octo AWAC loss")
+
     @partial(
         jax.jit,
         # state is replicated, batch is data-parallel
-        in_shardings=(replicated_sharding, dp_sharding),
+        in_shardings=(replicated_sharding, dp_sharding, replicated_sharding),
         out_shardings=(replicated_sharding, replicated_sharding),
         # allows jax to modify `state` in-place, saving a lot of memory
         # donate_argnums=0,
     )
-    def train_step(state, batch):
+    def train_step(state, batch, update_step):
         rng, dropout_rng = jax.random.split(state.rng)
         (loss, info), grads = jax.value_and_grad(loss_fn, has_aux=True)(
-            state.params, batch, dropout_rng, train=True
+            state.params, batch, dropout_rng, train=True, update_step=update_step
         )
         new_state = state.apply_gradients(grads=grads, rng=rng)
         return new_state, info
@@ -819,17 +869,8 @@ def main():
         # print(actions.shape)
         return actions
 
-        """
-        action_loss, action_metrics = bound_module.heads["action"].loss(
-            transformer_embeddings,  # Action head knows to pull out the action readout_key
-            batch["action"],
-            pad_mask=batch["observation"]["pad_mask"],
-            train=train,
-        )
-        """
-        # outs = bound_module( batch["observation"], batch["task"], batch["observation"]["pad_mask"], train=train,)
-        # actions = outs["action"]
-        return actions
+    # selects best of 5*20 proposals
+    # _model_step = mk_model_step(model, train_state)
 
     #
     #
@@ -859,7 +900,7 @@ def main():
         obs["task"] = {"language_instruction": lang}
         return obs
 
-    venv = mk_envs(cfg.inference_size)
+    venv, eval_env = mk_envs(cfg.inference_size)
     from improve.fm.oxes import OXESimplerInference, PolicyStepper
 
     stepper = PolicyStepper(
@@ -876,41 +917,130 @@ def main():
         raw, act = oxes.step(obs)
         return act
 
-    evalcallback = EvalCallback(venv, og_step)
+    evalcallback = EvalCallback(eval_env, og_step)
+    rolloutcollector = RolloutCollector(venv, og_step)
 
     #
     #
     #
+    
+    def wandb_plot_actions(train_info, i):
+        keys = [("action", "predicted_mean", "pred"), 
+                        ("action", "true_mean", "true"), 
+                        ("value", "predicted_val", "pred"), 
+                        ("value", "true_val", "true")]
+
+        names = ["x", "y", "z", "yaw", "pitch", "roll", "gripper"]
+        
+        for key, subkey, name in keys:
+            values = train_info[key][subkey]
+            del train_info[key][subkey]
+            
+            if key == "action":
+                for k, n in enumerate(names):
+                    wandb.log({f"stats/{name}/{n}": wandb.Histogram(values[:, :, :, k])}, step=i)
+            else:
+                wandb.log({f"stats/{name}/val": wandb.Histogram(values)}, step=i)
+
+    timer = Timer()
 
     # run finetuning loop
     logging.info("Starting finetuning...")
     for i in tqdm(range(cfg.train_steps), total=cfg.train_steps, dynamic_ncols=True):
-        batch = next(dataset)
-        batch["task"] = {"language_instruction": lang}
-        # batch = example_batch
-        # batch = process_batch(batch, text_processor)
+        # success, dones = rolloutcollector.collect_rollouts(n_rollouts=1)
+    
+        # if dones > 0:
+            # wandb.log({"rollout/success": success/dones}, step=i)
+        # timer.tick("total")
 
-        train_state, update_info = train_step(train_state, batch)
+        with timer("dataset"):
+            batch = next(dataset)
+            batch["task"] = {"language_instruction": lang}
+            # batch = example_batch
+            # batch = process_batch(batch, text_processor)
+
+        with timer("train"):
+            train_state, train_info = train_step(train_state, batch, i)
+
         if (i + 1) % 100 == 0:
             # if (i + 1) % 100 == 0:
-            print(update_info)
-            update_info = jax.device_get(update_info)
+            train_info = jax.device_get(train_info)
 
             lr = lrschedule(i)
-            print(f"Step {i}: LR: {lr}")
-            update_info.update({"learning_rate": lr})
+            # print(f"Step {i}: LR: {lr}")
+            train_info.update({"learning_rate": lr})
 
             evals = {}
             # if (i+1) % 500 == 0:
-            if (i+1) % 100 == 0:
-                evals = evalcallback(i)
-                evals = {'eval': evals}
+            if (i + 1) % 100 == 0:
+                with timer("rollout"):
+                    evals = evalcallback(i)
+                    evals = {"eval": evals}
 
-            wandb.log(du.flatten({"training": update_info, **evals}, delim="/"), step=i)
+            
+            wandb_plot_actions(train_info, i)
+
+            info = {
+                "training": train_info,
+                "timer": timer.get_average_times(),
+                **evals,
+            }
+            print(info)
+                
+            with timer("wandb"):
+                wandb.log(du.flatten(info, delim="/"), step=i)
 
         # if (i + 1) % 1000 == 0:
         # save checkpoint
         # train_state.model.save_pretrained(step=i, checkpoint_path=cfg.save_dir)
+
+        # timer.tock("total")
+        
+    # TODO: add online training
+    # for i in tqdm(range(cfg.offline_steps + cfg.train_steps), total=cfg.offline_steps + cfg.train_steps, dynamic_ncols=True):
+    #     if i > cfg.offline_steps:
+    #         success, dones = rolloutcollector.collect_rollouts(n_rollouts=1)
+    
+    #         if dones > 0:
+    #             wandb.log({"rollout/success": success/dones}, step=i)
+                
+    #         if (i + 1) % 200 == 0:
+    #             dataset = map(
+    #                 shard,
+    #                 iter(lora_octo.octo_dataset(cfg.batch_size, wrun.name)),
+    #             )
+        
+    #     with timer("dataset"):
+    #         batch = next(dataset)
+    #         batch["task"] = {"language_instruction": lang}
+
+    #     with timer("train"):
+    #         train_state, train_info = train_step(train_state, batch, i)            
+
+    #     if (i + 1) % 100 == 0:
+    #         train_info = jax.device_get(train_info)
+
+    #         lr = lrschedule(i)
+    #         train_info.update({"learning_rate": lr})
+
+    #         evals = {}
+    #         # if (i+1) % 500 == 0:
+    #         if (i + 1) % 500 == 0:
+    #             with timer("rollout"):
+    #                 evals = evalcallback(i)
+    #                 evals = {"eval": evals}
+                    
+    #         wandb_plot_actions(train_info)
+    #         info = {
+    #             "training": train_info,
+    #             "timer": timer.get_average_times(),
+    #             **evals,
+    #         }
+    #         print(info)
+                
+    #         with timer("wandb"):
+    #             wandb.log(du.flatten(info, delim="/"), step=i)
+
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from functools import partial
 from typing import Dict, Optional, Tuple
 
 import distrax
@@ -9,13 +10,16 @@ import numpy as np
 from einops import rearrange
 from jax import Array
 from jax.typing import ArrayLike
+# these can be borrowed from original octo code
+from octo.model.components.action_heads import (_check_action_window_size,
+                                                continuous_loss, masked_mean)
 from octo.model.components.base import TokenGroup
 from octo.model.components.diffusion import (cosine_beta_schedule,
                                              create_diffusion_model)
 from octo.model.components.tokenizers import BinTokenizer
 from octo.model.components.transformer import MAPHead
 # these can be borrowed from original octo code
-from octo.model.components.action_heads import (_check_action_window_size,
+from improve.offline.action_heads import (_check_action_window_size,
                                                      continuous_loss,
                                                      masked_mean)
 from octo.utils.typing import PRNGKey
@@ -133,11 +137,18 @@ class ContinuousCriticHead(nn.Module, CriticHead):
 
     readout_key: str = "readout_value"
     use_map: bool = False
+
+    predictions: int = 1  # number of critics? TBD
+    obs_horizon: int = 2  # window size
+    pred_horizon: int = 4
+    chunk_size: int = 5
     predictions: int = 1 # number of critics? TBD
     obs_horizon: int = 2
     pred_horizon: int = 4
     chunk_size: int = 5
     action_dim: int = 7
+    embedding_dim: int = 384
+    dim: int = 1
     embedding_dim: int = 384
     dim: int = 1 
     max_critic: float = 1.0
@@ -146,11 +157,11 @@ class ContinuousCriticHead(nn.Module, CriticHead):
     def setup(self):
         if self.use_map:
             self.map_head = MAPHead()
-            
-        self.action_embed = nn.Dense(self.obs_horizon * self.embedding_dim)
-        self.dense1 = nn.Dense(2 * self.embedding_dim)      # [action_embeds + obs_embeds]
-        self.mean_proj = nn.Dense(self.pred_horizon * self.dim)
 
+        self.action_embed = nn.Dense(self.embedding_dim)
+        self.dense1 = nn.Dense(self.embedding_dim)  # [action_embeds + obs_embeds]
+        self.mean_proj = nn.Dense(self.pred_horizon * self.dim)
+            
     def __call__(
         self,
         transformer_outputs: Dict[str, TokenGroup],
@@ -172,24 +183,24 @@ class ContinuousCriticHead(nn.Module, CriticHead):
         else:  # mean pooling
             embeddings = token_group.tokens.mean(axis=-2)
         # Now, embeddings is (batch_size, window_size, embedding_size)
-        
-        if actions is None:
-            actions = jnp.zeros((embeddings.shape[0], self.chunk_size, self.action_dim))  #   [bs, 4, 7]
-        
-        actions = actions.reshape(-1, self.chunk_size * self.action_dim)  # [bs, 28]
-        action_embeddings = self.action_embed(actions)  # [bs, 2 * 384]
-        action_embeddings = action_embeddings.reshape(*embeddings.shape[0:-1], self.embedding_dim)  # [bs, 2, 384]
-        
-        # breakpoint()
-        joined_embeddings = jnp.concatenate([embeddings, action_embeddings], axis=-1)   # [bs, 2, 768]
-        output = self.dense1(joined_embeddings) # [bs, 2, 768]
-        
-        mean = self.mean_proj(output)   # [bs, 2, 5]
-        mean = rearrange(
-            mean, "b w (p a) -> b w p a", p=self.pred_horizon, a=self.dim
-        )   # [bs, 2, 5, 1]
-        
-        ### TODO: do we need this?
+
+        bs = embeddings.shape[0]
+        if actions is None:  # during initialization actions is not passed :(
+            # [bs, 2,4,7]
+            actions = jnp.zeros(
+                (bs, self.obs_horizon, self.pred_horizon, self.action_dim)
+            )
+
+        actions = rearrange(actions, "b w p a -> b w (p a)")
+        act_emb = self.action_embed(actions)  # [bs, 2 , 384]
+
+        # [bs, 2, 768]
+        both = jnp.concatenate([embeddings, act_emb], axis=-1)
+        output = self.dense1(both)
+
+        mean = self.mean_proj(output)
+        mean = rearrange(mean, "b w (p a) -> b w p a", p=self.pred_horizon, a=self.dim)
+
         mean = jnp.tanh(mean / self.max_critic) * self.max_critic
         return mean
 
@@ -213,35 +224,43 @@ class ContinuousCriticHead(nn.Module, CriticHead):
             loss: float
             metrics: dict
         """
+        actions = chunk_actions(actions, self.pred_horizon)
+        b, w, p, a = actions.shape
+
+        src = self(transformer_outputs, actions, train=train)
+        # _check_action_window_size(src, w, self.pred_horizon)
+        src = src.squeeze(-1).mean(-1)
+
+        # chunk the values from the batch
+        # window_size = src.shape[1]
+        tgt = chunk_actions(values, self.pred_horizon)
+        tgt = tgt[:, :w]
+        tgt = tgt.squeeze(-1).mean(-1) # chunk level critic not intra-chunk critic
         # (batch, window_size, pred_horizon, action_dim)
         # mean = self(transformer_outputs, train=train)
-        
-        ### TODO: for MSE critic head, measure MSE btwn pred_values and values and return mean of batch as loss
-        pred_values = self(transformer_outputs, actions, train=train)
-
-        # window_size = mean.shape[1]
-        window_size = pred_values.shape[1]
-        _check_action_window_size(actions, window_size, self.pred_horizon)
-        # actions_chunked = chunk_actions(actions, self.pred_horizon)
-        # actions_chunked = actions_chunked[:, :window_size]
-        values_chunked = chunk_actions(values, self.pred_horizon)
-        values_chunked = values_chunked[:, :window_size]
 
         # loss, metrics = continuous_loss(
         #     mean, actions_chunked, pad_mask[:, :, None, None], loss_type=self.loss_type
         # )
-        
+
         loss, metrics = continuous_loss(
-            pred_values, values_chunked, pad_mask[:, :, None, None], loss_type=self.loss_type
+            src,
+            tgt,
+            pad_mask, # pad_mask[:, :, None, None],
+            loss_type=self.loss_type,
+            # pred_values, values_chunked, pad_mask[:, :, None, None], loss_type=self.loss_type
         )
-                
-        # Sum over action dimension instead of averaging
-        loss = loss * self.action_dim
-        metrics["loss"] = metrics["loss"] * self.action_dim
-        metrics["mse"] = metrics["mse"] * self.action_dim        
+
+        # Sum over dimension instead of averaging
+        loss = loss * self.dim
+        metrics["loss"] = metrics["loss"] * self.dim
+        metrics["mse"] = metrics["mse"] * self.dim
+        metrics["predicted_val"] = src
+        metrics["true_val"] = tgt
         
         return loss, metrics
 
+    # def predict(
     def predict(
         self,
         transformer_outputs: Dict[str, TokenGroup],
@@ -251,6 +270,7 @@ class ContinuousCriticHead(nn.Module, CriticHead):
         **kwargs,
     ) -> jax.Array:
         """Convenience methods for predicting actions for the final timestep in the window."""
+        raise NotImplementedError
         # only get the last timestep in the window
         # (batch, pred_horizon, action_dim)
         mean = self(transformer_outputs, train=train)[:, -1]
@@ -261,7 +281,258 @@ class MSECriticHead(ContinuousCriticHead):
     loss_type: str = "mse"
     use_map: bool = True
 
+    
+class DiscreteCriticHead(nn.Module, CriticHead):
+    """
+    A basic action decoding head that predicts discretized actions using the transformer token embeddings.
 
+
+    self.token_per determines how many tokens are used to represent each action.
+        - If "" (an empty string): then a single token is responsible for producing the action logits
+            for all dimensions at all future prediction horizons.
+        - If "pred_horizon", then we use `self.pred_horizon` tokens, each responsible for producing the action logits
+            for all dimensions at the corresponding future prediction horizon.
+        - If "action_dim_and_pred_horizon", then we use `self.pred_horizon * self.action_dim` tokens, where
+            each token is responsible for the logits for the specific dim and timestep.
+
+    If multi-head attention pooling is used (use_map=True), then the correct number of tokens is automatically
+    created, otherwise readout_key must have exactly the right number of tokens.
+    """
+
+    readout_key: str
+    use_map: bool = False
+    predictions: int = 1  # number of critics? 
+    pred_horizon: int = 1
+    action_dim: int = 7
+    chunk_size: int = 5
+    vocab_size: int = 256
+    max_critic: float = 1.0
+    # normalization_type: str = "uniform"
+    
+    embedding_dim: int = 384
+    obs_horizon: int = 2 # window size
+    quantiles: int = 200
+    
+    def setup(self):
+        if self.use_map:
+            self.map_head = MAPHead(num_readouts=self.n_tokens)
+
+        self.action_embed = nn.Dense(self.obs_horizon * self.embedding_dim)
+        
+        def create_network():
+            return [
+                nn.Dense(self.embedding_dim),
+                nn.Dense(self.embedding_dim // 2),
+                nn.Dense(self.quantiles * self.pred_horizon)
+                # # Define fully connected layers
+                # nn.Dense(self.embedding_dim),
+                # nn.Dense(self.quantiles * self.pred_horizon)  # Project to quantiles for each action
+            ]
+            
+        self.critic, self.target_critic = [create_network() for _ in range(2)]
+        
+    def _forward(
+        self, 
+        x: jnp.ndarray, 
+        main: bool = True
+    ) -> jnp.ndarray:
+        if main: 
+            network = self.critic
+        else:
+            network = self.target_critic
+            
+        for layer in network[:-1]:
+            x = layer(x)
+            x = nn.relu(x)
+            
+        x = network[-1](x)
+        return x
+        # return network(x) 
+
+    def __call__(
+        self, 
+        transformer_outputs: Dict[str, TokenGroup], 
+        actions: ArrayLike = None,
+        train: bool = True,
+        main: bool = True,
+    ) -> jax.Array:
+        
+        initializing = False
+        token_group = transformer_outputs[self.readout_key]
+        
+        assert token_group.tokens.ndim == 4, (
+            f"Expected token_group.tokens to have shape (batch_size, window_size, num_tokens, embedding_size), "
+            f"but got shape {token_group.tokens.shape}"
+        )
+        if self.use_map:  # Multi-head attention pooling
+            embeddings = self.map_head(token_group, train=train)[:, :, 0]
+        else:  # mean pooling
+            embeddings = token_group.tokens.mean(axis=-2)
+        # Now, embeddings is (batch_size, window_size, embedding_size)
+
+        bs = embeddings.shape[0]
+        if actions is None:  # during initialization actions is not passed :(
+            # [bs, 2,4,7]
+            initializing = True
+            actions = jnp.zeros(
+                (bs, self.obs_horizon, self.pred_horizon, self.action_dim)
+            )
+
+        actions = rearrange(actions, "b w p a -> b w (p a)")
+        act_emb = self.action_embed(actions)  # [bs, 2 , 384]
+
+        # [bs, 2, 768]
+        both = jnp.concatenate([embeddings, act_emb], axis=-1)
+        
+        if initializing:
+            self._forward(both, main=False) # to initialize the target network
+        
+        quantiles = self._forward(both, main=main)
+        quantiles = rearrange(quantiles, "b w (p a) -> b w p a", p=self.pred_horizon, a=self.quantiles)
+        
+        # mean = jnp.tanh(mean / self.max_critic) * self.max_critic
+        return quantiles
+
+    def loss(
+        self,
+        transformer_outputs: Dict[str, TokenGroup],
+        next_transformer_outputs: Dict[str, TokenGroup],
+        actions: ArrayLike,
+        rewards: ArrayLike,
+        dones: ArrayLike,
+        gamma: float,
+        delta: float,
+        pad_mask: ArrayLike,
+        train: bool = True,
+    ):
+        """Computes the loss for the discretized action objective.
+
+        Args:
+            transformer_ouputs: must contain self.readout_key with shape (batch_size, window_size, num_tokens,
+                embedding_size)
+            actions: shape (batch_size, >= window_size + pred_horizon - 1, action_dim)
+            pad_mask: boolean array (batch, window_size) which is True if the timestep is not a padding timestep
+
+        Returns:
+            loss: float
+            metrics: dict
+        """
+        dones = jnp.expand_dims(dones, axis=-1)
+        rewards = chunk_actions(rewards, self.pred_horizon)        
+        actions = chunk_actions(actions, self.pred_horizon)
+        
+        pred_quantiles = self(transformer_outputs, actions, train=train)
+        tgt_quantiles = self(next_transformer_outputs, actions, train=False, main=False)
+
+        tgt_quantiles = rewards + gamma * (1 - dones) * tgt_quantiles   # MC reward means don't use this
+        tau = jnp.linspace(0.0, 1.0, self.quantiles)
+
+        u = tgt_quantiles - pred_quantiles
+        loss = quantile_loss(u, tau, delta, pad_mask, self.loss_type)
+        
+        return loss, {"loss": loss, 
+                    "predicted_val": pred_quantiles.mean(-1), 
+                    "true_val": tgt_quantiles.mean(-1)}
+    
+    def update_target_network(
+            self, 
+            tau=0.005
+        ):
+        """
+        Soft update the target network with the main network's parameters.
+        """
+        
+        for main_layer, target_layer in zip(self.critic, self.target_critic):
+            # Update the target layer's parameters
+            new_target_layer_params = jax.tree_map(
+                lambda p_main, p_target: tau * p_main + (1 - tau) * p_target,
+                main_layer.variables['params'],
+                target_layer.variables['params']
+            )
+            
+            # target_layer.replace(variables={'params':new_target_layer_params})
+            
+        #     # new_variables = {**target_layer.variables, 'params': new_target_layer_params}
+            target_layer.variables["params"] = new_target_layer_params
+        # with jax.checking_leaks():
+        # new_target_params = jax.tree_map(
+        #     lambda p_main, p_target: tau * p_main + (1 - tau) * p_target,
+        #     self.critic.variables['params'],
+        #     self.target_critic.variables['params']
+        # )
+
+        # # Create a new target critic with the updated parameters
+        # self.target_critic.variables['params'] = new_target_params
+    
+        
+    def predict(
+        self,
+        transformer_outputs: Dict[str, TokenGroup],
+        train: bool = True,
+        argmax: bool = False,
+        sample_shape: tuple = (),
+        rng: Optional[PRNGKey] = None,
+        temperature: float = 1.0,
+    ) -> jax.Array:
+        raise NotImplementedError
+        """Convenience methods for predicting actions for the final timestep in the window."""
+        # only get the last timestep in the window
+        action_logits = self(transformer_outputs, train=train)[:, -1]
+
+        if argmax:
+            action_tokens = jnp.argmax(action_logits, axis=-1).astype(jnp.int32)
+            action_tokens = jnp.broadcast_to(
+                action_tokens, sample_shape + action_tokens.shape
+            )
+        else:
+            dist = distrax.Categorical(logits=action_logits / temperature)
+            action_tokens = dist.sample(seed=rng, sample_shape=sample_shape).astype(
+                jnp.int32
+            )
+        return self.action_tokenizer.decode(action_tokens)
+
+
+class QRDQNCriticHead(DiscreteCriticHead):
+    
+    readout_key: str = "readout_value"
+    quantiles: int = 200
+    loss_type: str = "huber"       
+    use_map: bool = False
+        
+@jax.jit
+def huber(u: jnp.ndarray, delta=1.0) -> jnp.ndarray:
+    abs_u = jnp.abs(u)
+    return jnp.where(abs_u <= delta, 0.5 * jnp.square(u), delta * (abs_u - 0.5 * delta))
+
+
+# @partial(jax.jit, static_argnums=3)
+def quantile_loss(
+    u: jnp.ndarray,
+    tau: jnp.ndarray,
+    delta: float,
+    pad_mask: jnp.ndarray,
+    loss_type: str,
+) -> jnp.ndarray:
+    
+    if loss_type == "l2":
+        element_wise_loss = jnp.square(u)
+    elif loss_type == "huber":
+        element_wise_loss = huber(u, delta)
+    else:
+        NotImplementedError
+
+    element_wise_loss *= jax.lax.stop_gradient(jnp.abs(tau - (u < 0).astype(jnp.float32)))
+    # batch_loss = element_wise_loss.sum(axis=1).mean(axis=1, keepdims=True)
+    loss = element_wise_loss.mean(axis=-1)  # average the quantiles
+    loss = loss.mean(axis=-1)  # average the prediction horizon
+    loss = masked_mean(loss, pad_mask)
+    
+    return loss
+
+
+# TODO add options for
+# DiscreteCriiticHead (for QRDQN?)
+# DiffusionCriticHead
 # class DiscreteActionHead(nn.Module, ActionHead):
 #     """
 #     A basic action decoding head that predicts discretized actions using the transformer token embeddings.

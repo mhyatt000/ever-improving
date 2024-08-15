@@ -111,7 +111,6 @@ def filter_keys(obs):
 
 def unscale(action):
     """ this is un-scaling for Octo with widowX robot """
-    print('unscale called')
     m = [0.00021161, 0.00012614, -0.00017022, -0.00015062, -0.00023831, 0.00025646, 0.0]
     mean = np.array(m)
     s = [0.00963721, 0.0135066, 0.01251861, 0.02806791, 0.03016905, 0.07632624, 1.0]
@@ -120,7 +119,7 @@ def unscale(action):
     out = (action - mean[None]) / std[None]
     return out
 
-
+import copy
 def preprocess(x: dict):
     proc = {
         "mp4": decord2mp4,
@@ -132,14 +131,20 @@ def preprocess(x: dict):
 
     x = {k: _process(k, v) for k, v in x.items()}
     x = {".".join(k.split(".")[:-1]): v for k, v in x.items()}
-    x = du.nest(x, delim=".")
+    # x = du.nest(x, delim=".")
+    
+    x['state']['obs']['simpler-img'] = x['obs']
+    x['state']['next_obs']['simpler-img'] = x['next_obs']
+    
+    del x['obs']
+    del x['next_obs']
 
     if "infos" not in x:
         x["infos"] = [None]
 
-    x["state"]["obs"].update(**x["obs"])
-    x["state"]["next_obs"].update(**x["next_obs"])
-    x["state"]["infos"] = x["infos"]
+    # x["state"]["obs"].update(**x["obs"])
+    # x["state"]["next_obs"].update(**x["next_obs"])
+    # x["state"]["infos"] = x["infos"]
     x = x["state"]
     x = du.apply(x, lambda x: x.numpy() if isinstance(x, torch.Tensor) else x)
 
@@ -156,7 +161,6 @@ def preprocess(x: dict):
     actions = unscale(actions)
     x["actions"] = actions
 
-    # return x
     return (
         filter_keys(x["obs"]),
         filter_keys(x["next_obs"]),

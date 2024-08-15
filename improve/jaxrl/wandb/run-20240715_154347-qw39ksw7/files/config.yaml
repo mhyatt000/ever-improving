@@ -1,0 +1,103 @@
+wandb_version: 1
+
+algo:
+  desc: null
+  value:
+    name: awac
+    actor_optim_kwargs:
+      learning_rate: 0.0003
+      weight_decay: 0.0001
+    actor_hidden_dims:
+    - 256
+    - 256
+    - 256
+    - 256
+    state_dependent_std: false
+    critic_lr: 0.0003
+    critic_hidden_dims:
+    - 256
+    - 256
+    discount: 0.99
+    tau: 0.005
+    target_update_period: 1
+    beta: 2.0
+    num_samples: 1
+    replay_buffer_size: null
+env_name:
+  desc: null
+  value: HalfCheetah-v2
+dataset_name:
+  desc: null
+  value: Dataset.AWAC
+seed:
+  desc: null
+  value: 42
+eval_episodes:
+  desc: null
+  value: 10
+log_interval:
+  desc: null
+  value: 1000
+eval_interval:
+  desc: null
+  value: 5000
+batch_size:
+  desc: null
+  value: 256
+updates_per_step:
+  desc: null
+  value: 1
+max_steps:
+  desc: null
+  value: 1000000
+start_training:
+  desc: null
+  value: 10000
+percentile:
+  desc: null
+  value: 100.0
+percentage:
+  desc: null
+  value: 100.0
+job:
+  desc: null
+  value:
+    wandb: true
+    wandb_project_name: null
+    wandb_entity: awac
+    save_dir: ./tmp/
+    save_video: false
+    tqdm: true
+locked:
+  desc: null
+  value: false
+_wandb:
+  desc: null
+  value:
+    code_path: code/improve/jaxrl/train.py
+    python_version: 3.11.9
+    cli_version: 0.17.0
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1721076227
+    t:
+      1:
+      - 1
+      - 2
+      - 3
+      - 12
+      - 45
+      - 50
+      - 55
+      - 105
+      3:
+      - 13
+      - 16
+      - 23
+      - 35
+      4: 3.11.9
+      5: 0.17.0
+      8:
+      - 5
+      13: linux-x86_64

@@ -1,0 +1,448 @@
+diff --git a/improve/cn/__init__.py b/improve/cn/__init__.py
+index 1f0e24f..9544152 100644
+--- a/improve/cn/__init__.py
++++ b/improve/cn/__init__.py
+@@ -1,23 +1,14 @@
+-from improve.util.config import default
+ from dataclasses import dataclass
+-from typing import Any, List
++from enum import Enum
++from typing import Any, List, Optional, Tuple, Union
++
++from improve.util.config import default, store_as_head
+ from omegaconf import MISSING
+ 
+ from .algo import *
+ from .buffer import base
+ from .buffer.base import Buffer
+-from .env.foundation.base import *
+-
+-defaults = [
+-    # Load the config "mysql" from the config group "db"
+-    {"db": "mysql"}
+-]
+-
+-
+-@dataclass
+-class Config:
+-    # this is unfortunately verbose due to @dataclass limitations
+-    defaults: List[Any] = default(defaults)
+-
+-    # Hydra will populate this field based on the defaults list
+-    db: Any = MISSING
++from .env.base import Env
++from .env.foundation.base import RTX, FoundationModel, OctoB, OctoS, RT1Model, Strategy
++from .env.obs_mode.base import (Hybrid, Image, LowDim, ObsMode, Oracle,
++                                OracleCentral)
+diff --git a/improve/cn/algo/__init__.py b/improve/cn/algo/__init__.py
+index a2c429d..f96b118 100644
+--- a/improve/cn/algo/__init__.py
++++ b/improve/cn/algo/__init__.py
+@@ -1,3 +1,4 @@
+ from .sac import SAC, RP_SAC
++from .awac import AWAC
+ from .base import Algo
+ from .pac import PAC
+diff --git a/improve/cn/env/base.py b/improve/cn/env/base.py
+index 3f693d6..4cb554a 100644
+--- a/improve/cn/env/base.py
++++ b/improve/cn/env/base.py
+@@ -1,17 +1,20 @@
+ from collections import namedtuple
+ from dataclasses import dataclass
++from enum import Enum
+ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+ 
+-from improve.util.config import default, store
++from improve.util.config import default, store, store_as_head
++from omegaconf import MISSING
+ 
+ 
++@store
+ @dataclass
+ class Env:
+     name: str = "base"
+     defaults: List[Any] = default(
+         [
+             {"foundation": "octo-base"},
+-            {"obs_mode": "image"},
++            {"obs_mode": "oracle-central"},
+         ]
+     )
+ 
+@@ -20,25 +23,30 @@ class Env:
+     kind: str = "sb3"
+     downscale: int = 7
+     device: Optional[Any] = None
+-    obs_keys: str = "${env.obs_mode.obs_keys}"
+-
+-    goal: dict = {
+-        "use": True,
+-        "key": "simpler-img",
+-        "cls": "${r_typeof:improve.wrapper.GoalEnvWrapper}",
+-    }
++    obs_keys: List[str] = "${env.obs_mode.obs_keys}"
++
++    goal: dict = default(
++        {
++            "use": True,
++            "key": "simpler-img",
++            "cls": "${r_typeof:improve.wrapper.GoalEnvWrapper}",
++        }
++    )
+ 
+     residual_scale: int = 1
+     scale_strategy: str = "clip"
+-    action_mask_dims: Optional[Any] = None
+-    use_original_space: str = "${algo.use_original_space}"
+-    use_wandb: str = "${job.wandb.use}"
+-
+-    seed: dict = {
+-        "force": False,
+-        "value": "${job.seed}",
+-        "seeds": None,
+-    }
++    action_mask_dims: Optional[List[int]] = None
++
++    # use_original_space: bool = False # "${algo.use_original_space}"
++    # use_wandb: str = "${job.wandb.use}"
++
++    seed: dict = default(
++        {
++            "force": False,
++            "value": "${job.seed}",
++            "seeds": None,
++        }
++    )
+ 
+     reward: str = "sparse"
+     max_episode_steps: int = 60
+diff --git a/improve/cn/env/obs_mode/base.py b/improve/cn/env/obs_mode/base.py
+index a953c21..708d463 100644
+--- a/improve/cn/env/obs_mode/base.py
++++ b/improve/cn/env/obs_mode/base.py
+@@ -30,7 +30,7 @@ class Mode(Enum):
+ @dataclass
+ class ObsMode:
+     name: str = "base"
+-    mode: Mode = "rgb"
++    mode: Mode = Mode.RGB
+ 
+ 
+ @dataclass
+@@ -38,7 +38,7 @@ class Oracle(ObsMode):
+     name: str = "oracle"
+     obs_keys: List[str] = default(OracleKeys + LowDimKeys)
+ 
+-
++@store
+ @dataclass
+ class OracleCentral(Oracle):
+     name: str = "oracle-central"
+@@ -47,7 +47,7 @@ class OracleCentral(Oracle):
+ 
+ class LowDim(ObsMode):
+     name: str = "lowdim"
+-    mode: str = "state_dict"
++    mode: str = Mode.STATE_DICT
+     obs_keys: None = None
+ 
+ 
+diff --git a/improve/env/__init__.py b/improve/env/__init__.py
+index eef237a..1356e08 100644
+--- a/improve/env/__init__.py
++++ b/improve/env/__init__.py
+@@ -2,6 +2,10 @@ import os.path as osp
+ 
+ import gymnasium as gym
+ import simpler_env as simpler
++# from mani_skill2.utils.wrappers import RecordEpisode
++from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
++                                              VecMonitor, VecVideoRecorder)
++
+ from improve.wrapper.force_seed import ForceSeedWrapper
+ from improve.wrapper.normalize import NormalizeObservation, NormalizeReward
+ from improve.wrapper.sb3.successinfo import SuccessInfoWrapper
+@@ -15,14 +19,23 @@ from improve.wrapper.simpler.misc import (DownscaleImgWrapper,
+ from improve.wrapper.simpler.no_rotation import NoRotationWrapper
+ from improve.wrapper.simpler.reach_task import ReachTaskWrapper
+ from improve.wrapper.simpler.rescale import RTXRescaleWrapper
++from improve.wrapper.simpler.source_target import SourceTargetWrapper
+ from improve.wrapper.wandb.record import VecRecord
+ from improve.wrapper.wandb.vec import WandbVecMonitor
+-from mani_skill2.utils.wrappers import RecordEpisode
+-from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
+-                                              VecMonitor, VecVideoRecorder)
+ 
+ from .action_rescale import ActionRescaler
+ 
++MULTI_OBJ_ENVS = [
++    "google_robot_move_near_v0",
++    "google_robot_move_near_v1",
++    "google_robot_move_near",
++    "widowx_spoon_on_towel",
++    "widowx_carrot_on_plate",
++    "widowx_stack_cube",
++    "widowx_put_eggplant_in_basket",
++]
++
++
+ # Defines a continuous, infinite horizon, task where terminated is always False
+ # unless a timelimit is reached.
+ class ContinuousTaskWrapper(gym.Wrapper):
+@@ -37,7 +50,6 @@ class ContinuousTaskWrapper(gym.Wrapper):
+         return ob, rew, False, truncated, info
+ 
+ 
+-
+ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
+     def _init() -> gym.Env:
+         # NOTE: Import envs here so that they are registered with gym in subprocesses
+@@ -45,8 +57,8 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
+ 
+         extra = {}
+ 
+-        if cfg.env.obs_mode.mode != "rgb":
+-            extra["obs_mode"] = cfg.env.obs_mode.mode
++        if cfg.env.obs_mode.mode.value != "rgb":
++            extra["obs_mode"] = cfg.env.obs_mode.mode.value
+         if cfg.env.task == "google_robot_pick_horizontal_coke_can":
+             extra["success_from_episode_stats"] = False
+ 
+@@ -79,6 +91,10 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
+ 
+         env = ExtraObservationWrapper(env)
+ 
++        if cfg.env.foundation.task in MULTI_OBJ_ENVS:
++            print("using src tgt wrapper")
++            env = SourceTargetWrapper(env)
++
+         if cfg.env.seed.force:
+             if cfg.env.seed.seeds is not None:
+                 env = ForceSeedWrapper(env, seeds=cfg.env.seed.seeds, verbose=True)
+@@ -123,9 +139,9 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
+         # if max_episode_steps is not None:
+         # env = ContinuousTaskWrapper(env)
+ 
+-        if record_dir is not None:
+-            print(f"TODO RECORD: {record_dir}")
+-            # env = RecordEpisode(env, record_dir, info_on_video=True)
++        # if record_dir is not None:
++        # print(f"TODO RECORD: {record_dir}")
++        # env = RecordEpisode(env, record_dir, info_on_video=True)
+ 
+         return env
+ 
+@@ -135,7 +151,7 @@ def make_env(cfg, max_episode_steps: int = None, record_dir: str = None):
+     return _init
+ 
+ 
+-def make_envs( cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None):
++def make_envs(cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=60):
+ 
+     suffix = "eval" if eval_only else "train"
+     record_dir = osp.join(log_dir, f"videos/{suffix}")
+@@ -173,7 +189,7 @@ def make_envs( cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None
+             )
+             env = VecMonitor(env)
+             # if cfg.job.wandb.use:
+-                # env = WandbVecMonitor(env, logger)
++            # env = WandbVecMonitor(env, logger)
+ 
+             env.seed(cfg.job.seed)
+             env.reset()
+@@ -197,7 +213,7 @@ def make_envs( cfg, log_dir, eval_only=False, num_envs=1, max_episode_steps=None
+ 
+         env = VecMonitor(env)
+         # if cfg.job.wandb.use:
+-            # env = WandbVecMonitor(env, logger)
++        # env = WandbVecMonitor(env, logger)
+ 
+         print("wrapped env")
+ 
+diff --git a/improve/sb3/maniskill_ppo_example.py b/improve/sb3/maniskill_ppo_example.py
+index 792cb27..b92cd38 100644
+--- a/improve/sb3/maniskill_ppo_example.py
++++ b/improve/sb3/maniskill_ppo_example.py
+@@ -3,7 +3,7 @@ import warnings
+ from pprint import pprint
+ 
+ import gymnasium as gym
+-import mani_skill2.envs
++# import mani_skill2.envs
+ import numpy as np
+ import simpler_env as simpler
+ import stable_baselines3 as sb3
+diff --git a/improve/util/config.py b/improve/util/config.py
+index 4858384..39ca74f 100644
+--- a/improve/util/config.py
++++ b/improve/util/config.py
+@@ -1,4 +1,5 @@
+ 
++import os.path as osp
+ import inspect
+ from hydra.core.config_store import ConfigStore
+ from dataclasses import dataclass, field
+@@ -20,9 +21,24 @@ def store(cls):
+         name = cls.name # tree[-1] 
+         base = tree.index("cn")
+         group = '/'.join(tree[base + 1:-1])
+-        print(name, group)
++
++        print(osp.join(group,name))
+         cs.store(name=name, node=cls, group=group)
+         return cls
+ 
+     return wrapper(cls)
+ 
++
++def store_as_head(cls):
++    """
++    @store will call
++    cs.store(node=<class type>, name=<filename with no extension>, group=<dirname>)
++    """
++
++    def wrapper(cls):
++        name = cls.name if hasattr(cls, "name") else 'config'
++        cs.store(name=name, node=cls)
++        return cls
++
++    return wrapper(cls)
++
+diff --git a/improve/wrapper/simpler/source_target.py b/improve/wrapper/simpler/source_target.py
+index 3e697be..31f0b91 100644
+--- a/improve/wrapper/simpler/source_target.py
++++ b/improve/wrapper/simpler/source_target.py
+@@ -1,18 +1,112 @@
++import gymnasium as gym
++import numpy as np
++import simpler_env as simpler
++from gymnasium.core import Wrapper
+ 
++import hydra
++import improve
++import improve.hydra.resolver
+ 
+ 
+-
+-    @property
+-    def source_obj_pose(self):
+-        """Get the center of mass (COM) pose."""
+-        return self.episode_source_obj.pose.transform(
+-            self.episode_source_obj.cmass_local_pose
++class SourceTargetWrapper(Wrapper):
++    def __init__(self, env):
++        super().__init__(env)
++        self.env = env
++        self.observation_space = self.env.observation_space
++        # add src/target object pose to observation space
++        self.observation_space["src-pose"] = gym.spaces.Box(
++            low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
++        )
++        self.observation_space["tgt-pose"] = gym.spaces.Box(
++            low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
++        )
++        self.observation_space["src-pose-wrt-eef"] = gym.spaces.Box(
++            low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
++        )
++        self.observation_space["tgt-pose-wrt-eef"] = gym.spaces.Box(
++            low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
+         )
+ 
+-    @property
+-    def target_obj_pose(self):
+-        """Get the center of mass (COM) pose."""
+-        return self.episode_target_obj.pose.transform(
+-            self.episode_target_obj.cmass_local_pose
++    def objs_wrt_eef(self, obj_pose):
++        """Get the object pose with respect to the end-effector frame"""
++        return obj_pose.p - self.get_tcp().pose.p
++
++    def observation(self, observation):
++        # get src and target object pose
++        src_pose, tgt_pose = self.source_obj_pose, self.target_obj_pose
++        src_pose, tgt_pose = np.hstack((src_pose.p, src_pose.q)), np.hstack(
++            (tgt_pose.p, tgt_pose.q)
+         )
+ 
++        observation["src-pose"] = src_pose
++        observation["tgt-pose"] = tgt_pose
++
++        # calculate the distance wrt to eef
++        observation["src-pose-wrt-eef"] = self.objs_wrt_eef(self.source_obj_pose)
++        observation["tgt-pose-wrt-eef"] = self.objs_wrt_eef(self.target_obj_pose)
++
++        return observation
++
++    def reset(self, **kwargs):
++        obs, info = super().reset(**kwargs)
++        return self.observation(obs), info
++
++    def step(self, action):
++        obs, reward, success, truncated, info = self.env.step(action)
++        obs = self.observation(obs)
++        return obs, reward, success, truncated, info
++
++
++@hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
++def main(cfg):
++    print(cfg)
++
++    from improve.env import make_env
++
++    multi_obj_envs = []
++    for task in simpler.ENVIRONMENTS:
++        cfg.env.foundation.task = task
++        env = make_env(cfg)()
++
++        final_subtask = env.is_final_subtask()
++        print("Final subtask", task)
++
++        if not final_subtask:
++            print("Current task", task)
++            while not final_subtask:
++                env = env.advance_to_next_subtask()
++                final_subtask = env.is_final_subtask()
++                print("\tsubtask", final_subtask)
++
++        # try:
++        #     getattr(env, 'source_obj_pose')
++        #     multi_obj_envs.append(task)
++        #     print(f"Task {task} is a multi-obj environment")
++        # except:
++        #     print(f"Task {task} is not a multi-obj environment")
++
++        env.close()
++
++    print(multi_obj_envs)
++
++    import json
++
++    with open("multi_obj_envs.json", "w") as f:
++        json.dump(multi_obj_envs, f, indent=4)
++
++    # # env = simpler.make(cfg.env.task)
++    # env = make_env(cfg)()
++    # env = SourceTargetWrapper(env)
++
++    # obs, info = env.reset()
++    # print(obs.keys())
++
++    # obs, reward, success, truncated, info = env.step(env.action_space.sample())
++    # print("src-pose", obs['src-pose'])
++    # print("tgt-pose", obs['tgt-pose'])
++    # print("src-pose-wrt-eef", obs['src-pose-wrt-eef'])
++    # print("tgt-pose-wrt-eef", obs['tgt-pose-wrt-eef'])
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/requirements/all.txt b/requirements/all.txt
+index 6cb0d7b..f413ab6 100755
+--- a/requirements/all.txt
++++ b/requirements/all.txt
+@@ -12,3 +12,4 @@ tf-agents
+ tensorflow-hub
+ moviepy 
+ imageio
++webdataset
