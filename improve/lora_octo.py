@@ -208,14 +208,14 @@ def future_actions(x: dict):
 
 
 def mk_horizon(x: dict, horizon, key):
-
+    
     things = x[key]
     n = things.shape[0]
     dims = list(things.shape[1:])
 
     # Create a new array of zeros with shape (n, horizon, 7)
     new = jnp.zeros([n, horizon] + dims)
-
+    
     # Use roll to shift the array and vmap to apply it over a range of shifts
     def get_future(idx):
         return jnp.stack(
@@ -304,8 +304,10 @@ def prepare_octo(x):
     del x["obs"]
 
     x.pop("__key__", None)
+    x["next_observation"] = {}
+    x["next_observation"]["image_primary"] = _resize_image(x["next_obs"]["simpler-img"])
     del x["next_obs"]
-    del x["done"]
+    # del x["done"]
     return x
 
 
@@ -313,6 +315,7 @@ def get_mask(x):
     mask_val = sum(x["reward"])
     # mask_val = mask_val if mask_val != 0 else -0.1
     x["observation"]["pad_mask"] = jnp.array([1, 1])
+    x["next_observation"]["pad_mask"] = jnp.array([1, 1])
     del x["reward"]
     return x
 
@@ -331,17 +334,25 @@ def is_batch(x, batch_size):
     return sz
 
 
-def octo_dataset(batch_size):
+def octo_dataset(batch_size, online_dataset=None):
     HOME = os.environ["HOME"]
-    dataset = ["sunny-eon-12"]
+    dataset = ["fulldl"]
+    # dataset = ["sunny-eon-12"]
+    
+    if online_dataset is not None:
+        dataset.append(str(online_dataset))
+        
+    print(dataset)
+    
     exp_root = [osp.join(HOME, "improve_logs", x) for x in dataset]
 
     # dnames = [osp.join(e, "eval") for e in exp_root]
     dnames = [osp.join(e, "train") for e in exp_root]
+    dnames = exp_root
     fnames = list(find_tarballs(dnames))
+    # fnames = [f for f in fnames if "pt" in f]
     print(fnames)
-    fnames = [f for f in fnames if "pt" in f]
-
+    
     dataset = wds.DataPipeline(
         # wds.SimpleShardList(fnames),
         # use resampled shards if you want to loop the dataset
@@ -412,7 +423,7 @@ class MyTrainState:
 
 # @hydra.main(config_path=improve.CONFIG, config_name="config", version_base="1.3.2")
 def main():
-
+    log_path = osp.join(osp.expanduser("~"), "improve_logs")
     print("Using wandb")
     wrun = wandb.init(
         project="awac",

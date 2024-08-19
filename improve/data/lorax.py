@@ -119,7 +119,7 @@ def unscale(action):
     out = (action - mean[None]) / std[None]
     return out
 
-
+import copy
 def preprocess(x: dict):
     proc = {
         "mp4": decord2mp4,
@@ -131,14 +131,20 @@ def preprocess(x: dict):
 
     x = {k: _process(k, v) for k, v in x.items()}
     x = {".".join(k.split(".")[:-1]): v for k, v in x.items()}
-    x = du.nest(x, delim=".")
+    # x = du.nest(x, delim=".")
+    
+    x['state']['obs']['simpler-img'] = x['obs']
+    x['state']['next_obs']['simpler-img'] = x['next_obs']
+    
+    del x['obs']
+    del x['next_obs']
 
     if "infos" not in x:
         x["infos"] = [None]
 
-    x["state"]["obs"].update(**x["obs"])
-    x["state"]["next_obs"].update(**x["next_obs"])
-    x["state"]["infos"] = x["infos"]
+    # x["state"]["obs"].update(**x["obs"])
+    # x["state"]["next_obs"].update(**x["next_obs"])
+    # x["state"]["infos"] = x["infos"]
     x = x["state"]
     x = du.apply(x, lambda x: x.numpy() if isinstance(x, torch.Tensor) else x)
 
@@ -155,7 +161,6 @@ def preprocess(x: dict):
     actions = unscale(actions)
     x["actions"] = actions
 
-    # return x
     return (
         filter_keys(x["obs"]),
         filter_keys(x["next_obs"]),

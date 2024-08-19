@@ -37,9 +37,9 @@ def mk_octo_adv_loss(model, beta):
 
 
 @lorax.lora
-def octo_adv_loss_fn(params, batch, rng, train, model, beta, dist_fn=jnp.exp):
+def octo_adv_loss_fn(params, batch, rng, train, model, beta, update_step, dist_fn=jnp.exp):
     bound = model.module.bind({"params": params}, rngs={"dropout": rng})
-
+    
     embeds = bound.octo_transformer(
         batch["observation"],
         batch["task"],
@@ -68,14 +68,17 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta, dist_fn=jnp.exp):
 
     def toval(x):
         return bound.heads["value"](embeds, x, train=False)
+        # return bound.heads["value"](embeds, x, train=False)[0]
 
     candidates = rearrange(candidates, "s b d w p a -> (s d) b w p a")
 
     values = jax.vmap(toval)(candidates)  # (60, 64, 2, 4, 1)
+    values = values.mean(-1, keepdims=True) # (60, 64, 2, 4, 1)
     values = values.squeeze(-1).mean(-1)[:, :, -1]  # (60,64)
 
     chunked = chunk_actions(batch["action"], bound.heads["action"].pred_horizon)
     q = bound.heads["value"](embeds, chunked, train=False)
+    q = q.mean(-1, keepdims=True)
     q = q.squeeze(-1).mean(-1)[:, -1]  # (64)
 
     action_metrics["q"] = q.mean()
@@ -93,13 +96,35 @@ def octo_adv_loss_fn(params, batch, rng, train, model, beta, dist_fn=jnp.exp):
     action_metrics["awac"] = action_loss
     # reduced by advantage_loss with sum since softmax advantages sum to 1
 
+    ### TODO: for QRDQN critic
+    next_embeds = bound.octo_transformer(
+        batch["next_observation"],
+        batch["task"],
+        batch["next_observation"]["pad_mask"],
+        train=False,
+    )
+    
     value_loss, value_metrics = bound.heads["value"].loss(
         embeds,
+        next_embeds,
         actions=batch["action"],
-        values=batch["value"],
+        rewards=batch["value"],
+        dones=jnp.expand_dims(batch["done"], axis=-1),
+        gamma=0.99,
+        delta=1.0,
         pad_mask=batch["observation"]["pad_mask"],
         train=train,
     )
+    
+    jax.lax.cond(update_step % 100 == 0, bound.heads["value"].update_target_network, lambda _: None, 0.005)
+    
+    # value_loss, value_metrics = bound.heads["value"].loss(
+    #     embeds,
+    #     actions=batch["action"],
+    #     values=batch["value"],
+    #     pad_mask=batch["observation"]["pad_mask"],
+    #     train=train,
+    # )
 
     loss = action_loss + value_loss
     metrics = {"action": action_metrics, "value": value_metrics}
@@ -230,6 +255,11 @@ def diffusion_loss(
     loss = loss * head.action_dim
     metrics["loss"] = metrics["loss"] * head.action_dim
     metrics["mse"] = metrics["mse"] * head.action_dim
+    
+    mean = rearrange(
+        pred_eps, "b w (p a) -> b w p a", p=head.pred_horizon, a=head.action_dim
+    ) 
+    metrics["true_mean"] = actions_chunked
     return loss, metrics
 
 
