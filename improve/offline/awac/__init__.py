@@ -259,7 +259,6 @@ def diffusion_loss(
     mean = rearrange(
         pred_eps, "b w (p a) -> b w p a", p=head.pred_horizon, a=head.action_dim
     ) 
-    metrics["predicted_mean"] = jnp.tanh(mean)
     metrics["true_mean"] = actions_chunked
     return loss, metrics
 

@@ -422,9 +422,9 @@ class DiscreteCriticHead(nn.Module, CriticHead):
         actions = chunk_actions(actions, self.pred_horizon)
         
         pred_quantiles = self(transformer_outputs, actions, train=train)
-        tgt_quantiles = self(next_transformer_outputs, actions, train=False, main=False)
-
-        tgt_quantiles = rewards + gamma * (1 - dones) * tgt_quantiles   # MC reward means don't use this
+        # tgt_quantiles = self(next_transformer_outputs, actions, train=False, main=False)
+        
+        tgt_quantiles = jnp.repeat(rewards, self.quantiles, -1) #+ gamma * (1 - dones) * tgt_quantiles   # MC reward means don't use this
         tau = jnp.linspace(0.0, 1.0, self.quantiles)
 
         u = tgt_quantiles - pred_quantiles

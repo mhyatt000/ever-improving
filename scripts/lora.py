@@ -7,6 +7,7 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import flax
 import flax.linen as nn
 import gymnasium as gym
+from improve.offline.action_heads import chunk_actions
 import improve.wrapper.dict_util as du
 import jax
 import jax.numpy as jnp
@@ -414,7 +415,7 @@ def mk_envs(n_envs=cfg.inference_size):
 
     venv.seed(0)
     venv.reset()
-    log_dir = osp.join(cfg.log_path, wandb.run.name) 
+    log_dir = osp.join(cfg.log_path, wandb.run.name) if wandb.run else "debug" 
     eval_env = W.VecRecord(venv, osp.join(log_dir, "eval"), use_wandb=True)
     venv = W.VecRecord(venv, osp.join(log_dir, "train"), use_wandb=True)
     return venv, eval_env
@@ -438,6 +439,7 @@ class EvalCallback:
 
         rewards = np.zeros(cfg.inference_size)
         lengths = np.zeros(cfg.inference_size, dtype="int")
+        chunked_actions = []
         obs = self.venv.reset()  # venv reset has no info
 
         obs = self.transform(obs) if self.transform is not None else obs
@@ -458,10 +460,11 @@ class EvalCallback:
                     raw, actions = self.oxes(actions)
 
                 actions = self.rescaler.dict2act(actions)
+                chunked_actions.append(chunk_actions(actions[np.newaxis, :], 4)) # pred horizon
 
                 # names = ["x", "y", "z", "yaw", "pitch", "roll", "gripper"]
-                # for i, n in enumerate(names):
-                # wandb.log({f"pred/{n}": wandb.Histogram(actions[:, i])})
+                # for j, n in enumerate(names):
+                #     wandb.log({f"pred/{n}": wandb.Histogram(chunked_actions[:, :, :, j])}, step=i)
 
                 obs, rew, done, info = self.venv.step(actions)
                 obs = self.transform(obs) if self.transform is not None else obs
@@ -474,8 +477,8 @@ class EvalCallback:
 
                 bar.set_description(f"rewards: {rewards.sum()}")
                 bar.update()
-
-        stats = {"SR": rewards.mean(), "length": lengths.mean()}
+                
+        stats = {"SR": rewards.mean(), "length": lengths.mean(), "pred_actions": np.concatenate(chunked_actions, axis=0)}
         return stats
     
     
@@ -746,13 +749,14 @@ def main():
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE
-    lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0))
+    
+    lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0)) #alpha=32)
     # target_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(1))
 
     # TODO: lower lr - original lr 3e-4
     lrschedule = optax.cosine_decay_schedule(3e-4, cfg.train_steps)
     # learning_rate = optax.join_schedules( [optax.linear_schedule(0, 3e-5, 100), optax.constant_schedule(3e-5)], [100])
-    tx = optax.adamw(learning_rate=lrschedule, weight_decay=1e-4, mu_dtype=jnp.bfloat16, alpha=1/32)    # originall 1e-4
+    tx = optax.adamw(learning_rate=lrschedule, weight_decay=1e-4, mu_dtype=jnp.bfloat16)    # originall 1e-4
     if cfg.grad_acc:
         tx = optax.MultiSteps(tx, cfg.grad_acc)
     if cfg.grad_clip is not None:
@@ -924,25 +928,13 @@ def main():
     #
     #
     
-    def wandb_plot_actions(train_info, i):
-        keys = [("action", "predicted_mean", "pred"), 
-                        ("action", "true_mean", "true"), 
-                        ("value", "predicted_val", "pred"), 
-                        ("value", "true_val", "true")]
-
-        names = ["x", "y", "z", "yaw", "pitch", "roll", "gripper"]
-        
-        for key, subkey, name in keys:
-            values = train_info[key][subkey]
-            del train_info[key][subkey]
-            
-            if key == "action":
-                for k, n in enumerate(names):
-                    wandb.log({f"stats/{name}/{n}": wandb.Histogram(values[:, :, :, k])}, step=i)
-            else:
-                wandb.log({f"stats/{name}/val": wandb.Histogram(values)}, step=i)
-
     timer = Timer()
+    
+    keys = [("action", "true_mean", "true"), 
+            ("value", "predicted_val", "pred"),
+            ("value", "true_val", "true")]
+
+    names = ["x", "y", "z", "yaw", "pitch", "roll", "gripper"]
 
     # run finetuning loop
     logging.info("Starting finetuning...")
@@ -976,9 +968,22 @@ def main():
                 with timer("rollout"):
                     evals = evalcallback(i)
                     evals = {"eval": evals}
-
-            
-            wandb_plot_actions(train_info, i)
+                    
+                    for k, n in enumerate(names):
+                        wandb.log({f"stats/pred/{n}": wandb.Histogram(evals["eval"]["pred_actions"][:, :, :, k])}, step=i)
+                    
+                    del evals["eval"]["pred_actions"]
+                
+            for key, subkey, name in keys:
+                values = train_info[key][subkey]
+                del train_info[key][subkey]
+                
+                if (i + 1) % 100 == 0:
+                    if key == "action":
+                        for k, n in enumerate(names):
+                            wandb.log({f"stats/{name}/{n}": wandb.Histogram(values[:, :, :, k])}, step=i)
+                    else:
+                        wandb.log({f"stats/{name}/val": wandb.Histogram(values)}, step=i)
 
             info = {
                 "training": train_info,
