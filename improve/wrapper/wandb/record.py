@@ -252,7 +252,7 @@ class VecRecord(VecEnvWrapper):
 
     def flush(self, i):
 
-        print(f"flushing {i}")
+        # print(f"flushing {i}")
 
         ep = self.episodes[i]
 
@@ -328,7 +328,7 @@ class VecRecord(VecEnvWrapper):
         if self.use_wandb:
             caption = f"ep_id={id} | reward={sum(rewards)} | {'success' if sum(rewards) > 0 else 'failure'}"
             videos = {
-                f"videos/obs.vid": wandb.Video(
+                f"videos/simpler.vid": wandb.Video(
                     frames.transpose(0, 3, 1, 2),
                     fps=5,
                     caption=caption,

@@ -1,4 +1,4 @@
-import os.path as osp
+# import os.path as osp
 from dataclasses import asdict, dataclass
 from functools import partial
 from pprint import pprint
@@ -10,33 +10,33 @@ import gymnasium as gym
 import improve.wrapper.dict_util as du
 import jax
 import jax.numpy as jnp
-import lorax
+# import lorax
 import numpy as np
 import optax
-import qax
+# import qax
 import simpler_env as simpler
 import tensorflow as tf
-import wandb
 from absl import app, flags, logging
 from flax import struct
-from improve import cn, lora_octo
+# from improve import cn, lora_octo
 from improve.env.action_rescale import ActionRescaler
 from improve.offline.awac import mk_model_step, mk_octo_adv_loss
 from improve.offline.critic_heads import MSECriticHead
 from improve.util.config import default
 from jax.experimental import multihost_utils
 from jax.sharding import Mesh, NamedSharding, PartitionSpec
-from tqdm import tqdm
-
 from octo.data.dataset import make_single_dataset
 from octo.data.utils.data_utils import NormalizationType
-from octo.model.components.action_heads import L1ActionHead, MSEActionHead 
+from octo.model.components.action_heads import L1ActionHead, MSEActionHead
 from octo.model.octo_model import OctoModel
 from octo.utils.jax_utils import initialize_compilation_cache
 from octo.utils.spec import ModuleSpec
 from octo.utils.train_utils import (Timer, TrainState, freeze_weights,
                                     merge_params, process_text)
 from octo.utils.typing import Config, Data, Params, PRNGKey
+from tqdm import tqdm
+
+import wandb
 
 """
 This script demonstrates how to finetune Octo to a new observation space (single camera + proprio)
@@ -367,10 +367,9 @@ def mk_envs(n_envs=cfg.inference_size):
     import gymnasium as gym
     import improve.wrapper as W
     from improve.fm.batch_octo import BatchedOctoInference
+    from octo.utils import gym_wrappers as GW
     from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
                                                   VecMonitor, VecVideoRecorder)
-
-    from octo.utils import gym_wrappers as GW
 
     def _init() -> gym.Env:
 

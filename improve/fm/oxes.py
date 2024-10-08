@@ -6,12 +6,11 @@ import jax
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from improve.fm.batch_octo import BatchedActionEnsembler
 from octo.model.octo_model import OctoModel
 from simpler_env.utils.action.action_ensemble import ActionEnsembler
 from transformers import AutoTokenizer
 from transforms3d.euler import euler2axangle
-
-from improve.fm.batch_octo import BatchedActionEnsembler
 
 
 class PolicyStepper:
@@ -317,7 +316,11 @@ class OXESimplerInference:
         batch = {"observation": {"image_primary": images, "pad_mask": pad_mask}}
         norm_raw_actions = self.stepper(batch, rng=self.rng, key=key)
 
-        assert norm_raw_actions.shape == (self.batch_size, self.pred_action_horizon, 7)
+        assert norm_raw_actions.shape == (
+            self.batch_size,
+            self.pred_action_horizon,
+            7,
+        ), f"norm_raw_actions.shape: {norm_raw_actions.shape} does not match expected shape ({self.batch_size}, {self.pred_action_horizon}, 7)"
 
         if self.action_ensemble:
             norm_raw_actions = self.action_ensembler.ensemble_action(norm_raw_actions)
